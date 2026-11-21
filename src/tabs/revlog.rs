@@ -155,13 +155,16 @@ impl Revlog {
 		&mut self,
 		ev: AsyncGitNotification,
 	) -> Result<()> {
+		// search results must land even while the tab is hidden
+		if ev == AsyncGitNotification::CommitFilter {
+			self.update_search_state();
+			return Ok(());
+		}
+
 		if self.visible {
 			match ev {
 				AsyncGitNotification::CommitFiles
 				| AsyncGitNotification::Log => self.update()?,
-				AsyncGitNotification::CommitFilter => {
-					self.update_search_state();
-				}
 				AsyncGitNotification::Tags => {
 					if let Some(tags) = self.git_tags.last()? {
 						self.list.set_tags(tags);

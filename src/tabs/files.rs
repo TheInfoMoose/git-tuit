@@ -51,9 +51,8 @@ impl FilesTab {
 		&mut self,
 		ev: AsyncNotification,
 	) -> Result<()> {
-		if self.is_visible() {
-			self.files.update(ev)?;
-		}
+		// async results must land even while the tab is hidden
+		self.files.update(ev)?;
 
 		Ok(())
 	}
