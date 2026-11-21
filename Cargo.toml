@@ -33,7 +33,6 @@ bitflags = "2.10"
 bugreport = "0.5.1"
 bwrap = { version = "1.3", features = ["use_std"] }
 bytesize = { version = "2.3", default-features = false }
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
 clap = { version = "4.5", features = ["cargo", "env"] }
 crossbeam-channel = "0.5"
 crossterm = { version = "0.29", features = ["serde"] }
@@ -76,7 +75,6 @@ tempfile = "3"
 
 [build-dependencies]
 jiff = "0.2"
-chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [badges]
 maintenance = { status = "actively-developed" }
