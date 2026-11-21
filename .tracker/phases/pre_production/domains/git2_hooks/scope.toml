@@ -19,14 +19,14 @@ features = []
 [[items.bugs]]
 id = "BUG-0018"
 title = "Harden hook path expansion, name traversal and exec checks"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0019"
 title = "Add option terminator to sh hook fallback"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 

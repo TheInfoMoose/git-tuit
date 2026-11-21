@@ -2,11 +2,11 @@
 id = "BUG-0031"
 type = "bug"
 title = "Create log file 0600 and refuse symlinks"
-status = "open"
+status = "closed"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:39Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T18:13:23Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "08f7022b"
+summary = "STEP 4I creates the trace log 0600 and refuses symlinks; existing-file mode follow-up is BUG-0061"

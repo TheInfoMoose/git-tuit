@@ -42,7 +42,9 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 4 goal:** close the places where gitui is looser than git or plainly unsafe with credentials, hooks, signing keys, editor launch, clipboard and its own log file, under the git-parity threat model (see Phase 4 section). Repo-local config stays trusted as in git.
+**Phase 5 goal:** no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete. P2-08 (extra confirm dialogs for revert/merge/rebase/detached checkout/submodule update) moves to Phase 6.
+
+_Phase 4 goal (done, reviewed 2026-11-21):_ closed the places where gitui was looser than git or unsafe with credentials, hooks, signing keys, editor launch, clipboard and its own log file (git-parity threat model).
 
 _Phase 3 goal (done, reviewed 2026-11-21):_ clippy --workspace --all-targets -D warnings and cargo test --workspace pass reliably; cargo-deny fails on transitive unsound crates; Linux-only CI landed (2K).
 
@@ -54,17 +56,18 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 4A** | `/goal` | Credential URL checks (http scheme, push URL, control chars) | `asyncgit/src/sync/cred.rs` | — |
-| 2 | **STEP 4B** | `/goal` | fetch_all keeps credentials on their host | `asyncgit/src/sync/remotes/mod.rs` | — |
-| 3 | **STEP 4D** | `/goal` | Hook path: ~ only, regular files, `--` | `git2-hooks/src/hookspath.rs` | — |
-| 4 | **STEP 4E** | `/goal` | SSH key:: literals of any type | `asyncgit/src/sync/sign.rs` | — |
-| 5 | **STEP 4F** | `/goal` | No writes through symlinks on discard | `asyncgit/src/sync/utils.rs` | — |
-| 6 | **STEP 4G** | `/boost` | Editor via sh -c, exit status, no drop-guard panic | `src/popups/externaleditor.rs` | — |
-| 7 | **STEP 4H** | `/goal` | Clipboard lookup and OSC 52 flush | `src/clipboard.rs` | — |
-| 8 | **STEP 4I** | `/goal` | Trace log 0600, no symlink | `src/args.rs` | — |
-| 9 | **STEP 4J** | `/goal` | Credential prompt clears both inputs | `src/components/cred.rs` | — |
-| 10 | **STEP 4K** | `/goal` | commit.template expands ~ only | `src/popups/commit.rs` | — |
-| 11 | **STEP 4C** | `/goal` | Redact passwords in Debug and logs | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/remotes/callbacks.rs` | — |
+| 1 | **STEP 5A** | `/boost` | Error boundaries in App (no more TUI exit on handler errors) | `src/app.rs` | — |
+| 2 | **STEP 5J** | `/goal` | Reset/checkout popups open on the safe option | `src/popups/reset.rs`, `src/popups/checkout_option.rs` | — |
+| 3 | **STEP 5K** | `/goal` | File discard prompt names the path, warns about untracked | `src/popups/confirm.rs`, `src/strings.rs` | — |
+| 4 | **STEP 5L** | `/goal` | Tighten an existing trace log to 0600 | `src/args.rs` | — |
+| 5 | **STEP 5B** | `/boost` | Delete the right remote branch | `src/app.rs`, `src/popups/push.rs` | — |
+| 6 | **STEP 5C** | `/goal` | Tag delete without remote, stage-remove-all errors | `src/app.rs`, `src/components/changes.rs` | — |
+| 7 | **STEP 5D** | `/goal` | Tree underflow panics | `filetreelist/src/filetreeitems.rs`, `src/components/utils/statustree.rs` | — |
+| 8 | **STEP 5E** | `/goal` | Commit list and status tree panics | `src/components/commitlist.rs`, `src/components/status_tree.rs`, `src/components/utils/filetree.rs` | — |
+| 9 | **STEP 5F** | `/goal` | Tag, blame and remote list panics | `src/popups/taglist.rs`, `src/popups/blame_file.rs`, `src/popups/remotelist.rs` | — |
+| 10 | **STEP 5G** | `/goal` | Branch list status error instead of panic | `src/popups/branchlist.rs` | — |
+| 11 | **STEP 5H** | `/goal` | Cancelling credentials cancels push/push-tags | `src/popups/push.rs`, `src/popups/push_tags.rs` | — |
+| 12 | **STEP 5I** | `/goal` | Cancel and preflight errors in pull/fetch | `src/popups/pull.rs`, `src/popups/fetch.rs` | — |
 
 ### Completed
 
@@ -95,6 +98,17 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 3K | ↪ withdrawn | `/goal` | Deferred (PRE_GATE waited on 3I); re-queued as STEP 3M | `src/ui/reflow.rs`, `src/keys/key_config.rs` |
 | STEP 3L | ✅ d9580191 | `/boost` | GIT_DIR test in a child process, GNUPGHOME guard (re-queued 3I) | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` |
 | STEP 3M | ✅ 6c7855d3 | `/goal` | gitui clippy: reflow, key_config; full gate green (re-queued 3K) | `src/ui/reflow.rs`, `src/keys/key_config.rs` |
+| STEP 4A | ✅ 90a3db8d | `/goal` | Credential URL checks | `asyncgit/src/sync/cred.rs` |
+| STEP 4B | ✅ 60bf599e | `/goal` | fetch_all keeps credentials on their host | `asyncgit/src/sync/remotes/mod.rs` |
+| STEP 4D | ✅ 4b8e56a1 | `/goal` | Hook path: ~ only, regular files, `--` | `git2-hooks/src/hookspath.rs` |
+| STEP 4E | ✅ ffe74ceb | `/goal` | SSH key:: literals of any type | `asyncgit/src/sync/sign.rs` |
+| STEP 4F | ✅ 80c47289 | `/goal` | No writes through symlinks on discard | `asyncgit/src/sync/utils.rs` |
+| STEP 4G | ✅ 6e10b62e | `/boost` | Editor via sh -c, exit status, no drop-guard panic | `src/popups/externaleditor.rs` |
+| STEP 4H | ✅ 1b5a5b07 | `/goal` | Clipboard lookup and OSC 52 flush | `src/clipboard.rs` |
+| STEP 4I | ✅ 08f7022b | `/goal` | Trace log 0600, no symlink | `src/args.rs` |
+| STEP 4J | ✅ f7995523 | `/goal` | Credential prompt clears both inputs | `src/components/cred.rs` |
+| STEP 4K | ✅ 8dc7eadb | `/goal` | commit.template expands ~ only | `src/popups/commit.rs` |
+| STEP 4C | ✅ 8d452264 | `/goal` | Redact passwords in Debug and logs | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/remotes/callbacks.rs` |
 
 ### User Step: IMAGE
 
@@ -128,15 +142,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 5 — Crashes and data loss.** Goal: no handler error exits the TUI, no audited panic remains, and no destructive action runs without a correct target and confirmation.
-  - Delete the right remote branch (P1-22)
-  - Fatal `?` → error popups (P1-23, 3 steps)
-  - Underflow/OOB/`expect` panics (P1-24, 4 steps)
-  - Credential-prompt cancel aborts push/pull/fetch; preflight modal lockup (P2-10, 2 steps)
-  - Sticky hard-reset/discard defaults (P2-06)
-  - Confirm prompts name targets and warn on untracked deletes (P2-07)
-  - Confirms for revert, merge, rebase, detached checkout, submodule update (P2-08, 2 steps)
-- **Phase 6 — Usability and modal flow.** Goal: popups take events in draw order, nothing leaks keys or gets stuck, errors are shown. P2-09, P2-11..P2-23, one finding (or half of one) per step, ≤3 files each (~14 steps).
+- **Phase 6 — Usability and modal flow.** Goal: popups take events in draw order, nothing leaks keys or gets stuck, errors are shown. P2-08 (moved from Phase 5), P2-09, P2-11..P2-23, P2-21 error getters, one finding (or half of one) per step, ≤3 files each (~14 steps).
 - **Phase 7 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
@@ -2191,6 +2197,510 @@ true
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'shellexpand::full' src/popups/commit.rs && grep -qF 'shellexpand::tilde(path.as_str())' src/popups/commit.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+## Phase 5: Crashes and data loss
+
+**Snippets in this phase show intent and shape.** Crates deny `clippy::all, pedantic, nursery`. If clippy rejects a snippet's exact shape (for example `option_if_let_else`), use the form clippy suggests and keep the behavior. The POST_GATE markers are short fixed strings chosen to survive that and rustfmt's `max_width = 70`.
+
+**Order matters:** 5A adds the error boundaries in `App`; later steps (5G and others) rely on them to turn a returned `Err` into an error popup instead of exiting the TUI.
+
+### STEP 5A: Error Boundaries in App
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 5A: Stop a failing internal event or component key handler from exiting gitui: catch the error per event, show it in the error popup, and keep the editor-launch path from leaving input polling switched off.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+READ_ONLY_REFS:
+  - src/app.rs:722-737 (`fn process_internal_events`: `flags.insert(self.process_internal_event(e)?);` inside `loop { let front = self.queue.pop(); ... }`)
+  - src/app.rs:306-317 (`pub fn event`: `if event_pump(&ev, self.components_mut().as_mut_slice())?.is_consumed() {`)
+  - src/app.rs:370-397 (InputState::Paused branch: `let changes = self.status_tab.get_files_changes()?; self.commit_popup.show_editor(changes)` then `if let Err(e) = result { ... }` then `self.input.set_polling(true);`)
+  - src/gitui.rs:123 (`self.app.event(ev)?;` — any Err returned from App::event ends the program)
+  - Audit P1-23: RewordCommit on a dirty repo, Push/PushTags with no remote, ResetHunk/ResetLines failures, stage_remove_all, get_stashes, amend and get_files_changes all reach `?` here today and quit the TUI.
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change process_internal_event's or process_confirmed_action's bodies in this step.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. process_internal_events: replace `flags.insert(self.process_internal_event(e)?);` with an error boundary:
+				let is_error_msg =
+					matches!(e, InternalEvent::ShowErrorMsg(_));
+				let result = self.process_internal_event(e);
+				if let Err(err) = &result {
+					log::error!("internal event failed: {err:?}");
+					if !is_error_msg {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!("{err}"),
+						));
+					}
+				}
+				flags.insert(result.unwrap_or_else(|_| NeedsUpdate::ALL));
+   Why: one failing event used to abort the loop and the program. `is_error_msg` stops a failing error popup from re-queueing itself forever.
+2. App::event: replace `event_pump(&ev, self.components_mut().as_mut_slice())?` with a call whose error is caught the same way: on Err, `log::error!`, push `InternalEvent::ShowErrorMsg(format!("{err}"))`, and treat the event as consumed (`flags.insert(NeedsUpdate::ALL)`); the later `self.process_queue(flags)?` then shows the popup.
+3. InputState::Paused branch: move `get_files_changes()` into the result so its error goes to the existing `if let Err(e) = result` popup and `self.input.set_polling(true);` always runs:
+					} else {
+						self.status_tab
+							.get_files_changes()
+							.and_then(|changes| {
+								self.commit_popup.show_editor(changes)
+							})
+					};
+   (If the borrow checker rejects the closure, bind `let changes = self.status_tab.get_files_changes();` first and `match`/`and_then` on it.)
+4. Tests: none new (App needs a terminal); the full workspace gate is the check.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'flags.insert(self.process_internal_event(e)?)' src/app.rs && grep -qF 'matches!(e, InternalEvent::ShowErrorMsg(_))' src/app.rs && grep -qF 'internal event failed' src/app.rs && ! grep -qF 'self.status_tab.get_files_changes()?;' src/app.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5B: Delete the Right Remote Branch
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 5B: Deleting a remote branch whose name contains `/` (refs/remotes/upstream/feat/login) deletes `feat/login` on `upstream`, instead of `login` on whatever remote the push would pick.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/popups/push.rs
+READ_ONLY_REFS:
+  - src/app.rs:1060-1086 (`fn delete_remote_branch(&mut self, branch_ref: &str) -> Result<()>`: `branch_ref.rsplit('/').next()` → `InternalEvent::Push(name.to_string(), PushType::Branch, false, true)`, then `self.select_branch_popup.update_branches()?`)
+  - src/popups/branchlist.rs:679-690 (the action carries `BranchInfo::reference`, the full ref name, e.g. `refs/remotes/origin/feat/x`)
+  - src/popups/push.rs:91-125 (`pub fn push(&mut self, branch, push_type, force, delete) -> Result<()>`), push.rs `fn push_to_remote(...)`: remote = `get_branch_remote(..)` upstream, else `get_default_remote_for_push(..)`
+  - asyncgit::sync::get_remotes(repo_path) -> Result<Vec<String>> (asyncgit/src/sync/remotes/mod.rs:86)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep `PushPopup::push`'s signature and the InternalEvent::Push variant unchanged.
+
+[PRE_GATE]
+grep -qF 'internal event failed' src/app.rs
+
+[MUTATION_SPEC]
+1. app.rs: add a free function
+	/// split `refs/remotes/<remote>/<branch>` into (remote, branch),
+	/// matching the longest configured remote name (remote and branch
+	/// names may both contain `/`)
+	fn split_remote_branch_ref<'a>(
+		branch_ref: &'a str,
+		remotes: &[String],
+	) -> Option<(String, &'a str)> {
+		let rest = branch_ref.strip_prefix("refs/remotes/")?;
+		remotes
+			.iter()
+			.filter(|r| {
+				rest.len() > r.len() + 1
+					&& rest.starts_with(r.as_str())
+					&& rest.as_bytes()[r.len()] == b'/'
+			})
+			.max_by_key(|r| r.len())
+			.map(|r| (r.clone(), &rest[r.len() + 1..]))
+	}
+2. app.rs delete_remote_branch: get remotes with `sync::get_remotes(&self.repo.borrow())`; on Err push ShowErrorMsg and return Ok(()). With `Some((remote, branch)) = split_remote_branch_ref(branch_ref, &remotes)` call `self.push_popup.delete_remote_branch(remote, branch.to_string())?`; on None push `InternalEvent::ShowErrorMsg(format!("Failed to find the remote and branch in {branch_ref}"))`. Keep `self.select_branch_popup.update_branches()?` at the end.
+3. push.rs: add a field `remote_override: Option<String>` (init `None`). Move the current body of `pub fn push(..)` into a private `fn start_push(&mut self, branch: String, push_type: PushType, force: bool, delete: bool) -> Result<()>`. New:
+	pub fn push(&mut self, branch: String, push_type: PushType, force: bool, delete: bool) -> Result<()> {
+		self.remote_override = None;
+		self.start_push(branch, push_type, force, delete)
+	}
+	/// delete `branch` on the given `remote` (not the upstream/default remote)
+	pub fn delete_remote_branch(&mut self, remote: String, branch: String) -> Result<()> {
+		self.remote_override = Some(remote);
+		self.start_push(branch, PushType::Branch, false, true)
+	}
+   In push_to_remote, use `self.remote_override.clone()` when it is Some, before the upstream/default lookup.
+4. Tests, in a new `#[cfg(test)] mod tests { use super::split_remote_branch_ref; ... }` at the end of app.rs:
+	#[test]
+	fn test_split_remote_branch_ref() {
+		let remotes = vec![String::from("origin"), String::from("upstream"), String::from("team/fork")];
+		assert_eq!(split_remote_branch_ref("refs/remotes/upstream/feat/login", &remotes), Some((String::from("upstream"), "feat/login")));
+		assert_eq!(split_remote_branch_ref("refs/remotes/origin/main", &remotes), Some((String::from("origin"), "main")));
+		assert_eq!(split_remote_branch_ref("refs/remotes/team/fork/x/y", &remotes), Some((String::from("team/fork"), "x/y")));
+		assert_eq!(split_remote_branch_ref("refs/remotes/unknown/main", &remotes), None);
+		assert_eq!(split_remote_branch_ref("refs/heads/main", &remotes), None);
+		assert_eq!(split_remote_branch_ref("refs/remotes/origin/", &remotes), None);
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF "branch_ref.rsplit('/')" src/app.rs && grep -qE '\bfn split_remote_branch_ref\b' src/app.rs && grep -qE '\bfn test_split_remote_branch_ref\b' src/app.rs && grep -qE '\bpub fn delete_remote_branch\(' src/popups/push.rs && grep -qF 'remote_override' src/popups/push.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5C: Tag Delete Without a Remote, Stage-Remove-All Errors
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5C: After a local tag delete, always refresh the tag list and only ask about deleting the remote tag when a default remote exists; show a stage-remove-all failure as an error popup and don't announce a file move that didn't happen.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/components/changes.rs
+READ_ONLY_REFS:
+  - src/app.rs:1041-1058 (`fn delete_tag`: `let remote = sync::get_default_remote(&self.repo.borrow())?;` then ConfirmAction(DeleteRemoteTag) then `self.tags_popup.update_tags()?;` — with no remote the `?` skips the tag-list refresh)
+  - src/components/changes.rs:266-279 (`} else { self.stage_remove_all()?; } self.queue.push(InternalEvent::StatusLastFileMoved);`; the working-dir branch already uses `try_or_popup!(self, "staging all error:", self.index_add_all())`)
+  - `try_or_popup!` macro: src/components/utils/mod.rs:13-26
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qE '\bfn split_remote_branch_ref\b' src/app.rs
+
+[MUTATION_SPEC]
+1. app.rs delete_tag, success branch: call `self.tags_popup.update_tags()?;` first, then `if let Ok(remote) = sync::get_default_remote(&self.repo.borrow()) { self.queue.push(InternalEvent::ConfirmAction(Action::DeleteRemoteTag(tag_name, remote))); }`.
+2. changes.rs: replace `self.stage_remove_all()?;` with `try_or_popup!(self, "unstaging all error:", self.stage_remove_all());`.
+3. changes.rs: push `InternalEvent::StatusLastFileMoved` only when the stage/unstage call succeeded. Restructure so each branch computes `let ok = <call>.is_ok()` (logging/popup on Err as try_or_popup! does) and push StatusLastFileMoved `if ok`. If that's cleaner with a small helper, add one in changes.rs.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'sync::get_default_remote(&self.repo.borrow())?' src/app.rs && grep -qF 'if let Ok(remote) = sync::get_default_remote(' src/app.rs && ! grep -qF 'self.stage_remove_all()?;' src/components/changes.rs && grep -qF '"unstaging all error:"' src/components/changes.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5D: Tree Underflow Panics
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5D: Remove the u8 underflow in filetreelist's show_element when the selected item sits at indent 0, and the usize underflow in StatusTree::selection_updown's search loop.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - filetreelist/src/filetreeitems.rs
+  - src/components/utils/statustree.rs
+READ_ONLY_REFS:
+  - filetreelist/src/filetreeitems.rs:214-222 and :254-262 (`} else if item.info().indent() == current_folder.1 - 1 {` and `if item.info().indent() == current_folder.1 - 1 {`; `current_folder.1` is a u8 indent, 0 for top-level items → debug-build panic, wrap in release)
+  - src/components/utils/statustree.rs:209-238 (selection_updown: `let mut cur_index_find = current_index;` … loop … `if current_index == 0 { current_index_in_available_selections = 0; break; }` then `cur_index_find -= 1;` — the guard tests the wrong variable, so cur_index_find underflows when the selection isn't in available_selections)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change which items are shown/selected for valid input.
+
+[PRE_GATE]
+grep -qF 'internal event failed' src/app.rs
+
+[MUTATION_SPEC]
+1. filetreeitems.rs, both sites: `item.info().indent() == current_folder.1 - 1` → `current_folder.1.checked_sub(1) == Some(item.info().indent())`.
+2. statustree.rs selection_updown: `if current_index == 0 {` → `if cur_index_find == 0 {` (the comment "This should never happen" stays).
+3. Tests:
+   - filetreeitems.rs tests module: `test_show_element_top_level_no_underflow` — build items from paths `["a.txt", "b/c.txt"]` with the module's existing constructor helpers, call the show-element path on the index of "a.txt" (indent 0), and assert it returns without panicking and "a.txt" is visible.
+   - statustree.rs tests module: `test_selection_updown_missing_index_no_underflow` — build a StatusTree from items `["a", "b/c"]` with the module's existing helpers, call `selection_updown` with a `current_index` that is not in `available_selections` (collapse "b" first so index of "b/c" is hidden), for both `up` and down, and assert no panic.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'current_folder.1 - 1' filetreelist/src/filetreeitems.rs && test "$(grep -cF 'current_folder.1.checked_sub(1)' filetreelist/src/filetreeitems.rs)" = 2 && grep -qF 'if cur_index_find == 0 {' src/components/utils/statustree.rs && grep -qE '\bfn test_show_element_top_level_no_underflow\b' filetreelist/src/filetreeitems.rs && grep -qE '\bfn test_selection_updown_missing_index_no_underflow\b' src/components/utils/statustree.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5E: Commit List and Status Tree Panics
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5E: Stop the commit list panicking when its selection is past the loaded commits, and the file trees panicking on paths that aren't valid UTF-8.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/commitlist.rs
+  - src/components/status_tree.rs
+  - src/components/utils/filetree.rs
+READ_ONLY_REFS:
+  - src/components/commitlist.rs:47 (`commits: IndexSet<CommitId>`), :277 (`entry == &self.commits[self.selection]`), :711 (`let commit = self.commits[self.selection];`) — IndexSet indexing panics when out of range (empty or shrunk list)
+  - src/components/status_tree.rs:174-178 (`Path::new(&status_item.path).file_name().and_then(std::ffi::OsStr::to_str).expect("invalid path.");`)
+  - src/components/utils/filetree.rs:213 (`String::from(c.to_str().expect("invalid path"))`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qF 'internal event failed' src/app.rs
+
+[MUTATION_SPEC]
+1. commitlist.rs:277: `entry == &self.commits[self.selection]` → `self.commits.get_index(self.selection) == Some(entry)`.
+2. commitlist.rs:711 selection_highlighted: get the commit with `self.commits.get_index(self.selection)` and return `false` when it is None.
+3. status_tree.rs:178: replace `.expect("invalid path.")` with `.unwrap_or(status_item.path.as_str())` (show the full path rather than panic).
+4. utils/filetree.rs:213: `String::from(c.to_str().expect("invalid path"))` → `c.to_string_lossy().into_owned()`.
+5. Test, in commitlist.rs's tests module: `test_selection_highlighted_empty_list` — build an empty CommitList the way the module's existing tests build one, set highlights to `Some` of any IndexSet, and assert `!list.selection_highlighted()`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'self.commits[self.selection]' src/components/commitlist.rs && ! grep -qF 'expect("invalid path' src/components/status_tree.rs && ! grep -qF 'expect("invalid path' src/components/utils/filetree.rs && grep -qE '\bfn test_selection_highlighted_empty_list\b' src/components/commitlist.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5F: Tag, Blame and Remote List Panics
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5F: Remove the empty-list underflows in the tag list and blame popup, the out-of-bounds blame line lookup, and the off-by-one in the remote list's selection check.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/taglist.rs
+  - src/popups/blame_file.rs
+  - src/popups/remotelist.rs
+READ_ONLY_REFS:
+  - src/popups/taglist.rs:391 (`self.tags.as_ref().map_or(0, |tags| tags.len() - 1);`)
+  - src/popups/blame_file.rs:329 (`let max_line = blame_result.lines().len() - 1;`), :706 (`.map_or(0, |file_blame| file_blame.lines().len() - 1)`), :788 (`file_blame.lines()[selected]`); :623 `lines()[line_number - 1]` is already guarded by `if line_number == 0` and stays
+  - src/popups/remotelist.rs:416-419 (`fn valid_selection`: `self.remote_names.len() >= self.selection as usize`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qF 'internal event failed' src/app.rs
+
+[MUTATION_SPEC]
+1. taglist.rs:391: `tags.len() - 1` → `tags.len().saturating_sub(1)`.
+2. blame_file.rs:329 and :706: `lines().len() - 1` → `lines().len().saturating_sub(1)`.
+3. blame_file.rs:788: `file_blame.lines()[selected].0.as_ref().map(|hunk| hunk.commit_id)` → `file_blame.lines().get(selected).and_then(|line| line.0.as_ref()).map(|hunk| hunk.commit_id)`.
+4. remotelist.rs valid_selection: `>=` → `>`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'tags.len() - 1' src/popups/taglist.rs && ! grep -qF 'lines().len() - 1' src/popups/blame_file.rs && ! grep -qF 'file_blame.lines()[selected]' src/popups/blame_file.rs && grep -qF 'self.remote_names.len() > self.selection as usize' src/popups/remotelist.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5G: Branch List Status Error Instead of Panic
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5G: Return the working-dir status error from switch_to_selected_branch (shown as an error popup by STEP 5A's boundary) instead of panicking, and guard its unchecked branch index.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/branchlist.rs
+READ_ONLY_REFS:
+  - src/popups/branchlist.rs:580-615 (`fn switch_to_selected_branch(&mut self) -> Result<()>`: `sync::status::get_status(..).expect("Could not get status");` then `let selected_branch = &self.branches[self.selection as usize];`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qF 'internal event failed' src/app.rs
+
+[MUTATION_SPEC]
+1. branchlist.rs:590: `.expect("Could not get status");` → `?;`.
+2. branchlist.rs switch_to_selected_branch: `let selected_branch = &self.branches[self.selection as usize];` → `let Some(selected_branch) = self.branches.get(self.selection as usize) else { return Ok(()); };`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'expect("Could not get status")' src/popups/branchlist.rs && grep -qF 'self.branches.get(self.selection as usize)' src/popups/branchlist.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5H: Cancelling Credentials Cancels Push and Push-Tags
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5H: Pressing Esc on the credential prompt during push or push-tags closes the popup instead of pushing with empty credentials.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/push.rs
+  - src/popups/push_tags.rs
+READ_ONLY_REFS:
+  - src/popups/push.rs:314-333 (`if self.input_cred.get_cred().is_complete() || !self.input_cred.is_visible() { self.push_to_remote(..)?; self.input_cred.hide(); }`)
+  - src/popups/push_tags.rs:236-255 (same shape, `self.push_to_remote(Some(..))?`)
+  - src/components/cred.rs hide() (STEP 4J): Esc hides the prompt and clears the credentials, so after Esc `is_complete()` is false and `is_visible()` is false
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qE '\bpub fn delete_remote_branch\(' src/popups/push.rs
+
+[MUTATION_SPEC]
+1. push.rs and push_tags.rs, in the cred-visible branch: split the condition —
+					if self.input_cred.get_cred().is_complete() {
+						<existing push_to_remote call>?;
+						self.input_cred.hide();
+					} else if !self.input_cred.is_visible() {
+						// credential prompt cancelled: don't push
+						self.hide();
+					}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF '|| !self.input_cred.is_visible()' src/popups/push.rs && ! grep -qF '|| !self.input_cred.is_visible()' src/popups/push_tags.rs && grep -qF "credential prompt cancelled: don't push" src/popups/push.rs && grep -qF "credential prompt cancelled: don't push" src/popups/push_tags.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5I: Cancelling Credentials and Preflight Errors in Pull and Fetch
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5I: Esc on the pull/fetch credential prompt closes the popup instead of fetching with empty credentials, and a preflight error (no remote, no upstream) closes the popup instead of leaving an un-closable modal.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/pull.rs
+  - src/popups/fetch.rs
+READ_ONLY_REFS:
+  - src/popups/pull.rs:70-87 (`pub fn fetch(&mut self, branch: String) -> Result<()>`: `self.show()?;` then `need_username_password_for_fetch(..)?` and the rest), pull.rs:261-273 (cred branch `is_complete() || !self.input_cred.is_visible()` → `self.fetch_from_remote(..)?`)
+  - src/popups/fetch.rs:62-80 (`pub fn fetch(&mut self) -> Result<()>`: `self.show()?;` then `need_username_password(..)?`), fetch.rs:174-185 (same cred condition → `self.fetch_all(..)`)
+  - Neither popup handles exit_popup itself, so once visible with nothing pending the user can't close it. app.rs:830 and :838 already turn their Err into an error popup.
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qF "credential prompt cancelled: don't push" src/popups/push.rs
+
+[MUTATION_SPEC]
+1. pull.rs and fetch.rs cred branch: same split as STEP 5H — `if self.input_cred.get_cred().is_complete() { <existing call>; self.input_cred.hide(); } else if !self.input_cred.is_visible() { // credential prompt cancelled: don't fetch` + `self.hide(); }`.
+2. pull.rs `pub fn fetch`: keep `self.branch = branch; self.show()?;`, move the rest into a private `fn start(&mut self) -> Result<()>`, and end with
+		let result = self.start();
+		if result.is_err() {
+			self.hide();
+		}
+		result
+3. fetch.rs `pub fn fetch`: same pattern (private `fn start(&mut self) -> Result<()>` holding everything after `self.show()?;`).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF '|| !self.input_cred.is_visible()' src/popups/pull.rs && ! grep -qF '|| !self.input_cred.is_visible()' src/popups/fetch.rs && grep -qF "credential prompt cancelled: don't fetch" src/popups/pull.rs && grep -qF "credential prompt cancelled: don't fetch" src/popups/fetch.rs && grep -qE '\bfn start\(&mut self\) -> Result<\(\)>' src/popups/pull.rs && grep -qE '\bfn start\(&mut self\) -> Result<\(\)>' src/popups/fetch.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5J: Reset and Checkout Popups Open on the Safe Option
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5J: Every time the reset popup or the checkout-option popup opens, start on the non-destructive choice (Soft reset / keep local changes) instead of whatever was picked last, including Hard or discard-all.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/reset.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - src/popups/reset.rs:60 (`kind: ResetType::Soft,` in new), :112-118 (`pub fn open(&mut self, id: CommitId) -> Result<()> { self.show()?; self.commit = Some(id); Ok(()) }`)
+  - src/popups/checkout_option.rs:44 (`option: CheckoutOptions::KeepLocalChanges,` in new), :80-86 (`pub fn open(&mut self, branch: BranchInfo) -> Result<()> { self.show()?; self.branch = Some(branch); Ok(()) }`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't add confirm dialogs here (that's P2-08, a later phase).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. reset.rs open: add `self.kind = ResetType::Soft;` before `self.show()?;`.
+2. checkout_option.rs open: add `self.option = CheckoutOptions::KeepLocalChanges;` before `self.show()?;`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(grep -cF 'self.kind = ResetType::Soft;' src/popups/reset.rs)" = 1 && test "$(grep -cF 'self.option = CheckoutOptions::KeepLocalChanges;' src/popups/checkout_option.rs)" = 1
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5K: File Discard Prompt Names the File and Warns About Untracked Files
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5K: The "Reset" confirmation for discarding a file or folder names the path and says untracked files are deleted permanently (sync::reset_workdir removes untracked files with force).
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/confirm.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - src/strings.rs:202-204 (`pub fn confirm_msg_reset() -> String { "confirm file reset?".to_string() }`; its only caller is confirm.rs:133)
+  - src/popups/confirm.rs:131-134 (`Action::Reset(_) => (strings::confirm_title_reset(), strings::confirm_msg_reset(),),`)
+  - src/queue.rs:38-41 (`pub struct ResetItem { pub path: String }`)
+  - asyncgit/src/sync/reset.rs:30-37 (reset_workdir: checkout with `.remove_untracked(true).force()`)
+  - src/strings.rs:1946 (`mod tests`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. strings.rs: change the signature to `pub fn confirm_msg_reset(path: &str) -> String` returning
+	format!("discard changes to '{path}'?\nuntracked files are deleted permanently and can't be recovered.")
+2. confirm.rs: `Action::Reset(_) =>` → `Action::Reset(item) =>` and pass `&item.path` to `strings::confirm_msg_reset`.
+3. Test, in strings.rs's tests module:
+	#[test]
+	fn test_confirm_msg_reset_names_path() {
+		let msg = confirm_msg_reset("src/main.rs");
+		assert!(msg.contains("'src/main.rs'"));
+		assert!(msg.contains("deleted permanently"));
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE 'pub fn confirm_msg_reset\(path: &str\)' src/strings.rs && ! grep -qF '"confirm file reset?"' src/strings.rs && grep -qF 'Action::Reset(item)' src/popups/confirm.rs && grep -qE '\bfn test_confirm_msg_reset_names_path\b' src/strings.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 5L: Tighten an Existing Trace Log to 0600
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 5L: When the `-l` trace log already exists, set its mode to 0600 too (STEP 4I's `OpenOptions::mode` only applies when the file is created).
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/args.rs
+READ_ONLY_REFS:
+  - src/args.rs `fn open_log_file(path: &Path) -> Result<File>` (STEP 4I, 08f7022b): symlink check, then `OpenOptions` with `.mode(0o600)` under `#[cfg(unix)]`, then `Ok(options.open(path)?)`
+  - src/args.rs tests module: test_open_log_file_mode_0600, test_open_log_file_refuses_symlink
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qE '\bfn open_log_file\(' src/args.rs
+
+[MUTATION_SPEC]
+1. open_log_file: open into `let file = options.open(path)?;`, then under `#[cfg(unix)]` call `file.set_permissions(fs::Permissions::from_mode(0o600))?;` (import `std::os::unix::fs::PermissionsExt` in that block), then `Ok(file)`.
+2. Test:
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_tightens_existing_mode() {
+		use std::os::unix::fs::PermissionsExt;
+		let dir = tempfile::tempdir().unwrap();
+		let path = dir.path().join("gitui.log");
+		fs::write(&path, "old").unwrap();
+		fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();
+		drop(open_log_file(&path).unwrap());
+		assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'Permissions::from_mode(0o600)' src/args.rs && grep -qE '\bfn test_open_log_file_tightens_existing_mode\b' src/args.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

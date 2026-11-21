@@ -2,11 +2,11 @@
 id = "BUG-0034"
 type = "bug"
 title = "Cap and flush OSC 52 clipboard payload"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:39Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T18:13:23Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "1b5a5b07"
+summary = "STEP 4H flushes OSC 52 and ignores empty WAYLAND_DISPLAY; payload cap not done"

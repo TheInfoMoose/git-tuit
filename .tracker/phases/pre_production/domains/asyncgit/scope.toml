@@ -82,28 +82,28 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0015"
 title = "Stop running repo-local credential.helper and reject newline injection"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0016"
 title = "Prevent credential leaks across hosts, remotes and redirects"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0017"
 title = "Redact passwords from Debug output and trace logs"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0022"
 title = "Validate signing program and key arguments"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -117,7 +117,7 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0024"
 title = "Block path traversal and symlink overwrite in repo_write_file"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -222,6 +222,6 @@ created_at = "2026-11-21T14:42:35Z"
 [[items.tasks]]
 id = "TASK-0050"
 title = "Relax STEP 4E POST_GATE grep for clippy::option_if_let_else and rustfmt"
-status = "pending"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T14:57:39Z"

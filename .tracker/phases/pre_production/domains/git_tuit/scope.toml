@@ -230,21 +230,21 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0027"
 title = "Parse editor commands with quotes and escapes correctly"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0028"
 title = "Remove expect panic from external editor drop guard"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0029"
 title = "Resolve clipboard tools from absolute PATH only"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -258,28 +258,28 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0031"
 title = "Create log file 0600 and refuse symlinks"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0032"
 title = "Clear and hide credential inputs on cancel and submit"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0033"
 title = "Harden commit popup COMMIT_EDITMSG and commit.template reads"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0034"
 title = "Cap and flush OSC 52 clipboard payload"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -293,42 +293,42 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0036"
 title = "Abort on failed editor exit and ignore empty GIT_EDITOR"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0037"
 title = "Delete the right remote branch when the name contains a slash"
-status = "pending"
+status = "open"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0038"
 title = "Show error popups instead of exiting on handler errors"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0039"
 title = "Fix underflow, out-of-bounds and expect panics in lists and popups"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0040"
 title = "Reset sticky hard-reset and discard defaults in popups"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0041"
 title = "Name targets and warn on untracked deletes in confirm prompts"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -349,7 +349,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0044"
 title = "Abort push, pull and fetch when credential prompt is cancelled"
-status = "pending"
+status = "open"
 severity = "critical"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -450,6 +450,13 @@ title = "Close transitive unsound advisories that cargo-deny lets through"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T06:46:40Z"
+
+[[items.bugs]]
+id = "BUG-0061"
+title = "Tighten an existing trace log file to 0600"
+status = "open"
+severity = "low"
+created_at = "2026-11-21T18:13:08Z"
 
 [[items.features]]
 id = "FEAT-0002"
@@ -709,3 +716,80 @@ title = "commit.template expands ~ only"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T14:42:35Z"
+
+[[items.tasks]]
+id = "TASK-0051"
+title = "Error boundaries in App (no more TUI exit on handler errors)"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0052"
+title = "Reset/checkout popups open on the safe option"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0053"
+title = "File discard prompt names the path, warns about untracked"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0054"
+title = "Tighten an existing trace log to 0600"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0055"
+title = "Delete the right remote branch"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0056"
+title = "Tag delete without remote, stage-remove-all errors"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0058"
+title = "Commit list and status tree panics"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0059"
+title = "Tag, blame and remote list panics"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0060"
+title = "Branch list status error instead of panic"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0061"
+title = "Cancelling credentials cancels push/push-tags"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0062"
+title = "Cancel and preflight errors in pull/fetch"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T19:19:42Z"
