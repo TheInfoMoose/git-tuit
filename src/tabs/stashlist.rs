@@ -199,21 +199,19 @@ impl Component for StashList {
 			if let Event::Key(k) = ev {
 				if key_match(k, self.key_config.keys.enter) {
 					self.pop_stash();
-				} else if key_match(
-					k,
-					self.key_config.keys.stash_apply,
-				) {
+					return Ok(EventState::Consumed);
+				}
+				if key_match(k, self.key_config.keys.stash_apply) {
 					self.apply_stash();
-				} else if key_match(
-					k,
-					self.key_config.keys.stash_drop,
-				) {
+					return Ok(EventState::Consumed);
+				}
+				if key_match(k, self.key_config.keys.stash_drop) {
 					self.drop_stash();
-				} else if key_match(
-					k,
-					self.key_config.keys.stash_open,
-				) {
+					return Ok(EventState::Consumed);
+				}
+				if key_match(k, self.key_config.keys.stash_open) {
 					self.inspect();
+					return Ok(EventState::Consumed);
 				}
 			}
 		}

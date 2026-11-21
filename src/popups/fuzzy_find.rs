@@ -343,16 +343,15 @@ impl Component for FuzzyFindPopup {
 					|| key_match(key, self.key_config.keys.enter)
 				{
 					self.hide();
-				} else if key_match(
-					key,
-					self.key_config.keys.popup_down,
-				) {
+					return Ok(EventState::Consumed);
+				}
+				if key_match(key, self.key_config.keys.popup_down) {
 					self.move_selection(ScrollType::Down);
-				} else if key_match(
-					key,
-					self.key_config.keys.popup_up,
-				) {
+					return Ok(EventState::Consumed);
+				}
+				if key_match(key, self.key_config.keys.popup_up) {
 					self.move_selection(ScrollType::Up);
+					return Ok(EventState::Consumed);
 				}
 			}
 
@@ -372,6 +371,7 @@ impl Component for FuzzyFindPopup {
 
 	fn hide(&mut self) {
 		self.visible = false;
+		self.find_text.hide();
 	}
 
 	fn show(&mut self) -> Result<()> {

@@ -820,7 +820,10 @@ impl App {
 			InternalEvent::Tags => {
 				self.tags_popup.open()?;
 			}
-			InternalEvent::TabSwitchStatus => self.set_tab(0)?,
+			InternalEvent::TabSwitchStatus => {
+				self.set_tab(0)?;
+				flags.insert(NeedsUpdate::ALL);
+			}
 			InternalEvent::TabSwitch(tab) => {
 				self.switch_to_tab(&tab)?;
 				flags.insert(NeedsUpdate::ALL);
@@ -903,12 +906,17 @@ impl App {
 						.select_branch_popup
 						.branch_finder_update(idx)?,
 					FuzzyFinderTarget::Files => {
-						self.files_tab.file_finder_update(
-							&PathBuf::from(content.clone()),
-						);
-						self.revision_files_popup.file_finder_update(
-							&PathBuf::from(content),
-						);
+						// fuzzy file selection goes only to the view that opened the finder
+						if self.revision_files_popup.is_visible() {
+							self.revision_files_popup
+								.file_finder_update(&PathBuf::from(
+									content,
+								));
+						} else {
+							self.files_tab.file_finder_update(
+								&PathBuf::from(content),
+							);
+						}
 					}
 				}
 
