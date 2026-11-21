@@ -371,11 +371,22 @@ mod tests {
 	}
 
 	#[test]
-	#[serial]
 	fn test_env_variables() {
-		let (_td, repo) = repo_init().unwrap();
-		let git_dir = repo.path();
-
+		const CHILD: &str = "ASYNCGIT_TEST_ENV_VARIABLES_CHILD";
+		if std::env::var_os(CHILD).is_none() {
+			let (_td, repo) = repo_init().unwrap();
+			let status = std::process::Command::new(
+				std::env::current_exe().unwrap(),
+			)
+			.args(["--exact", "revlog::tests::test_env_variables"])
+			.env(CHILD, "1")
+			.env("GIT_DIR", repo.path())
+			.status()
+			.unwrap();
+			assert!(status.success(), "child test failed: {status}");
+			return;
+		}
+		// child process: GIT_DIR was set by the parent for this process only
 		let (tx_git, _rx_git) = unbounded();
 
 		let empty_dir = TempDir::new().unwrap();
@@ -388,8 +399,6 @@ mod tests {
 		}));
 		let arc_background = Arc::new(AtomicBool::new(false));
 
-		std::env::set_var("GIT_DIR", git_dir);
-
 		let result = AsyncLog::fetch_helper_without_filter(
 			// We pass an empty path, thus testing whether `GIT_DIR`, set above, is taken into account.
 			&empty_path,
@@ -397,8 +406,6 @@ mod tests {
 			&arc_background,
 			&tx_git,
 		);
-
-		std::env::remove_var("GIT_DIR");
 
 		assert_eq!(result.unwrap(), ());
 	}

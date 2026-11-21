@@ -696,6 +696,28 @@ mod tests {
 			})
 	}
 
+	#[cfg(unix)]
+	struct EnvRestore(&'static str, Option<std::ffi::OsString>);
+
+	#[cfg(unix)]
+	impl EnvRestore {
+		fn set(key: &'static str, value: &std::path::Path) -> Self {
+			let old = std::env::var_os(key);
+			std::env::set_var(key, value);
+			Self(key, old)
+		}
+	}
+
+	#[cfg(unix)]
+	impl Drop for EnvRestore {
+		fn drop(&mut self) {
+			match self.1.take() {
+				Some(v) => std::env::set_var(self.0, v),
+				None => std::env::remove_var(self.0),
+			}
+		}
+	}
+
 	/// e2e x509 signing: set up a throwaway `gpgsm` identity, sign a real
 	/// commit and verify it. Serial + unix-only: uses a process-wide `GNUPGHOME`.
 	#[cfg(unix)]
@@ -751,7 +773,7 @@ mod tests {
 		)?;
 
 		// GPGSign inherits env, so point the child gpgsm at our keyring.
-		std::env::set_var("GNUPGHOME", home);
+		let _gnupghome = EnvRestore::set("GNUPGHOME", home);
 
 		let run = |program: &str, args: &[&str]| {
 			let out = Command::new(program)
@@ -866,7 +888,6 @@ mod tests {
 			"gpgsm did not accept the signature: {verify_err}"
 		);
 
-		std::env::remove_var("GNUPGHOME");
 		Ok(())
 	}
 
@@ -902,7 +923,7 @@ mod tests {
 		)?;
 
 		// GPGSign inherits env, so point the child gpg at our keyring.
-		std::env::set_var("GNUPGHOME", home);
+		let _gnupghome = EnvRestore::set("GNUPGHOME", home);
 
 		let run = |program: &str, args: &[&str]| {
 			let out = Command::new(program)
@@ -986,7 +1007,6 @@ mod tests {
 			"gpg did not accept the signature: {verify_err}"
 		);
 
-		std::env::remove_var("GNUPGHOME");
 		Ok(())
 	}
 
