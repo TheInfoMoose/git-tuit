@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0046"
 type = "task"
 title = "Trace log 0600, no symlink"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T14:42:35Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T15:16:39Z"
 source_ref = "STEP 4I"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0046@2026-11-21T15:14:41Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "08f7022b"
+summary = "STEP 4I: Private Trace Log File (phased check PASS)"

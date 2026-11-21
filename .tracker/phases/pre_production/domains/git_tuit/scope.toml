@@ -692,7 +692,7 @@ created_at = "2026-11-21T14:42:35Z"
 [[items.tasks]]
 id = "TASK-0046"
 title = "Trace log 0600, no symlink"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T14:42:35Z"
 
