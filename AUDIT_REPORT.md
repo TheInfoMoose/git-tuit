@@ -1,10 +1,10 @@
 # `git-tuit` Component Audit & Remediation Report (`STEP 1A`)
 
 **Audit Date:** 2026-11-20  
-**Scope:** Full read-only repository audit + reference styling extraction from `/srv/devshare/Nebulous` and `/srv/devshare/Orrery`.  
+**Scope:** Full read-only repository audit + reference styling extraction from the Nebulous repo and the Orrery repo.  
 **Pre-Gate Status:**
 - Clean working tree: `git diff --name-only` is empty (`git status --short` showed only pre-existing untracked `STEPPED_IMPLEMENTATION_PLAN.md`).
-- Reference repos `/srv/devshare/Nebulous` and `/srv/devshare/Orrery` were blocked inside the read-only subagent sandbox (container mount restriction + `read_file` permission timeout) and were inspected directly by the parent agent outside the sandbox.
+- The Nebulous and Orrery reference repos were blocked inside the read-only subagent sandbox (container mount restriction + `read_file` permission timeout) and were inspected directly by the parent agent outside the sandbox.
 
 ---
 
@@ -55,7 +55,7 @@
 | `cargo fmt --all -- --check` | **PASS** | Exit `0` |
 | `cargo metadata --offline --locked --no-deps` | **PASS** | Exit `0` (7 workspace crates) |
 | `cargo metadata --offline --locked` | **BLOCKED** | Exit `101`: `error: no matching package named 'easy-cast' found` (`158 / 460` crates cached; **302 missing**) |
-| `cargo deny --offline check` | **BLOCKED** | Fails at `cargo metadata` due to missing 302 crates; local RustSec DB (`~/.cargo/advisory-dbs/advisory-db-3157b0e258782691`, updated 2026-11-20) cross-checked directly against `Cargo.lock` |
+| `cargo deny --offline check` | **BLOCKED** | Fails at `cargo metadata` due to missing 302 crates; local RustSec advisory DB (updated 2026-11-20) cross-checked directly against `Cargo.lock` |
 | `cargo clippy` / `cargo test` (`--offline`) | **BLOCKED** | Requires `cargo fetch --locked` first |
 
 ### 1.2 Workflow Failures (`STEP 2A`)
@@ -296,7 +296,7 @@ All 32 files in `src/popups/`, `src/popup_stack.rs`, `src/queue.rs`, and `src/st
 
 ### 5.1 Canonical Nebulous & Orrery Design System (Verified Direct Source)
 
-Both `/srv/devshare/Nebulous` (`crates/nebulous_cli/src/tui/theme.rs:6-107`, `render.rs:20-583`) and `/srv/devshare/Orrery` (`crates/orrery-tui/src/theme.rs:5-82`, `widgets.rs:48-662`) share an **exact byte-for-byte 7-color P3 Phosphor Amber-on-Black CRT design system**:
+Both the Nebulous repo (`crates/nebulous_cli/src/tui/theme.rs:6-107`, `render.rs:20-583`) and the Orrery repo (`crates/orrery-tui/src/theme.rs:5-82`, `widgets.rs:48-662`) share an **exact byte-for-byte 7-color P3 Phosphor Amber-on-Black CRT design system**:
 
 | Token Name | RGB / Hex | Verified Source Citations | Semantic Role |
 |---|---|---|---|
