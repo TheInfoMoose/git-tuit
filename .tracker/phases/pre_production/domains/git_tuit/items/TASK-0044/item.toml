@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0044"
 type = "task"
 title = "Editor via sh -c, exit status, no drop-guard panic"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T14:42:35Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T15:12:59Z"
 source_ref = "STEP 4G"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 6
 iteration_count = 1
+last_timer_session = "TASK-0044@2026-11-21T15:06:12Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "6e10b62e"
+summary = "STEP 4G: Run the Editor the Way git Does (phased check PASS)"
