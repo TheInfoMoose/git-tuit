@@ -208,9 +208,7 @@ impl FileTreeItems {
 		for c in &ancestors {
 			if c.parent().is_some() && !paths_added.contains(c) {
 				paths_added.insert(c);
-				//TODO: get rid of expect
-				let path_string =
-					String::from(c.to_str().expect("invalid path"));
+				let path_string = c.to_string_lossy().into_owned();
 				let is_collapsed = collapsed.contains(&path_string);
 				nodes.push(FileTreeItem::new_path(
 					c,

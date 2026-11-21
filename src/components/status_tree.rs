@@ -175,7 +175,7 @@ impl StatusTreeComponent {
 				let file = Path::new(&status_item.path)
 					.file_name()
 					.and_then(std::ffi::OsStr::to_str)
-					.expect("invalid path.");
+					.unwrap_or(status_item.path.as_str());
 
 				let txt = if selected {
 					format!(

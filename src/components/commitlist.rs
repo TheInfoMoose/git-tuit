@@ -274,7 +274,8 @@ impl CommitList {
 		self.highlighted_selection =
 			self.highlights.as_ref().and_then(|highlights| {
 				highlights.iter().position(|entry| {
-					entry == &self.commits[self.selection]
+					self.commits.get_index(self.selection)
+						== Some(entry)
 				})
 			});
 	}
@@ -708,11 +709,14 @@ impl CommitList {
 	}
 
 	fn selection_highlighted(&self) -> bool {
-		let commit = self.commits[self.selection];
+		let Some(commit) = self.commits.get_index(self.selection)
+		else {
+			return false;
+		};
 
 		self.highlights
 			.as_ref()
-			.is_some_and(|highlights| highlights.contains(&commit))
+			.is_some_and(|highlights| highlights.contains(commit))
 	}
 
 	fn needs_data(&self, idx: usize, idx_max: usize) -> bool {
@@ -1002,6 +1006,17 @@ mod tests {
 			CommitList::default().concat_selected_commit_ids(),
 			None
 		);
+	}
+
+	#[test]
+	fn test_selection_highlighted_empty_list() {
+		let mut highlights = IndexSet::default();
+		highlights.insert(CommitId::default());
+		let list = CommitList {
+			highlights: Some(highlights.into()),
+			..Default::default()
+		};
+		assert!(!list.selection_highlighted());
 	}
 
 	#[test]
