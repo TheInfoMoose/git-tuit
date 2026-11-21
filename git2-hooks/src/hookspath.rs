@@ -62,11 +62,11 @@ impl HookPaths {
 	/// Expand path according to the rule of githooks and config
 	/// core.hooksPath
 	fn expand_path(path: &Path, pwd: &Path) -> Result<PathBuf> {
-		let hook_expanded = shellexpand::full(
+		let hook_expanded = shellexpand::tilde(
 			path.as_os_str()
 				.to_str()
 				.ok_or(HooksError::PathToString)?,
-		)?;
+		);
 		let hook_expanded = PathBuf::from_str(hook_expanded.as_ref())
 			.map_err(|_| HooksError::PathToString)?;
 
@@ -249,7 +249,7 @@ impl HookPaths {
 			// execute hook directly
 			match run_command(&mut Command::new(&hook)) {
 				Err(err) if err.raw_os_error() == Some(ENOEXEC) => {
-					run_command(sh_command().arg(&hook))
+					run_command(sh_command().arg("--").arg(&hook))
 				}
 				result => result,
 			}
@@ -306,7 +306,7 @@ fn is_executable(path: &Path) -> bool {
 
 	let permissions = metadata.permissions();
 
-	permissions.mode() & 0o111 != 0
+	metadata.is_file() && permissions.mode() & 0o111 != 0
 }
 
 #[cfg(windows)]
@@ -377,5 +377,25 @@ mod test {
 			.unwrap(),
 			absolute_hook
 		);
+	}
+
+	#[test]
+	fn test_hookspath_does_not_expand_env_vars() {
+		assert_eq!(
+			HookPaths::expand_path(
+				Path::new("$HOME/hooks/pre-commit"),
+				Path::new("example_git_root"),
+			)
+			.unwrap(),
+			Path::new("example_git_root")
+				.join("$HOME/hooks/pre-commit")
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_directory_is_not_executable() {
+		let dir = tempfile::tempdir().unwrap();
+		assert!(!super::is_executable(dir.path()));
 	}
 }
