@@ -811,7 +811,7 @@ created_at = "2026-11-21T20:28:02Z"
 [[items.tasks]]
 id = "TASK-0064"
 title = "Panes come back after blame/file history"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:02Z"
 
