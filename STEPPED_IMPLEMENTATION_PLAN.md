@@ -10,7 +10,7 @@
 - **`chrono` advisory (`RUSTSEC-2026-0543`):** migrate the `chrono` usage sites to `jiff` (`0.2.32`, already in `Cargo.lock`). No `deny.toml` ignore.
 - **No new advisory ignores.** If an advisory can't be fixed by an update inside a step's scope, the step reports `Blocked`.
 - **Compatibility:** keep crate/binary name `gitui`, `~/.config/gitui/` configuration, keybindings and `theme.ron` override compatibility.
-- **Styling tokens (from `/srv/devshare/Nebulous` & `/srv/devshare/Orrery`), for Phase 7:**
+- **Styling tokens (from the Nebulous and Orrery TUIs), for Phase 7:**
   - 7-color P3 phosphor amber-on-black base: `BG_BLACK` (`#000000`), `PANEL_BG` (`#0C0800`), `AMBER_PRIMARY` (`#FFB000`), `AMBER_BRIGHT` (`#FFD866`), `AMBER_DIM` (`#996300`), `AMBER_DARK` (`#5C3A00`), `AMBER_ALERT` (`#FF5500`).
   - **BorderType:** `BorderType::Plain` (`Borders::ALL`, `┌─┐│└─┘`) with padded `" {title} "` titles.
   - **Diff/status accents:** warm phosphor-green additions (`#7FD962`) + `AMBER_ALERT` (`#FF5500`) deletions.
@@ -70,11 +70,11 @@
 Warm the host cache so the host-side `phased:step_check` gate can build, then capture the baseline Phase 3 is written from (Claude can't run cargo in this repo):
 
 ```bash
-cd /srv/devshare/git-tuit && cargo fetch --locked
+cargo fetch --locked
 ```
 
 ```bash
-cd /srv/devshare/git-tuit && mkdir -p docs/baseline && cargo clippy --workspace --all-targets -- -D warnings 2>&1 | tee docs/baseline/clippy.txt; cargo test --workspace 2>&1 | tee docs/baseline/test.txt
+mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going -- -D warnings 2>&1 | tee docs/baseline/clippy.txt; cargo test --workspace --no-fail-fast 2>&1 | tee docs/baseline/test.txt
 ```
 
 ### Future phases
