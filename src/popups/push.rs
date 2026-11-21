@@ -347,14 +347,15 @@ impl Component for PushPopup {
 				if self.input_cred.is_visible() {
 					self.input_cred.event(ev)?;
 
-					if self.input_cred.get_cred().is_complete()
-						|| !self.input_cred.is_visible()
-					{
+					if self.input_cred.get_cred().is_complete() {
 						self.push_to_remote(
 							Some(self.input_cred.get_cred().clone()),
 							self.modifier.force(),
 						)?;
 						self.input_cred.hide();
+					} else if !self.input_cred.is_visible() {
+						// credential prompt cancelled: don't push
+						self.hide();
 					}
 				} else if key_match(
 					e,
