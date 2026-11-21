@@ -559,7 +559,7 @@ created_at = "2026-11-21T05:43:55Z"
 [[items.tasks]]
 id = "TASK-0014"
 title = "deny.toml for cargo-deny 0.20"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:43:55Z"
 
