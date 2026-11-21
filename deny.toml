@@ -15,17 +15,25 @@ allow = [
 ]
 
 [advisories]
+unsound = "all"
 ignore = [
   # See https://github.com/trishume/syntect/issues/606
   { id = "RUSTSEC-2025-0141", reason = "Only brought in via syntect" },
+  # heapless 0.8.0: compiled but unused, see BUG-0060
+  { id = "RUSTSEC-2026-0574", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0575", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0576", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0577", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0578", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0579", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0580", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0581", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
+  { id = "RUSTSEC-2026-0582", reason = "heapless 0.8 via faster-hex 0.10; unreachable because gix-hash enables faster-hex std/alloc (BUG-0060)" },
 ]
 
 [bans]
 multiple-versions = "deny"
 skip-tree = [
-  # currently needed due to:
-  # * `dirs-sys v0.4.1` (https://github.com/dirs-dev/dirs-sys-rs/issues/29)
-  { crate = "windows-sys" },
   # this is needed for:
   #  `bwrap v1.3.0` (https://github.com/micl2e2/bwrap/pull/4)
   { crate = "unicode-width" },
@@ -33,10 +41,6 @@ skip-tree = [
   # * `redox_users v0.4.6`
   # * `syntect v5.2.0`
   { crate = "thiserror" },
-  # currently needed due to:
-  # * `windows v0.57.0`
-  # * `iana-time-zone v0.1.60`
-  { crate = "windows-core" },
   # currently needed due to:
   # * `gix-hashtable v0.6.0`
   { crate = "hashbrown" },
