@@ -24,13 +24,13 @@
 
 **Workflow:** phased
 
-**Base gate:** `cargo fmt --all -- --check && cargo build --workspace --all-targets --locked`
+**Base gate:** `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked`
 
 **Forbidden paths:** `AUDIT_REPORT.md:CLAUDE.md:.orrery/*:scripts/*:wix/*:docs/*`
 
 **Planning files:** `AUDIT_REPORT.md`
 
-**Base gate note:** Phase 2's Base gate compiles everything but doesn't run clippy or tests, because HEAD doesn't pass `clippy --all-targets -D warnings` yet (audit `P0-15`: >1,270 test-module diagnostics). This is a temporary weaker gate: it hides existing clippy and test failures until Phase 3. Phase 3 steps add per-crate clippy checks on top, and STEP 3K runs the full gate. The Phase 3 review switches the Base gate to `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`.
+**Base gate note:** Phases 2–3 ran on a weaker gate (fmt + build) while HEAD couldn't pass clippy. Phase 3 made the full gate green (STEP 3M, 6c7855d3), so from Phase 4 on every POST_GATE starts with fmt + `clippy --workspace --all-targets -D warnings` + `cargo test --workspace --locked`.
 
 **Gate environment:** POST_GATE runs twice: in the agent container (Neon/Hydrogen) and on the host (`phased:step_check`, authoritative). The container has no PyYAML, so YAML parse checks are written as `{ ! python3 -c 'import yaml' 2>/dev/null || <parse>; }`: skipped in the container, enforced on the host. The toolchain is pinned in `rust-toolchain.toml` (STEP 2J) so `cargo fmt` gives the same result in both places.
 
@@ -42,7 +42,9 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 3 goal (continued after the Phase 3 review, 2026-11-21: 10 of 12 landed; 3L/3M re-queue the two deferrals):** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass reliably on the pinned toolchain, `cargo deny check` fails on transitive unsound crates and passes cleanly, and the Linux-only CI workflow (deferred 2A) lands.
+**Phase 4 goal:** close the places where gitui is looser than git or plainly unsafe with credentials, hooks, signing keys, editor launch, clipboard and its own log file, under the git-parity threat model (see Phase 4 section). Repo-local config stays trusted as in git.
+
+_Phase 3 goal (done, reviewed 2026-11-21):_ clippy --workspace --all-targets -D warnings and cargo test --workspace pass reliably; cargo-deny fails on transitive unsound crates; Linux-only CI landed (2K).
 
 _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only and correct, `deny.toml` works with cargo-deny 0.20, `chrono` is replaced by `jiff`, `cargo deny check` passes, and the `Makefile` matches CI. Everything but 2A landed; 2A is re-queued as 2K.
 
@@ -52,9 +54,17 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **[USER] IMAGE** | — | Rebuild the agent image with gpg/gpgsm/ssh-keygen | `orrery-cli-agents:…-neb` | **[USER]** runs the commands under "User Step: IMAGE". |
-| 2 | **STEP 3L** | `/boost` | GIT_DIR test in a child process, GNUPGHOME guard (re-queued 3I) | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` | [USER] IMAGE |
-| 3 | **STEP 3M** | `/goal` | gitui clippy: reflow, key_config; full gate (re-queued 3K) | `src/ui/reflow.rs`, `src/keys/key_config.rs` | [USER] IMAGE |
+| 1 | **STEP 4A** | `/goal` | Credential URL checks (http scheme, push URL, control chars) | `asyncgit/src/sync/cred.rs` | — |
+| 2 | **STEP 4B** | `/goal` | fetch_all keeps credentials on their host | `asyncgit/src/sync/remotes/mod.rs` | — |
+| 3 | **STEP 4D** | `/goal` | Hook path: ~ only, regular files, `--` | `git2-hooks/src/hookspath.rs` | — |
+| 4 | **STEP 4E** | `/goal` | SSH key:: literals of any type | `asyncgit/src/sync/sign.rs` | — |
+| 5 | **STEP 4F** | `/goal` | No writes through symlinks on discard | `asyncgit/src/sync/utils.rs` | — |
+| 6 | **STEP 4G** | `/boost` | Editor via sh -c, exit status, no drop-guard panic | `src/popups/externaleditor.rs` | — |
+| 7 | **STEP 4H** | `/goal` | Clipboard lookup and OSC 52 flush | `src/clipboard.rs` | — |
+| 8 | **STEP 4I** | `/goal` | Trace log 0600, no symlink | `src/args.rs` | — |
+| 9 | **STEP 4J** | `/goal` | Credential prompt clears both inputs | `src/components/cred.rs` | — |
+| 10 | **STEP 4K** | `/goal` | commit.template expands ~ only | `src/popups/commit.rs` | — |
+| 11 | **STEP 4C** | `/goal` | Redact passwords in Debug and logs | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/remotes/callbacks.rs` | — |
 
 ### Completed
 
@@ -83,6 +93,8 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 3H | ✅ 88ccd87b | `/goal` | asyncgit clippy: remotes push and tags | `asyncgit/src/sync/remotes/{push,tags}.rs` |
 | STEP 3I | ↪ withdrawn | `/boost` | Deferred (agent image lacked gpg tools); re-queued as STEP 3L | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` |
 | STEP 3K | ↪ withdrawn | `/goal` | Deferred (PRE_GATE waited on 3I); re-queued as STEP 3M | `src/ui/reflow.rs`, `src/keys/key_config.rs` |
+| STEP 3L | ✅ d9580191 | `/boost` | GIT_DIR test in a child process, GNUPGHOME guard (re-queued 3I) | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` |
+| STEP 3M | ✅ 6c7855d3 | `/goal` | gitui clippy: reflow, key_config; full gate green (re-queued 3K) | `src/ui/reflow.rs`, `src/keys/key_config.rs` |
 
 ### User Step: IMAGE
 
@@ -116,21 +128,6 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 4 — Security hardening.** Goal: no command execution, file read or credential leak driven by an untrusted repo's config, paths or refs.
-  - Global-only git config reader (P1-12)
-  - Credential helper from global config, URL/newline validation (P1-02)
-  - Redact credentials in `Debug` and logs (P1-04)
-  - Expected-URL check and per-remote credentials (P1-03, 2 steps)
-  - Hook path expansion, name and exec checks; `--` in the sh fallback (P1-05, P1-06)
-  - Safe `COMMIT_EDITMSG` in git2-hooks (P1-07); `create_hook` without chmod/unwrap (P1-08)
-  - pre-push ref validation (P1-10)
-  - Signing program and key validation (P1-09, 2 steps)
-  - `repo_write_file` traversal/symlink guard (P1-11)
-  - External editor: source, containment, tokenizer, drop guard, exit status (P1-13..P1-16, P2-05; 3 steps)
-  - Clipboard tool resolution and OSC 52 cap (P1-17, P2-03)
-  - CLI args: theme name, log file perms, `-d`/`-w` (P1-18, P1-19, P2-04; 2 steps)
-  - Credential popup clears inputs (P1-20); commit popup edit file and template (P1-21)
-  - Error state getters on `AsyncFetchJob` / `AsyncBlame` (prep for P2-21)
 - **Phase 5 — Crashes and data loss.** Goal: no handler error exits the TUI, no audited panic remains, and no destructive action runs without a correct target and confirmation.
   - Delete the right remote branch (P1-22)
   - Fatal `?` → error popups (P1-23, 3 steps)
@@ -1591,6 +1588,614 @@ cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
 ```
+## Phase 4: Security hardening (git-parity threat model)
+
+**Threat model (Phase 3 review decision):** match git. Repo-local `.git/config` is trusted the way git trusts it; libgit2 already refuses to open repos the user doesn't own (`safe.directory`), and asyncgit keeps that check on (`Repository::open_ext(.., FROM_ENV, ..)` in `asyncgit/src/sync/repository.rs:56-60`). Phase 4 fixes the places where gitui is looser than git or plainly buggy. The audit's "ignore repo-local config" fixes (P1-12, P1-13, and those parts of P1-02/P1-21) are parked, not done.
+
+### STEP 4A: Credential URL Checks
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4A: Make asyncgit's credential lookup treat only http/https URLs as needing a password, use the push URL when extracting push credentials, and refuse remote URLs containing control characters before they reach the credential helper.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/cred.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/cred.rs:38-87 (need_username_password*: `let is_http = url.starts_with("http");` three times)
+  - asyncgit/src/sync/cred.rs:89-176 (extract_username_password, _for_fetch, _for_push: each builds `url` then `CredentialHelper::new(&url)`; _for_push reads `.url()` only, unlike need_username_password_for_push at :72-87 which prefers `.pushurl()`)
+  - asyncgit/src/error.rs:86 (`Generic(String)` variant)
+  - git's CVE-2020-5260: a newline in the URL lets a remote inject extra key=value lines into the credential-helper protocol
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep every pub fn signature. Keep reading `credential.*` from `repo.config()` (git-parity: repo-local config is trusted).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. cred.rs: add two private helpers above `need_username_password`:
+	/// true only for real http(s) URLs (`starts_with("http")` also matched `httpfoo://`)
+	fn is_http_url(url: &str) -> bool {
+		url::Url::parse(url)
+			.is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
+	}
+
+	/// a newline or other control character in the URL could inject
+	/// lines into the credential-helper protocol (CVE-2020-5260 class)
+	fn ensure_no_control_chars(url: &str) -> Result<()> {
+		if url.chars().any(char::is_control) {
+			return Err(Error::Generic(String::from(
+				"remote url contains control characters",
+			)));
+		}
+		Ok(())
+	}
+2. cred.rs: in all three need_username_password* functions, `let is_http = url.starts_with("http");` → `let is_http = is_http_url(&url);`.
+3. cred.rs: in all three extract_username_password* functions, insert `ensure_no_control_chars(&url)?;` on the line before `let mut helper = CredentialHelper::new(&url);`.
+4. cred.rs extract_username_password_for_push: build `url` the same way need_username_password_for_push does (prefer `remote.pushurl()`, fall back to `remote.url()`, else `Error::UnknownRemote`), so credentials are looked up for the URL the push actually goes to.
+5. Tests, in cred.rs's tests module:
+	#[test]
+	fn test_is_http_url() {
+		assert!(is_http_url("https://example.com/repo.git"));
+		assert!(is_http_url("http://example.com/repo.git"));
+		assert!(!is_http_url("httpfoo://example.com/repo.git"));
+		assert!(!is_http_url("git@example.com:repo.git"));
+		assert!(!is_http_url("ssh://git@example.com/repo.git"));
+	}
+	#[test]
+	fn test_ensure_no_control_chars() {
+		assert!(ensure_no_control_chars("https://example.com/repo.git").is_ok());
+		assert!(ensure_no_control_chars("https://example.com/r\nhost=evil.example.com").is_err());
+		assert!(ensure_no_control_chars("https://example.com/r\r").is_err());
+	}
+   cred.rs's tests module does not glob-import `super::*`; add `use super::{ensure_no_control_chars, is_http_url};` to its imports.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'starts_with("http")' asyncgit/src/sync/cred.rs && test "$(grep -cF 'ensure_no_control_chars(&url)?;' asyncgit/src/sync/cred.rs)" = 3 && test "$(grep -cF 'is_http_url(&url)' asyncgit/src/sync/cred.rs)" = 3 && grep -qE '\bfn test_ensure_no_control_chars\b' asyncgit/src/sync/cred.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4B: Don't Send One Remote's Credentials to Every Remote
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4B: In fetch_all, pass the user's credentials only to remotes on the same scheme/host/port as the default remote they were entered for; other remotes get none.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/remotes/mod.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/remotes/mod.rs:301-334 (`pub fn fetch_all(repo_path, basic_credential, progress_sender)`: loops over all remotes calling `fetch_from_remote(repo_path, &remote, basic_credential.clone(), None)?`)
+  - asyncgit/src/sync/remotes/mod.rs:239 (`pub(crate) fn get_default_remote_in_repo(repo: &Repository) -> Result<String>`)
+  - src/popups/fetch.rs:64-66 (the credentials come from `extract_username_password`, i.e. the default remote)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep fetch_all's signature.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. remotes/mod.rs: add a private helper above fetch_all:
+	/// scheme, host and port of a remote's URL, used to keep credentials on the host they were entered for
+	fn remote_url_origin(
+		repo: &git2::Repository,
+		name: &str,
+	) -> Option<(String, String, Option<u16>)> {
+		let remote = repo.find_remote(name).ok()?;
+		let url = url::Url::parse(remote.url()?).ok()?;
+		Some((
+			url.scheme().to_owned(),
+			url.host_str()?.to_owned(),
+			url.port_or_known_default(),
+		))
+	}
+2. remotes/mod.rs fetch_all: after `let remotes_count = remotes.len();`, add
+	let cred_origin = get_default_remote_in_repo(&repo)
+		.ok()
+		.and_then(|name| remote_url_origin(&repo, &name));
+   and in the loop pass
+	let cred = if cred_origin.is_some()
+		&& remote_url_origin(&repo, &remote) == cred_origin
+	{
+		basic_credential.clone()
+	} else {
+		None
+	};
+   to fetch_from_remote instead of `basic_credential.clone()`.
+3. Test, in remotes/mod.rs's tests module:
+	#[test]
+	fn test_remote_url_origin() {
+		let (_td, repo) = repo_init().unwrap();
+		repo.remote("origin", "https://example.com/a.git").unwrap();
+		repo.remote("same", "https://example.com:443/c.git").unwrap();
+		repo.remote("other", "https://example.org/b.git").unwrap();
+		repo.remote("ssh", "git@example.com:a.git").unwrap();
+		let origin = remote_url_origin(&repo, "origin");
+		assert!(origin.is_some());
+		assert_eq!(remote_url_origin(&repo, "same"), origin);
+		assert_ne!(remote_url_origin(&repo, "other"), origin);
+		assert_eq!(remote_url_origin(&repo, "ssh"), None);
+	}
+   Use the tests module's existing `repo_init` import; add `use super::remote_url_origin;` if the module doesn't glob-import `super::*`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn remote_url_origin\(' asyncgit/src/sync/remotes/mod.rs && grep -qF 'remote_url_origin(&repo, &remote) == cred_origin' asyncgit/src/sync/remotes/mod.rs && grep -qE '\bfn test_remote_url_origin\b' asyncgit/src/sync/remotes/mod.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4C: Redact Passwords from Debug Output and Logs
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4C: Stop BasicAuthCredential's Debug output and the credentials callback's debug log from printing passwords or URL userinfo (gitui -l writes a trace log).
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/cred.rs
+  - asyncgit/src/sync/remotes/callbacks.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/cred.rs:15-22 (`#[derive(Debug, Clone, Default, PartialEq, Eq)] pub struct BasicAuthCredential { pub username: Option<String>, pub password: Option<String> }`)
+  - asyncgit/src/sync/remotes/callbacks.rs:179-187 (`fn credentials(&self, url: &str, ...)` then `log::debug!("creds: '{url}' {username_from_url:?} ({allowed_types:?})",);`)
+  - PushRequest/FetchRequest/PushTagsRequest derive Debug and contain BasicAuthCredential, so the manual Debug covers them.
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep BasicAuthCredential's fields, Clone/Default/PartialEq/Eq derives and pub API.
+
+[PRE_GATE]
+grep -qF 'ensure_no_control_chars(&url)?;' asyncgit/src/sync/cred.rs
+
+[MUTATION_SPEC]
+1. cred.rs: remove `Debug` from BasicAuthCredential's derive list and add
+	impl std::fmt::Debug for BasicAuthCredential {
+		fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+			f.debug_struct("BasicAuthCredential")
+				.field("username", &self.username)
+				.field(
+					"password",
+					&self.password.as_ref().map(|_| "<redacted>"),
+				)
+				.finish()
+		}
+	}
+2. callbacks.rs credentials: replace the `log::debug!("creds: ...")` call with
+		let shown_url = url::Url::parse(url).map_or_else(
+			|_| String::from("<unparsable url>"),
+			|mut u| {
+				let _ = u.set_password(None);
+				u.to_string()
+			},
+		);
+		log::debug!(
+			"creds: '{shown_url}' {username_from_url:?} ({allowed_types:?})",
+		);
+3. Test, in cred.rs's tests module:
+	#[test]
+	fn test_debug_redacts_password() {
+		let cred = BasicAuthCredential::new(
+			Some(String::from("testuser")),
+			Some(String::from("s3cret-value")),
+		);
+		let shown = format!("{cred:?}");
+		assert!(shown.contains("testuser"));
+		assert!(!shown.contains("s3cret-value"));
+		assert!(shown.contains("<redacted>"));
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'impl std::fmt::Debug for BasicAuthCredential' asyncgit/src/sync/cred.rs && ! grep -qF "\"creds: '{url}'" asyncgit/src/sync/remotes/callbacks.rs && grep -qF 'u.set_password(None)' asyncgit/src/sync/remotes/callbacks.rs && grep -qE '\bfn test_debug_redacts_password\b' asyncgit/src/sync/cred.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4D: Hook Path Expansion and Executable Check
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4D: Expand only `~` in core.hooksPath (as git does, not $VARS), treat only regular files as executable hooks, and pass `--` before the hook path in the sh fallback.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - git2-hooks/src/hookspath.rs
+READ_ONLY_REFS:
+  - git2-hooks/src/hookspath.rs:62-70 (`fn expand_path`: `let hook_expanded = shellexpand::full(path.as_os_str().to_str().ok_or(HooksError::PathToString)?,)?;`)
+  - git2-hooks/src/hookspath.rs:250-256 (`match run_command(&mut Command::new(&hook)) { Err(err) if err.raw_os_error() == Some(ENOEXEC) => { run_command(sh_command().arg(&hook)) } ...`)
+  - git2-hooks/src/hookspath.rs:294-308 (`fn is_executable`: `permissions.mode() & 0o111 != 0`; a directory with mode 0755 counts as executable)
+  - git2-hooks/src/hookspath.rs:315- (test module: test_hookspath_relative, test_hookspath_absolute)
+  - `shellexpand::tilde(&str) -> Cow<str>` (infallible)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the Windows `sh -c` branch and the `HooksError::ShellExpand` variant (error.rs) unchanged.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. hookspath.rs expand_path: `shellexpand::full(...)?` → `shellexpand::tilde(...)` (drop the trailing `?`; the `.ok_or(HooksError::PathToString)?` on the str conversion stays). Why: git expands only `~` in core.hooksPath; `$VAR` expansion let config pull environment values into the hook path.
+2. hookspath.rs unix ENOEXEC fallback: `run_command(sh_command().arg(&hook))` → `run_command(sh_command().arg("--").arg(&hook))`.
+3. hookspath.rs unix is_executable: return `metadata.is_file() && permissions.mode() & 0o111 != 0` (a directory named like a hook is not a hook).
+4. Tests, in hookspath.rs's test module:
+	#[test]
+	fn test_hookspath_does_not_expand_env_vars() {
+		assert_eq!(
+			HookPaths::expand_path(
+				Path::new("$HOME/hooks/pre-commit"),
+				Path::new("example_git_root"),
+			)
+			.unwrap(),
+			Path::new("example_git_root").join("$HOME/hooks/pre-commit")
+		);
+	}
+	#[cfg(unix)]
+	#[test]
+	fn test_directory_is_not_executable() {
+		let dir = tempfile::tempdir().unwrap();
+		assert!(!super::is_executable(dir.path()));
+	}
+   If `tempfile` is not a git2-hooks dev-dependency, write the directory test with `std::env::temp_dir()` instead (an existing directory).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'shellexpand::full' git2-hooks/src/hookspath.rs && grep -qF 'shellexpand::tilde(' git2-hooks/src/hookspath.rs && grep -qF 'sh_command().arg("--").arg(&hook)' git2-hooks/src/hookspath.rs && grep -qF 'metadata.is_file()' git2-hooks/src/hookspath.rs && grep -qE '\bfn test_hookspath_does_not_expand_env_vars\b' git2-hooks/src/hookspath.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4E: SSH `key::` Literals of Any Key Type
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4E: Treat every `key::<literal>` user.signingKey as an inline key written to a temp file (as git does), not only literals starting with `ssh-`; today `key::ecdsa-sha2-…` or `key::sk-ssh-…` is passed to `ssh-keygen -f` as if it were a file path.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/sign.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/sign.rs:193-234 (ssh branch of SignBuilder::from_gitconfig: strips `key::`, then `if signing_key.starts_with("ssh-") { write_signing_key_to_temp_file .. } else { (signing_key, None) }`)
+  - asyncgit/src/sync/sign.rs:521-539 (test_ssh_keyliteral_config: `config.set_str("user.signingKey", "ssh-ed25519 test")`, asserts `PathBuf::from(sign.signing_key()).is_file()`)
+  - git-config(1) user.signingKey: "If gpg.format is set to ssh this can contain the path to either your private ssh key or the public key ... Alternatively it can contain a public key prefixed with key:: directly"; git also still accepts a bare `ssh-` literal.
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change the GPG/x509 branches or the e2e tests.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. sign.rs ssh branch: replace the strip + `starts_with("ssh-")` logic with
+				// `key::<literal>` is git's syntax for an inline key; a bare
+				// `ssh-…` value is also treated as a literal (legacy git behavior)
+				let (literal, signing_key) =
+					match signing_key.strip_prefix("key::") {
+						Some(rest) => (true, rest.to_string()),
+						None => (
+							signing_key.starts_with("ssh-"),
+							signing_key,
+						),
+					};
+   and use `if literal {` where the code had `if signing_key.starts_with("ssh-") {`.
+2. Test, next to test_ssh_keyliteral_config:
+	#[test]
+	fn test_ssh_key_prefixed_literal_any_type() -> Result<()> {
+		use std::path::PathBuf;
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			config.set_str("user.signingKey", "key::ecdsa-sha2-nistp256 test")?;
+		}
+		let sign = SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		let path = PathBuf::from(sign.signing_key());
+		assert!(path.is_file());
+		assert_eq!(std::fs::read_to_string(path)?.trim_end(), "ecdsa-sha2-nistp256 test");
+		Ok(())
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'match signing_key.strip_prefix("key::")' asyncgit/src/sync/sign.rs && ! grep -qF 'if signing_key.starts_with("ssh-") {' asyncgit/src/sync/sign.rs && grep -qE '\bfn test_ssh_key_prefixed_literal_any_type\b' asyncgit/src/sync/sign.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4F: Don't Write Through Symlinks When Discarding Lines
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4F: Make repo_write_file refuse to write through a symlink, so discarding lines of a symlinked file can't overwrite the file it points to (possibly outside the repo).
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/utils.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/utils.rs:181-193 (`pub(crate) fn repo_write_file(repo, file, content)`: `File::create(work_dir(repo)?.join(file))` then `write_all`)
+  - asyncgit/src/sync/staging/discard_tracked.rs:40 (the one production caller: `repo_write_file(&repo, file_path, new_content.as_str())?;`)
+  - asyncgit/src/error.rs:86 (`Generic(String)`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the signature; all existing test callers write regular files and must keep working.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. utils.rs repo_write_file: before `File::create`, add
+	if std::fs::symlink_metadata(file_path)
+		.is_ok_and(|m| m.file_type().is_symlink())
+	{
+		return Err(Error::Generic(format!(
+			"refusing to write through symlink: {file_path}"
+		)));
+	}
+2. Test, in utils.rs's tests module:
+	#[cfg(unix)]
+	#[test]
+	fn test_repo_write_file_refuses_symlink() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.workdir().unwrap();
+		let outside = tempfile::NamedTempFile::new().unwrap();
+		std::fs::write(outside.path(), "keep").unwrap();
+		std::os::unix::fs::symlink(outside.path(), root.join("link.txt")).unwrap();
+		assert!(repo_write_file(&repo, "link.txt", "overwritten").is_err());
+		assert_eq!(std::fs::read_to_string(outside.path()).unwrap(), "keep");
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'refusing to write through symlink' asyncgit/src/sync/utils.rs && grep -qE '\bfn test_repo_write_file_refuses_symlink\b' asyncgit/src/sync/utils.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4G: Run the Editor the Way git Does
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 4G: Launch the external editor through `sh -c '<editor> "$@"'` like git (so quoted editor commands work), treat a non-zero editor exit as an error (`:cq` aborts), and stop the terminal-restore guard from panicking.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/externaleditor.rs
+READ_ONLY_REFS:
+  - src/popups/externaleditor.rs:47-115 (`pub fn open_file_in_editor(repo, path)`: `defer! { io::stdout().execute(EnterAlternateScreen).expect("reset terminal"); }`, editor lookup GIT_EDITOR → core.editor → VISUAL → EDITOR → "vi", hand-rolled split on the first `"`/space, then `Command::new(command).current_dir(work_dir).args(args).status()` ignoring the exit status)
+  - git's run-command.c prepare_shell_cmd / editor.c launch_specified_editor: the editor string is run as `sh -c '<editor> "$@"' '<editor>' <file>`; a non-zero exit makes git report "There was a problem with the editor" and abort.
+  - Callers: src/popups/commit.rs (commit message editing) treats Err as "don't use the edited message".
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the editor lookup order (GIT_EDITOR, core.editor, VISUAL, EDITOR, vi) and the empty-editor error.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. defer! block: `io::stdout().execute(EnterAlternateScreen).expect("reset terminal");` → `if let Err(e) = io::stdout().execute(EnterAlternateScreen) { log::error!("reset terminal failed: {e}"); }`.
+2. Replace the hand-rolled splitting (from the `// TODO: proper handling arguments containing whitespaces` comment through the `Command::new(command.clone())...` call) with, under `#[cfg(unix)]`:
+		if editor.trim().is_empty() {
+			bail!("editor env variable found empty: {}", environment_options.join(" or "));
+		}
+		let status = Command::new("sh")
+			.current_dir(&work_dir)
+			.arg("-c")
+			.arg(format!("{editor} \"$@\""))
+			.arg(&editor)
+			.arg(&path)
+			.status()
+			.map_err(|e| anyhow!("\"{editor}\": {e}"))?;
+		if !status.success() {
+			bail!("editor \"{editor}\" exited with {status}");
+		}
+   and keep the existing splitting code under `#[cfg(not(unix))]` (still followed by the same `status.success()` check). Remove imports that become unused on unix.
+3. Tests, in externaleditor.rs (add `#[cfg(test)] mod tests` if absent; unix only). Factor the launch into `fn run_editor(editor: &str, work_dir: &Path, path: &Path) -> Result<()>` holding item 2's unix code, call it from open_file_in_editor, and test it:
+	#[cfg(unix)]
+	#[test]
+	fn test_run_editor_quoted_command() {
+		let dir = tempfile::tempdir().unwrap();
+		let file = dir.path().join("msg.txt");
+		std::fs::write(&file, "").unwrap();
+		run_editor("sh -c 'printf edited > \"$1\"' sh", dir.path(), &file).unwrap();
+		assert_eq!(std::fs::read_to_string(&file).unwrap(), "edited");
+	}
+	#[cfg(unix)]
+	#[test]
+	fn test_run_editor_nonzero_exit_is_error() {
+		let dir = tempfile::tempdir().unwrap();
+		let file = dir.path().join("msg.txt");
+		std::fs::write(&file, "").unwrap();
+		assert!(run_editor("false", dir.path(), &file).is_err());
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'expect("reset terminal")' src/popups/externaleditor.rs && grep -qF 'format!("{editor} \"$@\"")' src/popups/externaleditor.rs && grep -qF '!status.success()' src/popups/externaleditor.rs && grep -qE '\bfn run_editor\(' src/popups/externaleditor.rs && grep -qE '\bfn test_run_editor_nonzero_exit_is_error\b' src/popups/externaleditor.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4H: Clipboard Tool Lookup and OSC 52 Flush
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4H: Fail fast when a clipboard tool isn't on PATH (instead of spawning a bare name), ignore an empty WAYLAND_DISPLAY, and flush the OSC 52 escape so it reaches the terminal.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/clipboard.rs
+READ_ONLY_REFS:
+  - src/clipboard.rs:13-15 (`let binary = which(command).ok().unwrap_or_else(|| PathBuf::from(command));`)
+  - src/clipboard.rs:71-83 (`fn copy_string_osc52(text, out)`: `write!(out, "\x1b]52;...\x07", ...)?; Ok(())` with no flush)
+  - src/clipboard.rs:118-121 (`if std::env::var("WAYLAND_DISPLAY").is_ok() { return copy_string_wayland(text); }`)
+  - src/clipboard.rs tests: clipboard::tests::test_copy_string_osc52
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the fallback order (wl-copy → OSC 52; xclip → xsel → OSC 52; WSL clip.exe).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. exec_copy_with_args: `let binary = which(command).ok().unwrap_or_else(|| PathBuf::from(command));` → `let binary = which(command).map_err(|e| anyhow!("`{command}` not found: {e}"))?;`. Remove `use std::path::PathBuf;` if it becomes unused.
+2. copy_string_osc52: after the `write!(...)?;` add `out.flush()?;`.
+3. copy_string (unix, non-macos): `std::env::var("WAYLAND_DISPLAY").is_ok()` → `std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty())`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'unwrap_or_else(|| PathBuf::from(command))' src/clipboard.rs && grep -qF 'out.flush()?;' src/clipboard.rs && grep -qF 'is_ok_and(|v| !v.is_empty())' src/clipboard.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4I: Private Trace Log File
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4I: Create the `-l` trace log with mode 0600 and refuse to write it through a symlink; the trace log records remote URLs and command lines.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/args.rs
+READ_ONLY_REFS:
+  - src/args.rs:194-212 (`fn setup_logging(path_override: Option<PathBuf>)`: `WriteLogger::init(LevelFilter::Trace, Config::default(), File::create(path)?)?;`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the default log location (`<cache dir>/gitui/gitui.log`) and the `--logfile` override.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. args.rs: add
+	fn open_log_file(path: &Path) -> Result<File> {
+		if fs::symlink_metadata(path)
+			.is_ok_and(|m| m.file_type().is_symlink())
+		{
+			bail!("refusing to write log through symlink: {}", path.display());
+		}
+		let mut options = fs::OpenOptions::new();
+		options.write(true).create(true).truncate(true);
+		#[cfg(unix)]
+		{
+			use std::os::unix::fs::OpenOptionsExt;
+			options.mode(0o600);
+		}
+		Ok(options.open(path)?)
+	}
+   and in setup_logging use `open_log_file(&path)?` instead of `File::create(path)?`. Add `bail` to the `anyhow` import and `Path` to the std imports if missing.
+2. Tests, in args.rs (add `#[cfg(test)] mod tests` if absent):
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_mode_0600() {
+		use std::os::unix::fs::PermissionsExt;
+		let dir = tempfile::tempdir().unwrap();
+		let path = dir.path().join("gitui.log");
+		drop(open_log_file(&path).unwrap());
+		assert_eq!(fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+	}
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_refuses_symlink() {
+		let dir = tempfile::tempdir().unwrap();
+		let target = dir.path().join("target.txt");
+		fs::write(&target, "keep").unwrap();
+		let link = dir.path().join("gitui.log");
+		std::os::unix::fs::symlink(&target, &link).unwrap();
+		assert!(open_log_file(&link).is_err());
+		assert_eq!(fs::read_to_string(&target).unwrap(), "keep");
+	}
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn open_log_file\(' src/args.rs && grep -qF 'options.mode(0o600)' src/args.rs && ! grep -qF 'File::create(path)?' src/args.rs && grep -qE '\bfn test_open_log_file_refuses_symlink\b' src/args.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4J: Credential Prompt Clears and Hides Both Inputs
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4J: When the credential prompt is closed, hide and clear both the username and password inputs, so the next prompt doesn't draw a stale password box over the username box (which made the next password get typed visibly into the username field).
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/cred.rs
+READ_ONLY_REFS:
+  - src/components/cred.rs:147-150 (`fn hide(&mut self) { self.cred = BasicAuthCredential::new(None, None); self.visible = false; }`)
+  - src/components/cred.rs:61-68 (draw: draws input_username then input_password when visible)
+  - src/components/cred.rs:152-160 (show: shows input_username if no username yet, else input_password)
+  - TextInputComponent has `hide()` and `clear()` (used at cred.rs:135-136)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change how push/pull/fetch react to the prompt closing (that is P2-10, a later phase).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. cred.rs hide(): add, after resetting `self.cred`:
+		self.input_username.hide();
+		self.input_username.clear();
+		self.input_password.hide();
+		self.input_password.clear();
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'self.input_username.clear();' src/components/cred.rs && test "$(grep -cF 'self.input_password.clear();' src/components/cred.rs)" -ge 2 && test "$(grep -cF 'self.input_username.hide();' src/components/cred.rs)" -ge 2
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 4K: commit.template Expands Only `~`
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 4K: Expand only `~` in commit.template (as git does), not $VARS, so config can't make gitui read a file named by an environment variable into the commit box.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/commit.rs
+READ_ONLY_REFS:
+  - src/popups/commit.rs:409-415 (`.and_then(|path| { shellexpand::full(path.as_str()).ok().and_then(|path| { PathBuf::from_str(path.as_ref()).ok() }) })`)
+  - `shellexpand::tilde(&str) -> Cow<str>` (infallible)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep reading commit.template from repo config (git-parity). Don't change COMMIT_EDITMSG handling.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. commit.rs: replace that `.and_then` closure with
+					.and_then(|path| {
+						PathBuf::from_str(
+							shellexpand::tilde(path.as_str()).as_ref(),
+						)
+						.ok()
+					})
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'shellexpand::full' src/popups/commit.rs && grep -qF 'shellexpand::tilde(path.as_str())' src/popups/commit.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
 ---
 
 ## Phase 1: Parallel Subagent Component Audit (completed)

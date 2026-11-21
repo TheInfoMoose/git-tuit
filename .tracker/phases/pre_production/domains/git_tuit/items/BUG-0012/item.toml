@@ -2,11 +2,11 @@
 id = "BUG-0012"
 type = "bug"
 title = "Unblock clippy --all-targets for test modules"
-status = "open"
+status = "closed"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:39Z"
-updated_at = "2026-11-21T06:53:06Z"
+updated_at = "2026-11-21T14:35:52Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "6c7855d3"
+summary = "STEPs 3B-3H, 3J, 3M: clippy --workspace --all-targets -D warnings passes (test allows + 46 test-code fixes)"

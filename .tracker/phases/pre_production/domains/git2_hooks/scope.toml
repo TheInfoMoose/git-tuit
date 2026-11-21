@@ -19,14 +19,14 @@ features = []
 [[items.bugs]]
 id = "BUG-0018"
 title = "Harden hook path expansion, name traversal and exec checks"
-status = "pending"
+status = "open"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0019"
 title = "Add option terminator to sh hook fallback"
-status = "pending"
+status = "open"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -57,3 +57,10 @@ title = "git2-hooks clippy and python3 hook tests"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T06:58:37Z"
+
+[[items.tasks]]
+id = "TASK-0041"
+title = "Hook path: ~ only, regular files, --"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T14:42:35Z"
