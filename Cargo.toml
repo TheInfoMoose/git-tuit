@@ -20,6 +20,7 @@ members = [
   "filetreelist",
   "git2-hooks",
   "git2-testing",
+  "invalidstring",
   "scopetime",
 ]
 

@@ -3,6 +3,7 @@ name = "filetreelist"
 version = "0.6.0"
 authors = ["extrawurst <mail@rusticorn.com>"]
 edition = "2021"
+rust-version = "1.88"
 description = "filetree abstraction based on a sorted path list, supports key based navigation events, folding, scrolling and more"
 homepage = "https://github.com/gitui-org/gitui"
 repository = "https://github.com/gitui-org/gitui"
