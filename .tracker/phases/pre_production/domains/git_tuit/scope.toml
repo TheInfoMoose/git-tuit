@@ -734,7 +734,7 @@ created_at = "2026-11-21T19:19:42Z"
 [[items.tasks]]
 id = "TASK-0053"
 title = "File discard prompt names the path, warns about untracked"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
 
