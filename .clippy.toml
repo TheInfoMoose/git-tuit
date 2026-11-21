@@ -1,2 +1,5 @@
 msrv = "1.88.0"
 cognitive-complexity-threshold = 18
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-panic-in-tests = true
