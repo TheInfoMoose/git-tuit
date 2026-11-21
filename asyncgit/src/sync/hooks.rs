@@ -392,7 +392,7 @@ mod tests {
 				root.to_string_lossy().trim_end_matches('/'),
 			);
 		} else {
-			assert!(false);
+			unreachable!("expected HookResult::NotOk");
 		}
 	}
 
@@ -431,11 +431,12 @@ mod tests {
 	#[test]
 	fn test_hooks_commit_msg_reject_in_hooks_folder_githooks_moved_absolute(
 	) {
+		const HOOKS_DIR: &str = "my_hooks";
+
 		let (_td, repo) = repo_init().unwrap();
 		let root = repo.workdir().unwrap();
 		let mut config = repo.config().unwrap();
 
-		const HOOKS_DIR: &str = "my_hooks";
 		config.set_str("core.hooksPath", HOOKS_DIR).unwrap();
 
 		let hook = b"#!/bin/sh
@@ -481,8 +482,9 @@ exit 1
 			None,
 		);
 
-		let expected_stdin =
-			git2_hooks::PrePushRef::to_stdin(&[update.clone()]);
+		let expected_stdin = git2_hooks::PrePushRef::to_stdin(
+			std::slice::from_ref(&update),
+		);
 
 		let res = git2_hooks::hooks_pre_push(
 			&repo,

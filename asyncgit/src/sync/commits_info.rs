@@ -322,6 +322,9 @@ mod tests {
 
 	#[test]
 	fn test_get_commit_from_revision() -> Result<()> {
+		const FOREIGN_HASH: &str =
+			"d6d7d55cb6e4ba7301d6a11a657aab4211e5777e";
+
 		let (_td, repo) = repo_init_empty().unwrap();
 		let root = repo.path().parent().unwrap();
 		let repo_path: &RepoPath =
@@ -339,8 +342,6 @@ mod tests {
 			c1
 		);
 
-		const FOREIGN_HASH: &str =
-			"d6d7d55cb6e4ba7301d6a11a657aab4211e5777e";
 		assert!(
 			CommitId::from_revision(repo_path, FOREIGN_HASH).is_err()
 		);

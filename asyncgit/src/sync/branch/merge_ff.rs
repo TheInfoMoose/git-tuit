@@ -136,9 +136,9 @@ mod test {
 		)
 		.unwrap();
 
-		let commits = get_commit_ids(&clone1, 10);
-		assert_eq!(commits.len(), 2);
-		assert_eq!(commits[1], commit1);
-		assert_eq!(commits[0], commit2);
+		let commit_ids = get_commit_ids(&clone1, 10);
+		assert_eq!(commit_ids.len(), 2);
+		assert_eq!(commit_ids[1], commit1);
+		assert_eq!(commit_ids[0], commit2);
 	}
 }
