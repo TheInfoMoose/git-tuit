@@ -71,6 +71,7 @@ impl FileTree {
 		if !self.is_empty() {
 			self.items.collapse(0, true);
 			self.items.expand(0, false);
+			self.visual_selection = self.calc_visual_selection();
 		}
 	}
 
@@ -110,6 +111,7 @@ impl FileTree {
 	pub fn collapse_recursive(&mut self) {
 		if let Some(selection) = self.selection {
 			self.items.collapse(selection, true);
+			self.visual_selection = self.calc_visual_selection();
 		}
 	}
 
@@ -117,6 +119,7 @@ impl FileTree {
 	pub fn expand_recursive(&mut self) {
 		if let Some(selection) = self.selection {
 			self.items.expand(selection, true);
+			self.visual_selection = self.calc_visual_selection();
 		}
 	}
 
@@ -178,22 +181,20 @@ impl FileTree {
 	}
 
 	pub fn select_file(&mut self, path: &Path) -> bool {
-		let new_selection = self
+		let Some(idx) = self
 			.items
 			.tree_items
 			.iter()
-			.position(|item| item.info().full_path() == path);
-
-		if new_selection == self.selection {
+			.position(|item| item.info().full_path() == path)
+		else {
 			return false;
-		}
+		};
 
-		self.selection = new_selection;
-		if let Some(selection) = self.selection {
-			self.items.show_element(selection);
-		}
+		let changed = self.selection != Some(idx);
+		self.selection = Some(idx);
+		self.items.show_element(idx);
 		self.visual_selection = self.calc_visual_selection();
-		true
+		changed
 	}
 
 	fn visual_index_to_absolute(
@@ -533,5 +534,23 @@ mod test {
 		assert_eq!(tree.selection, Some(2));
 		assert!(tree.move_selection(MoveSelection::PageUp));
 		assert_eq!(tree.selection, Some(0));
+	}
+
+	#[test]
+	fn test_select_file_miss_keeps_selection() {
+		let items = vec![
+			Path::new("a/b.txt"), //
+			Path::new("c.txt"),   //
+		];
+
+		let mut tree =
+			FileTree::new(&items, &BTreeSet::new()).unwrap();
+
+		assert!(tree.select_file(Path::new("c.txt")));
+		assert!(!tree.select_file(Path::new("missing.txt")));
+		assert_eq!(
+			tree.selected_file().map(crate::TreeItemInfo::full_path),
+			Some(Path::new("c.txt"))
+		);
 	}
 }

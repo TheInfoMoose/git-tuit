@@ -137,14 +137,13 @@ impl FileTreeItems {
 			for i in index + 1..self.tree_items.len() {
 				let item = &mut self.tree_items[i];
 
-				if recursive && item.kind().is_path() {
-					item.collapse_path();
-				}
-
 				let item_path =
 					Path::new(item.info().full_path_str());
 
 				if item_path.starts_with(&path) {
+					if recursive && item.kind().is_path() {
+						item.collapse_path();
+					}
 					item.hide();
 				} else {
 					break;
@@ -933,6 +932,28 @@ mod tests {
 		assert_eq!(tree.tree_items[0].info().indent(), 0);
 		assert!(tree.show_element(0).is_some());
 		assert!(tree.tree_items[0].info().is_visible());
+	}
+
+	#[test]
+	fn test_collapse_recursive_keeps_sibling() {
+		let items = vec![
+			Path::new("a/x/1.txt"), //
+			Path::new("b/2.txt"),   //
+		];
+
+		//0 a/x/
+		//1   1.txt
+		//2 b/
+		//3   2.txt
+
+		let mut tree =
+			FileTreeItems::new(&items, &BTreeSet::new()).unwrap();
+
+		tree.collapse(0, true);
+
+		assert!(tree.tree_items[2].kind().is_path());
+		assert!(!tree.tree_items[2].kind().is_path_collapsed());
+		assert!(tree.tree_items[3].info().is_visible());
 	}
 }
 
