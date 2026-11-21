@@ -34,6 +34,7 @@ struct LastResult<P, R> {
 pub struct AsyncBlame {
 	current: Arc<Mutex<Request<u64, FileBlame>>>,
 	last: Arc<Mutex<Option<LastResult<BlameParams, FileBlame>>>>,
+	last_error: Arc<Mutex<Option<String>>>,
 	sender: Sender<AsyncGitNotification>,
 	pending: Arc<AtomicUsize>,
 	repo: RepoPath,
@@ -49,6 +50,7 @@ impl AsyncBlame {
 			repo,
 			current: Arc::new(Mutex::new(Request(0, None))),
 			last: Arc::new(Mutex::new(None)),
+			last_error: Arc::new(Mutex::new(None)),
 			sender: sender.clone(),
 			pending: Arc::new(AtomicUsize::new(0)),
 		}
@@ -61,6 +63,11 @@ impl AsyncBlame {
 		Ok(last.clone().map(|last_result| {
 			(last_result.params, last_result.result)
 		}))
+	}
+
+	/// takes the error of the last failed blame, if any
+	pub fn take_last_error(&self) -> Result<Option<String>> {
+		Ok(self.last_error.lock()?.take())
 	}
 
 	///
@@ -99,6 +106,7 @@ impl AsyncBlame {
 
 		let arc_current = Arc::clone(&self.current);
 		let arc_last = Arc::clone(&self.last);
+		let arc_last_error = Arc::clone(&self.last_error);
 		let sender = self.sender.clone();
 		let arc_pending = Arc::clone(&self.pending);
 		let repo = self.repo.clone();
@@ -117,6 +125,10 @@ impl AsyncBlame {
 			let notify = match notify {
 				Err(err) => {
 					log::error!("get_blame_helper error: {err}");
+					if let Ok(mut last_error) = arc_last_error.lock()
+					{
+						*last_error = Some(err.to_string());
+					}
 					true
 				}
 				Ok(notify) => notify,

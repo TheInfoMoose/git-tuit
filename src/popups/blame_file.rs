@@ -447,6 +447,14 @@ impl BlameFilePopup {
 				ref mut async_blame,
 			)) = self.blame
 			{
+				if let Some(err) = async_blame.take_last_error()? {
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!("blame failed:\n{err}"),
+					));
+					self.hide_stacked(false);
+					return Ok(());
+				}
+
 				if let Some(params) = &self.params {
 					if let Some((
 						previous_blame_params,
