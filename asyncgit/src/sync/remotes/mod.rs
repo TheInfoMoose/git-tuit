@@ -298,6 +298,20 @@ fn fetch_from_remote(
 	Ok(())
 }
 
+/// scheme, host and port of a remote's URL, used to keep credentials on the host they were entered for
+fn remote_url_origin(
+	repo: &git2::Repository,
+	name: &str,
+) -> Option<(String, String, Option<u16>)> {
+	let remote = repo.find_remote(name).ok()?;
+	let url = url::Url::parse(remote.url().ok()?).ok()?;
+	Some((
+		url.scheme().to_owned(),
+		url.host_str()?.to_owned(),
+		url.port_or_known_default(),
+	))
+}
+
 /// updates/prunes all branches from all remotes
 pub fn fetch_all(
 	repo_path: &RepoPath,
@@ -315,14 +329,19 @@ pub fn fetch_all(
 		.map(String::from)
 		.collect::<Vec<_>>();
 	let remotes_count = remotes.len();
+	let cred_origin = get_default_remote_in_repo(&repo)
+		.ok()
+		.and_then(|name| remote_url_origin(&repo, &name));
 
 	for (idx, remote) in remotes.into_iter().enumerate() {
-		fetch_from_remote(
-			repo_path,
-			&remote,
-			basic_credential.clone(),
-			None,
-		)?;
+		let cred = if cred_origin.is_some()
+			&& remote_url_origin(&repo, &remote) == cred_origin
+		{
+			basic_credential.clone()
+		} else {
+			None
+		};
+		fetch_from_remote(repo_path, &remote, cred, None)?;
 
 		if let Some(sender) = progress_sender {
 			let progress = ProgressPercent::new(idx, remotes_count);
@@ -560,5 +579,20 @@ mod tests {
 		assert!(
 			matches!(default_push_remote, Ok(remote_name) if remote_name == "branchpushremote")
 		);
+	}
+
+	#[test]
+	fn test_remote_url_origin() {
+		let (_td, repo) = repo_init().unwrap();
+		repo.remote("origin", "https://example.com/a.git").unwrap();
+		repo.remote("same", "https://example.com:443/c.git")
+			.unwrap();
+		repo.remote("other", "https://example.org/b.git").unwrap();
+		repo.remote("ssh", "git@example.com:a.git").unwrap();
+		let origin = remote_url_origin(&repo, "origin");
+		assert!(origin.is_some());
+		assert_eq!(remote_url_origin(&repo, "same"), origin);
+		assert_ne!(remote_url_origin(&repo, "other"), origin);
+		assert_eq!(remote_url_origin(&repo, "ssh"), None);
 	}
 }
