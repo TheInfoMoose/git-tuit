@@ -300,35 +300,35 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0037"
 title = "Delete the right remote branch when the name contains a slash"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0038"
 title = "Show error popups instead of exiting on handler errors"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0039"
 title = "Fix underflow, out-of-bounds and expect panics in lists and popups"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0040"
 title = "Reset sticky hard-reset and discard defaults in popups"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0041"
 title = "Name targets and warn on untracked deletes in confirm prompts"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -342,21 +342,21 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0043"
 title = "Match popup event order to draw order"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0044"
 title = "Abort push, pull and fetch when credential prompt is cancelled"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0045"
 title = "Stop modal popups leaking key events"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -370,14 +370,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0047"
 title = "Restore pane visibility after closing blame or file revlog"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0048"
 title = "Process search and highlight updates while tab is hidden"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -391,14 +391,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0051"
 title = "Apply stash untracked and keep-index toggles to stashing list"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0052"
 title = "Fix NeedsUpdate REMOTES bit collision and remote status handling"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -419,7 +419,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0055"
 title = "Surface fetch, blame, remote-tag and remote-URL errors"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -454,9 +454,16 @@ created_at = "2026-11-21T06:46:40Z"
 [[items.bugs]]
 id = "BUG-0061"
 title = "Tighten an existing trace log file to 0600"
-status = "open"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T18:13:08Z"
+
+[[items.bugs]]
+id = "BUG-0062"
+title = "Guard the 0-line discard prompt and show the full branch in force-push confirm"
+status = "pending"
+severity = "low"
+created_at = "2026-11-21T20:03:58Z"
 
 [[items.features]]
 id = "FEAT-0002"
@@ -793,3 +800,52 @@ title = "Cancel and preflight errors in pull/fetch"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0063"
+title = "Popup event order = reverse draw order; no tab keys under popups"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0064"
+title = "Panes come back after blame/file history"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0066"
+title = "REMOTES bit, branch list refresh, truncation"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0069"
+title = "Modal popups consume their keys"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0070"
+title = "Stash list keys, fuzzy nav, tab-switch refresh"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0071"
+title = "Search/highlight finish while tab hidden"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:03Z"
+
+[[items.tasks]]
+id = "TASK-0072"
+title = "Stashing tab honors the untracked toggle"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:03Z"

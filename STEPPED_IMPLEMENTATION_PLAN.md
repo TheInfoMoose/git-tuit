@@ -42,7 +42,9 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 5 goal:** no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete. P2-08 (extra confirm dialogs for revert/merge/rebase/detached checkout/submodule update) moves to Phase 6.
+**Phase 6 goal:** popups get keys in the order they're drawn and don't leak them; panes, searches, highlighting, blame and fetch never stay blank, stuck or silent; the file tree and stash list keep working selections and toggles.
+
+_Phase 5 goal (done, reviewed 2026-11-21):_ no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete.
 
 _Phase 4 goal (done, reviewed 2026-11-21):_ closed the places where gitui was looser than git or unsafe with credentials, hooks, signing keys, editor launch, clipboard and its own log file (git-parity threat model).
 
@@ -56,18 +58,16 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 5A** | `/boost` | Error boundaries in App (no more TUI exit on handler errors) | `src/app.rs` | — |
-| 2 | **STEP 5J** | `/goal` | Reset/checkout popups open on the safe option | `src/popups/reset.rs`, `src/popups/checkout_option.rs` | — |
-| 3 | **STEP 5K** | `/goal` | File discard prompt names the path, warns about untracked | `src/popups/confirm.rs`, `src/strings.rs` | — |
-| 4 | **STEP 5L** | `/goal` | Tighten an existing trace log to 0600 | `src/args.rs` | — |
-| 5 | **STEP 5B** | `/boost` | Delete the right remote branch | `src/app.rs`, `src/popups/push.rs` | — |
-| 6 | **STEP 5C** | `/goal` | Tag delete without remote, stage-remove-all errors | `src/app.rs`, `src/components/changes.rs` | — |
-| 7 | **STEP 5D** | `/goal` | Tree underflow panics | `filetreelist/src/filetreeitems.rs`, `src/components/utils/statustree.rs` | — |
-| 8 | **STEP 5E** | `/goal` | Commit list and status tree panics | `src/components/commitlist.rs`, `src/components/status_tree.rs`, `src/components/utils/filetree.rs` | — |
-| 9 | **STEP 5F** | `/goal` | Tag, blame and remote list panics | `src/popups/taglist.rs`, `src/popups/blame_file.rs`, `src/popups/remotelist.rs` | — |
-| 10 | **STEP 5G** | `/goal` | Branch list status error instead of panic | `src/popups/branchlist.rs` | — |
-| 11 | **STEP 5H** | `/goal` | Cancelling credentials cancels push/push-tags | `src/popups/push.rs`, `src/popups/push_tags.rs` | — |
-| 12 | **STEP 5I** | `/goal` | Cancel and preflight errors in pull/fetch | `src/popups/pull.rs`, `src/popups/fetch.rs` | — |
+| 1 | **STEP 6A** | `/goal` | Popup event order = reverse draw order; no tab keys under popups | `src/app.rs` | — |
+| 2 | **STEP 6D** | `/goal` | Panes come back after blame/file history | `src/tabs/files.rs`, `src/components/changes.rs`, `src/tabs/stashing.rs` | — |
+| 3 | **STEP 6F** | `/goal` | File tree keeps a valid selection | `filetreelist/src/filetree.rs`, `filetreelist/src/filetreeitems.rs` | — |
+| 4 | **STEP 6H** | `/goal` | REMOTES bit, branch list refresh, truncation | `src/queue.rs`, `src/popups/branchlist.rs`, `src/popups/submodules.rs` | — |
+| 5 | **STEP 6I** | `/goal` | Show fetch errors | `asyncgit/src/fetch_job.rs`, `src/popups/fetch.rs` | — |
+| 6 | **STEP 6J** | `/goal` | Blame errors stop the spinner | `asyncgit/src/blame.rs`, `src/popups/blame_file.rs` | — |
+| 7 | **STEP 6B** | `/goal` | Modal popups consume their keys | `src/popups/revision_files.rs`, `src/popups/taglist.rs`, `src/popups/inspect_commit.rs` | — |
+| 8 | **STEP 6C** | `/goal` | Stash list keys, fuzzy nav, tab-switch refresh | `src/tabs/stashlist.rs`, `src/popups/fuzzy_find.rs`, `src/app.rs` | — |
+| 9 | **STEP 6E** | `/goal` | Search/highlight finish while tab hidden | `src/tabs/revlog.rs`, `src/tabs/files.rs` | — |
+| 10 | **STEP 6G** | `/goal` | Stashing tab honors the untracked toggle | `src/tabs/stashing.rs` | — |
 
 ### Completed
 
@@ -109,6 +109,18 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 4J | ✅ f7995523 | `/goal` | Credential prompt clears both inputs | `src/components/cred.rs` |
 | STEP 4K | ✅ 8dc7eadb | `/goal` | commit.template expands ~ only | `src/popups/commit.rs` |
 | STEP 4C | ✅ 8d452264 | `/goal` | Redact passwords in Debug and logs | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/remotes/callbacks.rs` |
+| STEP 5A | ✅ 7cd02752 | `/boost` | Error boundaries in App | `src/app.rs` |
+| STEP 5J | ✅ f5d20cfd | `/goal` | Reset/checkout popups open on the safe option | `src/popups/reset.rs`, `src/popups/checkout_option.rs` |
+| STEP 5K | ✅ 3f79314d | `/goal` | File discard prompt names the path | `src/popups/confirm.rs`, `src/strings.rs` |
+| STEP 5L | ✅ 0cb2aa18 | `/goal` | Tighten an existing trace log to 0600 | `src/args.rs` |
+| STEP 5B | ✅ 10c7fb9c | `/boost` | Delete the right remote branch | `src/app.rs`, `src/popups/push.rs` |
+| STEP 5C | ✅ 2f3d4d0a | `/goal` | Tag delete without remote, unstage-all errors | `src/app.rs`, `src/components/changes.rs` |
+| STEP 5D | ✅ b6c9f071 | `/goal` | Tree underflow panics | `filetreelist/src/filetreeitems.rs`, `src/components/utils/statustree.rs` |
+| STEP 5E | ✅ 682bb6a0 | `/goal` | Commit list and status tree panics | `src/components/commitlist.rs`, `src/components/status_tree.rs`, `src/components/utils/filetree.rs` |
+| STEP 5F | ✅ 6f02c395 | `/goal` | Tag, blame, remote list panics | `src/popups/taglist.rs`, `src/popups/blame_file.rs`, `src/popups/remotelist.rs` |
+| STEP 5G | ✅ aa9ee1ec | `/goal` | Branch list status error | `src/popups/branchlist.rs` |
+| STEP 5H | ✅ f1d5782d | `/goal` | Cancel credentials cancels push/push-tags | `src/popups/push.rs`, `src/popups/push_tags.rs` |
+| STEP 5I | ✅ e6ec537b | `/goal` | Cancel and preflight errors in pull/fetch | `src/popups/pull.rs`, `src/popups/fetch.rs` |
 
 ### User Step: IMAGE
 
@@ -142,8 +154,8 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 6 — Usability and modal flow.** Goal: popups take events in draw order, nothing leaks keys or gets stuck, errors are shown. P2-08 (moved from Phase 5), P2-09, P2-11..P2-23, P2-21 error getters, one finding (or half of one) per step, ≤3 files each (~14 steps).
-- **Phase 7 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
+- **Phase 7 — Remaining usability.** Goal: confirmations, key hints, small-terminal layout, keymap, selection and input-validation polish. P2-08 (confirm dialogs for revert/merge/rebase/detached checkout/submodule update), P2-12 (key hints), P2-16 (80x24 layout, scroll clamping), P2-19 (vim keymap collision, singleline Ctrl+n/p), P2-20 (status tree lookup, commit list marks/widths), P2-22 (stuck loading, stale tab index, focus), P2-23 (pre-submit input validation), rest of P2-18 (Status remote/detached-HEAD state), rest of P2-21 (tag/remote-URL errors), BUG-0062.
+- **Phase 8 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
   - Shared plain-border block helpers (P3-03)
@@ -2701,6 +2713,377 @@ grep -qE '\bfn open_log_file\(' src/args.rs
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'Permissions::from_mode(0o600)' src/args.rs && grep -qE '\bfn test_open_log_file_tightens_existing_mode\b' src/args.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+## Phase 6: Modal flow and stuck states (high-severity usability)
+
+Same conventions as Phase 5: snippets show intent and shape; where clippy (`all, pedantic, nursery`) rejects a shape, use the form clippy suggests and keep the behavior. Markers are short fixed strings. A **modal popup** is one that, while visible, must consume every key event it receives (return `EventState::Consumed`) so nothing leaks to the tabs or popups under it.
+
+### STEP 6A: Popup Event Order Matches Draw Order
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6A: Make the event order of popups the exact reverse of their draw order, so the popup drawn on top always gets keys first, and stop tab/options shortcuts firing underneath an open popup.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+READ_ONLY_REFS:
+  - src/app.rs:506-546 (`accessors!(self, [ log_search_popup, fuzzy_find_popup, msg_popup, ... help_popup, revlog, status_tab, files_tab, stashing_tab, stashlist_tab ])` — event order: first entry gets events first, see event_pump in src/components/mod.rs:142-153)
+  - src/app.rs:548-582 (`setup_popups!(self, [ commit_popup, stashmsg_popup, help_popup, ..., confirm_popup, msg_popup, goto_line_popup ])` — draw order: first is drawn first, i.e. at the bottom)
+  - src/app.rs:316-368 (App::event key chain: tab_toggle, tab_toggle_reverse, tab_status/log/files/stashing/stashes via `self.switch_tab(k)?`, cmd_bar_toggle, open_options)
+  - `fn any_popup_visible(&self) -> bool` is generated by setup_popups! (src/components/mod.rs:97-104)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change the setup_popups! (draw) order; don't add or remove popups.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. app.rs accessors!: replace the popup part of the list with the exact reverse of the setup_popups! list, followed by the five tabs unchanged:
+	goto_line_popup, msg_popup, confirm_popup, options_popup, fetch_popup, pull_popup, push_tags_popup, push_popup, log_search_popup, fuzzy_find_popup, revision_files_popup, rename_branch_popup, create_branch_popup, checkout_option_popup, reset_popup, tags_popup, submodule_popup, update_remote_url_popup, rename_remote_popup, create_remote_popup, remotes_popup, select_branch_popup, tag_commit_popup, external_editor_popup, file_revlog_popup, blame_file_popup, compare_commits_popup, inspect_commit_popup, help_popup, stashmsg_popup, commit_popup,
+	revlog, status_tab, files_tab, stashing_tab, stashlist_tab
+   Add a comment above it: `// event order: reverse of the draw order in setup_popups! below (topmost popup first)`.
+2. App::event: before the key chain, `let popup_open = self.any_popup_visible();` and require `!popup_open` in the conditions for tab_toggle, tab_toggle_reverse, the five tab_* switch keys and open_options (cmd_bar_toggle stays allowed). With a popup open those keys do nothing here.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'event order: reverse of the draw order' src/app.rs && grep -qF 'let popup_open = self.any_popup_visible();' src/app.rs && test "$(grep -cF '!popup_open' src/app.rs)" -ge 4
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6B: Modal Popups Consume Their Keys
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6B: Stop the revision-files, tag-list and inspect-commit popups from passing keys through to whatever is underneath while they are open.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/revision_files.rs
+  - src/popups/taglist.rs
+  - src/popups/inspect_commit.rs
+READ_ONLY_REFS:
+  - src/popups/revision_files.rs:123-145 (event: on exit_popup calls `self.hide_stacked(false)` but doesn't return; then `let res = self.files.event(event)?; ... return Ok(res);` — returns NotConsumed for keys the files component ignores)
+  - src/popups/taglist.rs:228-260 (delete_tag / select_tag branches: `self.selected_tag().map_or(Ok(EventState::NotConsumed), ...)` — with no tags the key leaks)
+  - src/popups/inspect_commit.rs:174-192 (open_file_tree branch: `return Ok(EventState::NotConsumed);` when `open_request` is None)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the `hide_stacked(true)` logic in revision_files (it stacks the popup when the files component hid itself).
+
+[PRE_GATE]
+grep -qF 'event order: reverse of the draw order' src/app.rs
+
+[MUTATION_SPEC]
+1. revision_files.rs event: after `self.hide_stacked(false);` in the exit_popup branch, `return Ok(EventState::Consumed);`. At the end of the visible branch, keep the `hide_stacked(true)` check and return `Ok(EventState::Consumed)` instead of `Ok(res)`.
+2. taglist.rs: in the delete_tag and select_tag branches, the `map_or` default becomes `Ok(EventState::Consumed)`.
+3. inspect_commit.rs: the `return Ok(EventState::NotConsumed);` in the open_file_tree branch becomes `return Ok(EventState::Consumed);`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'return Ok(res);' src/popups/revision_files.rs && ! grep -qF 'Ok(EventState::NotConsumed),' src/popups/taglist.rs && ! grep -qF 'return Ok(EventState::NotConsumed);' src/popups/inspect_commit.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6C: Stash List Keys, Fuzzy Finder Navigation, Tab-Switch Refresh
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6C: The stash list consumes the keys it acts on; the fuzzy finder's Up/Down move the selection instead of being re-handled (and reset) by its text input; jumping to the Status tab refreshes it; fuzzy-file selection goes only to the view that opened the finder.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/stashlist.rs
+  - src/popups/fuzzy_find.rs
+  - src/app.rs
+READ_ONLY_REFS:
+  - src/tabs/stashlist.rs:195-221 (after `self.list.event(ev)?`: enter → pop_stash, stash_apply, stash_drop, stash_open → inspect; then always `Ok(EventState::NotConsumed)`)
+  - src/popups/fuzzy_find.rs:336-361 (event: exit/enter → `self.hide()`, popup_down/popup_up → `move_selection`, then always `self.find_text.event(event)?` → `update_query()` which resets `self.selection = 0`); fuzzy_find.rs:371-373 (`fn hide(&mut self) { self.visible = false; }`)
+  - src/app.rs:825 (`InternalEvent::TabSwitchStatus => self.set_tab(0)?,` — no NeedsUpdate flags, unlike TabSwitch at :826-829)
+  - src/app.rs:898-915 (FuzzyFinderChanged with FuzzyFinderTarget::Files updates both `self.files_tab` and `self.revision_files_popup`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change the accessors!/setup_popups! lists (STEP 6A).
+
+[PRE_GATE]
+grep -qF 'event order: reverse of the draw order' src/app.rs
+
+[MUTATION_SPEC]
+1. stashlist.rs: each matched key branch (enter, stash_apply, stash_drop, stash_open) returns `Ok(EventState::Consumed)` after its action.
+2. fuzzy_find.rs event: when the key matched exit_popup/enter or popup_down/popup_up, `return Ok(EventState::Consumed);` right after handling it, so `find_text` only sees other keys.
+3. fuzzy_find.rs hide(): also call `self.find_text.hide();`.
+4. app.rs TabSwitchStatus: `=> { self.set_tab(0)?; flags.insert(NeedsUpdate::ALL); }`.
+5. app.rs FuzzyFinderChanged, Files target: if `self.revision_files_popup.is_visible()` update only the popup, else only `self.files_tab`. Put the comment `// fuzzy file selection goes only to the view that opened the finder` above it.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(grep -cF 'return Ok(EventState::Consumed);' src/tabs/stashlist.rs)" -ge 4 && grep -qF 'self.find_text.hide();' src/popups/fuzzy_find.rs && ! grep -qF 'InternalEvent::TabSwitchStatus => self.set_tab(0)?,' src/app.rs && grep -qF 'goes only to the view that opened the finder' src/app.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6D: Panes Come Back After Blame or File History
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6D: When a tab's file tree hides itself to open blame or file-history (a back-channel the popups use to stack themselves), the owning tab shows it again, so the Files, Status and Stashing panes don't stay blank after the popup closes.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/files.rs
+  - src/components/changes.rs
+  - src/tabs/stashing.rs
+READ_ONLY_REFS:
+  - src/components/revision_files.rs:486-497 (`if self.blame() { self.hide(); ... }`, `if self.file_history() { self.hide(); ... }`) and src/components/status_tree.rs:320, :485 (`self.hide();` before queuing OpenPopup)
+  - Popups that rely on this hide to stack themselves and must keep it: src/popups/revision_files.rs:134-139, src/components/commit_details/mod.rs:198-205
+  - src/tabs/files.rs:95-101 (FilesTab::event: `return self.files.event(ev);`)
+  - src/components/changes.rs:247-250 (ChangesComponent::event: `if self.files.event(ev)?.is_consumed() { return Ok(EventState::Consumed); }`; used by the Status tab for the working-dir and index trees)
+  - src/tabs/stashing.rs (the `index: StatusTreeComponent` field; its event handler forwards to `self.index`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't remove the `self.hide()` calls in revision_files.rs/status_tree.rs (the popups need them).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. files.rs FilesTab::event: `let res = self.files.event(ev)?; if !self.files.is_visible() { self.files.show()?; } return Ok(res);` (comment: `// the tree hides itself to open blame/history popups; the tab keeps it shown`).
+2. changes.rs ChangesComponent::event: after a consumed `self.files.event(ev)?`, `if !self.files.is_visible() { self.files.show()?; }` before returning Consumed (same comment).
+3. stashing.rs: in the event handler, after forwarding to `self.index`, `if self.is_visible() && !self.index.is_visible() { self.index.show()?; }` (same comment).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'the tab keeps it shown' src/tabs/files.rs && grep -qF 'the tab keeps it shown' src/components/changes.rs && grep -qF 'the tab keeps it shown' src/tabs/stashing.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6E: Search and Highlighting Finish While a Tab Is Hidden
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6E: Process the log search's CommitFilter notification and the Files tab's async (syntax-highlighting) notifications even while their tab is hidden, so switching tabs mid-search or mid-highlight doesn't leave them stuck at "Searching" / "(0%)".
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/revlog.rs
+  - src/tabs/files.rs
+READ_ONLY_REFS:
+  - src/tabs/revlog.rs:153-170 (`pub fn update_git(&mut self, ev)`: `if self.visible { match ev { ... AsyncGitNotification::CommitFilter => { self.update_search_state(); } ... } }`)
+  - src/tabs/files.rs:51-59 (`pub fn update_async(&mut self, ev: AsyncNotification)`: `if self.is_visible() { self.files.update(ev)?; }`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Other notification arms in revlog keep their visibility gate.
+
+[PRE_GATE]
+grep -qF 'the tab keeps it shown' src/tabs/files.rs
+
+[MUTATION_SPEC]
+1. revlog.rs update_git: handle `AsyncGitNotification::CommitFilter` before the `if self.visible` gate (call `self.update_search_state();` and return Ok(())), and remove its arm from the gated match. Comment above it: `// search results must land even while the tab is hidden`.
+2. files.rs update_async: drop the `if self.is_visible()` gate and always call `self.files.update(ev)?;` (comment: `// async results must land even while the tab is hidden`).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'async results must land even while the tab is hidden' src/tabs/files.rs && grep -qF 'search results must land even while the tab is hidden' src/tabs/revlog.rs && test "$(grep -cF 'AsyncGitNotification::CommitFilter' src/tabs/revlog.rs)" = 1
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6F: File Tree Keeps a Valid Selection
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6F: FileTree::select_file keeps the current selection when the path isn't found (instead of clearing it and breaking keyboard navigation), re-reveals a re-selected file, recalculates the visual selection after collapse/expand, and collapsing a folder recursively no longer collapses the next sibling folder.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - filetreelist/src/filetree.rs
+  - filetreelist/src/filetreeitems.rs
+READ_ONLY_REFS:
+  - filetreelist/src/filetree.rs:180-197 (`pub fn select_file(&mut self, path: &Path) -> bool`: `let new_selection = ...position(..)`; `if new_selection == self.selection { return false; }`; `self.selection = new_selection;` (None on a miss); show_element; recompute visual_selection)
+  - filetreelist/src/filetree.rs:69-75 (collapse_but_root), :106-117 (collapse_recursive, expand_recursive) — none recompute `self.visual_selection`
+  - filetreelist/src/filetreeitems.rs:129-152 (collapse: in the loop, `if recursive && item.kind().is_path() { item.collapse_path(); }` runs before `if item_path.starts_with(&path) { item.hide(); } else { break; }`, so the first non-descendant folder gets collapsed too)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep select_file's `bool` return meaning "selection changed".
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. filetree.rs select_file: on a miss (`position` is None) return false and leave `self.selection` unchanged. On a hit, always call `self.items.show_element(idx)` and recompute `self.visual_selection`, then return whether the selection changed.
+2. filetree.rs: in collapse_but_root, collapse_recursive and expand_recursive, add `self.visual_selection = self.calc_visual_selection();` after the change.
+3. filetreeitems.rs collapse: move the `if recursive && item.kind().is_path() { item.collapse_path(); }` inside the `if item_path.starts_with(&path)` branch (before `item.hide()`).
+4. Tests:
+   - filetree.rs tests: `test_select_file_miss_keeps_selection` — tree from `["a/b.txt", "c.txt"]`, `select_file(Path::new("c.txt"))` → true; `select_file(Path::new("missing.txt"))` → false; `selected_file()` still `c.txt`.
+   - filetreeitems.rs tests: `test_collapse_recursive_keeps_sibling` — items from `["a/x/1.txt", "b/2.txt"]`, collapse the index of `a` with `recursive = true`, assert folder `b` is still expanded (not collapsed) and `b/2.txt` is visible.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn test_select_file_miss_keeps_selection\b' filetreelist/src/filetree.rs && grep -qE '\bfn test_collapse_recursive_keeps_sibling\b' filetreelist/src/filetreeitems.rs && test "$(grep -cF 'self.visual_selection = self.calc_visual_selection();' filetreelist/src/filetree.rs)" -ge 4
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6G: Stashing Tab Honors the Untracked Toggle
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6G: The Stashing tab's file list hides untracked files when "stash untracked" is off, and the toggle survives switching tabs instead of resetting from git config on every show.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/stashing.rs
+READ_ONLY_REFS:
+  - src/tabs/stashing.rs:71-80 (`pub fn update(&self)`: `//TODO: support options` then `.fetch(&StatusParams::new(StatusType::Both, None))?;`)
+  - src/tabs/stashing.rs:258-273 (show(): re-derives `self.options.stash_untracked = !config_untracked_files.include_none();` on every show)
+  - asyncgit StatusParams::new(status_type: StatusType, config: Option<ShowUntrackedFilesConfig>) (asyncgit/src/status.rs:32-40); ShowUntrackedFilesConfig::{No, Normal, All} (asyncgit/src/sync/config.rs:14-22). `None` means "use the repo's status.showUntrackedFiles".
+  - keep_index doesn't change what gets stashed (git stashes everything and keeps the index), so the list stays the same for it.
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qF 'the tab keeps it shown' src/tabs/stashing.rs
+
+[MUTATION_SPEC]
+1. update(): `let untracked = (!self.options.stash_untracked).then_some(ShowUntrackedFilesConfig::No);` and fetch with `StatusParams::new(StatusType::Both, untracked)`. Remove the `//TODO: support options` comment. Import ShowUntrackedFilesConfig from asyncgit::sync.
+2. Add a field `options_initialized: bool` (false in new). In show(), derive `stash_untracked` from config only when `!self.options_initialized`, then set it to true.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'TODO: support options' src/tabs/stashing.rs && grep -qF 'then_some(ShowUntrackedFilesConfig::No)' src/tabs/stashing.rs && grep -qF 'options_initialized' src/tabs/stashing.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6H: REMOTES Flag, Branch List Refresh and Truncation
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6H: Give NeedsUpdate::REMOTES its own bit (it was ALL|BRANCHES), refresh the branch list after a fetch, drop every `*/HEAD` remote branch, and actually truncate long commit messages and submodule paths before appending "...".
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/queue.rs
+  - src/popups/branchlist.rs
+  - src/popups/submodules.rs
+READ_ONLY_REFS:
+  - src/queue.rs:20-34 (`const REMOTES = 0b1001;` next to ALL = 0b001 and BRANCHES = 0b1000)
+  - src/popups/branchlist.rs:320-326 (`.position(|b| b.name.ends_with("/HEAD")).map(|idx| self.branches.remove(idx));` — removes only the first)
+  - src/popups/branchlist.rs:332-341 (update_git: `if self.is_visible() && ev == AsyncGitNotification::Push {`)
+  - src/popups/branchlist.rs:505-509 (`commit_message.unicode_truncate(commit_message_length.saturating_sub(THREE_DOTS_LENGTH));` — return value (truncated &str, width) is discarded; compare the branch_name code just below, which uses `.0`)
+  - src/popups/submodules.rs:363-367 (same discarded `module_path.unicode_truncate(..)`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. queue.rs: `const REMOTES = 0b1001;` → `const REMOTES = 0b1_0000;`.
+2. branchlist.rs update_branches: replace the position/remove with `self.branches.retain(|b| !b.name.ends_with("/HEAD"));` (still only when `!self.local`).
+3. branchlist.rs update_git: refresh on `AsyncGitNotification::Push | AsyncGitNotification::Fetch` (use `matches!`).
+4. branchlist.rs commit message: `commit_message = commit_message.unicode_truncate(..).0.to_string();` then append THREE_DOTS.
+5. submodules.rs: `module_path = module_path.unicode_truncate(..).0.to_string();` then append THREE_DOTS.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'const REMOTES = 0b1_0000;' src/queue.rs && grep -qF 'retain(|b| !b.name.ends_with("/HEAD"))' src/popups/branchlist.rs && grep -qF 'AsyncGitNotification::Fetch' src/popups/branchlist.rs && grep -qF 'commit_message = commit_message' src/popups/branchlist.rs && grep -qF 'module_path = module_path' src/popups/submodules.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6I: Show Fetch Errors
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6I: Surface a failed fetch (bad credentials, unreachable remote) as an error popup instead of closing the fetch popup silently.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/fetch_job.rs
+  - src/popups/fetch.rs
+READ_ONLY_REFS:
+  - asyncgit/src/fetch_job.rs:13-68 (`enum JobState { Request(Option<BasicAuthCredential>), Response(Result<()>) }`, `pub struct AsyncFetchJob { state: Arc<Mutex<Option<JobState>>>, repo }`; run() stores `JobState::Response(result)` and nothing reads it)
+  - src/popups/fetch.rs:107-118 (update_git → update(): `self.pending = self.async_fetch.is_pending(); ... if !self.pending { self.hide(); ...`)
+  - AsyncSingleJob::take_last(&self) -> Option<J> (asyncgit/src/asyncjob/mod.rs:107)
+  - src/popups/fetch.rs has `queue: Queue`; InternalEvent::ShowErrorMsg(String)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep AsyncFetchJob::new's signature.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. fetch_job.rs: add
+	/// the fetch's error message, once the job has finished with an error
+	pub fn error(&self) -> Option<String> {
+		let state = self.state.lock().ok()?;
+		match state.as_ref()? {
+			JobState::Response(Err(e)) => Some(e.to_string()),
+			_ => None,
+		}
+	}
+2. fetch.rs update(): when `!self.pending`, before hiding: `if let Some(err) = self.async_fetch.take_last().and_then(|job| job.error()) { self.queue.push(InternalEvent::ShowErrorMsg(format!("fetch failed:\n{err}"))); }`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE 'pub fn error\(&self\) -> Option<String>' asyncgit/src/fetch_job.rs && grep -qF 'fetch failed:' src/popups/fetch.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 6J: Blame Errors Stop the Spinner
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 6J: When blaming a file fails, show the error and close the blame popup, instead of logging it and re-requesting forever behind a spinner.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/blame.rs
+  - src/popups/blame_file.rs
+READ_ONLY_REFS:
+  - asyncgit/src/blame.rs:33-40 (`pub struct AsyncBlame { current, last, sender, pending, repo }`), :107-125 (spawned task: `Err(err) => { log::error!("get_blame_helper error: {err}"); true }` — notifies but leaves `last` unchanged)
+  - asyncgit/src/blame.rs:58-64 (`pub fn last(&self) -> Result<Option<(BlameParams, FileBlame)>>`)
+  - src/popups/blame_file.rs:443-482 (update(): in BlameProcess::GettingBlame, if `last()` doesn't match `params` it calls `async_blame.request(params.clone())?` again → endless loop on a persistent error)
+  - src/popups/blame_file.rs:89 (`queue: Queue`), :379 (`fn hide_stacked(&mut self, stack: bool)`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep AsyncBlame's existing pub fns.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. blame.rs: add a field `last_error: Arc<Mutex<Option<String>>>` (init `Arc::new(Mutex::new(None))`); clone it into the spawned task and, in the `Err(err)` arm, store `err.to_string()` in it (keep the log line). Add
+	/// takes the error of the last failed blame, if any
+	pub fn take_last_error(&self) -> Result<Option<String>> {
+		Ok(self.last_error.lock()?.take())
+	}
+2. blame_file.rs update(): inside the GettingBlame branch, first check `if let Some(err) = async_blame.take_last_error()? { self.queue.push(InternalEvent::ShowErrorMsg(format!("blame failed:\n{err}"))); self.hide_stacked(false); return Ok(()); }` (restructure to satisfy the borrow checker: read the error before calling self methods).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE 'pub fn take_last_error\(&self\)' asyncgit/src/blame.rs && grep -qF 'last_error' asyncgit/src/blame.rs && grep -qF 'blame failed:' src/popups/blame_file.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

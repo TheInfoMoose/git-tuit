@@ -24,6 +24,13 @@ features = []
 [[items.bugs]]
 id = "BUG-0049"
 title = "Keep file tree selection valid after select_file miss"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
+
+[[items.tasks]]
+id = "TASK-0065"
+title = "File tree keeps a valid selection"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"

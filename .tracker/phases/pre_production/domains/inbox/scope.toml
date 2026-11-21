@@ -21,3 +21,17 @@ title = "Tree underflow panics"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
+
+[[items.tasks]]
+id = "TASK-0067"
+title = "Show fetch errors"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"
+
+[[items.tasks]]
+id = "TASK-0068"
+title = "Blame errors stop the spinner"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T20:28:02Z"

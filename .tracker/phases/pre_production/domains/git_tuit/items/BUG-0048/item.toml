@@ -2,11 +2,11 @@
 id = "BUG-0048"
 type = "bug"
 title = "Process search and highlight updates while tab is hidden"
-status = "pending"
+status = "open"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:40Z"
-updated_at = "2026-11-21T05:36:40Z"
+updated_at = "2026-11-21T20:28:03Z"
 
 [effort]
 logged_time_minutes = 0
