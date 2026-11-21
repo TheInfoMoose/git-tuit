@@ -538,7 +538,7 @@ exit 0
 		assert_eq!(response.code, 42);
 		assert_eq!(response.hook, hook.hook);
 		assert_eq!(stdout, TEXT, "{:?} != {TEXT:?}", stdout);
-		assert!(response.stderr.is_empty());
+		assert_eq!(response.stderr, "");
 	}
 
 	#[test]
@@ -696,7 +696,7 @@ exit 1
 
 		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
-		let hook = b"#!/usr/bin/env python
+		let hook = b"#!/usr/bin/env python3
 import sys
 sys.exit(0)
         ";
@@ -717,7 +717,7 @@ sys.exit(0)
 
 		// mirror how python pre-commit sets itself up
 		#[cfg(not(windows))]
-		let hook = b"#!/usr/bin/env python
+		let hook = b"#!/usr/bin/env python3
 import sys
 sys.exit(1)
         ";
