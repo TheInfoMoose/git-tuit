@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0045"
 type = "task"
 title = "Clipboard lookup and OSC 52 flush"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T14:42:35Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T15:14:41Z"
 source_ref = "STEP 4H"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0045@2026-11-21T15:12:59Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "1b5a5b07"
+summary = "STEP 4H: Clipboard Tool Lookup and OSC 52 Flush (phased check PASS)"
