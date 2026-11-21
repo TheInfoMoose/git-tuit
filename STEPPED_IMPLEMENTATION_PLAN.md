@@ -32,6 +32,8 @@
 
 **Base gate note:** Phase 2's Base gate compiles everything but doesn't run clippy or tests, because HEAD doesn't pass `clippy --all-targets -D warnings` yet (audit `P0-15`: >1,270 test-module diagnostics). This is a temporary weaker gate: it hides existing clippy and test failures until Phase 3, whose review switches the Base gate to `cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`.
 
+**Gate environment:** POST_GATE runs twice: in the agent container (Neon/Hydrogen) and on the host (`phased:step_check`, authoritative). The container has no PyYAML, so YAML parse checks are written as `{ ! python3 -c 'import yaml' 2>/dev/null || <parse>; }`: skipped in the container, enforced on the host. The toolchain is pinned in `rust-toolchain.toml` (STEP 2J) so `cargo fmt` gives the same result in both places.
+
 **How to read this:** work goes strictly top to bottom through **Up Next**, one step at a time. The **#** column is the only order. Step IDs are kept because commits and notes cite them. A step whose "Waits on" names an Open Question or a **[USER]** action doesn't start until that's resolved.
 
 **Who runs what (phased workflow, through Orrery `gemini-phased`):**
@@ -49,15 +51,16 @@
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
 | 1 | **[USER] FETCH** | — | Warm the host crate cache | `~/.cargo/registry` | **[USER]** runs the commands under "User Step: FETCH". |
-| 2 | **STEP 2A** | `/goal` | Linux-only CI workflow | `.github/workflows/ci.yml` | — |
-| 3 | **STEP 2B** | `/goal` | Remove upstream workflows, Linux-only release | `.github/workflows/cd.yml`, `nightly.yml`, `brew.yml` | — |
-| 4 | **STEP 2C** | `/goal` | Workspace manifests and dependabot cadence | `Cargo.toml`, member `Cargo.toml`s, `.github/dependabot.yml` | — |
-| 5 | **STEP 2D** | `/goal` | `deny.toml` for cargo-deny 0.20 | `deny.toml` | — |
-| 6 | **STEP 2E** | `/goal` | jiff dependency, `build.rs` and `time_to_string` | `Cargo.toml`, `build.rs`, `src/components/utils/mod.rs` | — |
-| 7 | **STEP 2F** | `/goal` | jiff in `LogEntry` and its callers | `src/components/utils/logitems.rs`, `src/components/commitlist.rs`, `src/popups/file_revlog.rs` | — |
-| 8 | **STEP 2G** | `/goal` | Drop `chrono` | `Cargo.toml`, `Cargo.lock` | — |
-| 9 | **STEP 2H** | `/goal` | Lockfile advisory updates | `Cargo.lock`, `asyncgit/Cargo.toml` | — |
-| 10 | **STEP 2I** | `/goal` | `Makefile` matches Linux CI | `Makefile`, `.cargo/config.toml` | — |
+| 2 | **STEP 2J** | `/goal` | Pin the Rust toolchain to 1.99.1 | `rust-toolchain.toml` | — |
+| 3 | **STEP 2A** | `/goal` | Linux-only CI workflow | `.github/workflows/ci.yml` | — |
+| 4 | **STEP 2B** | `/goal` | Remove upstream workflows, Linux-only release | `.github/workflows/cd.yml`, `nightly.yml`, `brew.yml` | — |
+| 5 | **STEP 2C** | `/goal` | Workspace manifests and dependabot cadence | `Cargo.toml`, member `Cargo.toml`s, `.github/dependabot.yml` | — |
+| 6 | **STEP 2D** | `/goal` | `deny.toml` for cargo-deny 0.20 | `deny.toml` | — |
+| 7 | **STEP 2E** | `/goal` | jiff dependency, `build.rs` and `time_to_string` | `Cargo.toml`, `build.rs`, `src/components/utils/mod.rs` | — |
+| 8 | **STEP 2F** | `/goal` | jiff in `LogEntry` and its callers | `src/components/utils/logitems.rs`, `src/components/commitlist.rs`, `src/popups/file_revlog.rs` | — |
+| 9 | **STEP 2G** | `/goal` | Drop `chrono` | `Cargo.toml`, `Cargo.lock` | — |
+| 10 | **STEP 2H** | `/goal` | Lockfile advisory updates | `Cargo.lock`, `asyncgit/Cargo.toml` | — |
+| 11 | **STEP 2I** | `/goal` | `Makefile` matches Linux CI | `Makefile`, `.cargo/config.toml` | — |
 
 ### Completed
 
@@ -131,6 +134,43 @@ Tracked in neb: `neb list --status pending`. Reviewed at phase end; only picked 
 
 ## Phase 2: Linux-only CI and supply chain
 
+### STEP 2J: Pin the Rust Toolchain
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 2J: Pin rust-toolchain.toml to 1.99.1 so rustfmt, clippy and cargo give the same result on the host gate, in the agent container and in CI's lint job.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - rust-toolchain.toml
+READ_ONLY_REFS:
+  - rust-toolchain.toml:1-3 (current: channel = "stable", profile = "default")
+  - Agent image toolchain is named `1.99.1-x86_64-unknown-linux-gnu`; floating `stable` pulled 1.100.0, whose rustfmt reformats asyncgit/src/sync/reword.rs:32, src/app.rs:1182, src/components/commitlist.rs:354 and src/popups/branchlist.rs:418 (TASK-0020).
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't reformat any .rs file.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. rust-toolchain.toml: replace the whole file with exactly:
+
+[toolchain]
+channel = "1.99.1"
+profile = "default"
+components = ["clippy", "rustfmt"]
+
+   Why: `stable` floats to whatever rustup last installed, so fmt results differ between environments. 1.99.1 is the toolchain in the agent image and on the host. CI's build/test matrix still chooses its own toolchain through RUSTUP_TOOLCHAIN.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml && grep -qF 'components = ["clippy", "rustfmt"]' rust-toolchain.toml && rustc --version | grep -qF 'rustc 1.99.1'
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
 ### STEP 2A: Linux-Only CI Workflow
 
 * **Recommended Command:** `/goal`
@@ -144,13 +184,13 @@ ALLOWED_FILES:
   - .github/workflows/ci.yml
 READ_ONLY_REFS:
   - AUDIT_REPORT.md:61-73 (P0-01..P0-06, P1-01, P2-01)
-  - rust-toolchain.toml (pins channel = "stable"; the RUSTUP_TOOLCHAIN env var overrides it, which is how the 1.88 matrix leg uses 1.88)
+  - rust-toolchain.toml (pinned to channel = "1.99.1" by STEP 2J; the RUSTUP_TOOLCHAIN env var overrides it, which is how the stable and 1.88 matrix legs pick their toolchain; the lint job sets no RUSTUP_TOOLCHAIN so rustfmt matches the pin)
   - Makefile:55-62 (musl build targets; not used by the new workflow)
 FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES. Don't edit Makefile, cd.yml, nightly.yml or brew.yml here (later steps).
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. .github/workflows/ci.yml: replace the whole file with exactly this content (2-space YAML indentation, LF line endings, trailing newline):
@@ -248,13 +288,12 @@ jobs:
   linting:
     name: Lints
     runs-on: ubuntu-latest
-    env:
-      RUSTUP_TOOLCHAIN: stable
     steps:
       - uses: actions/checkout@v4
 
+      # no RUSTUP_TOOLCHAIN here: rustfmt must match rust-toolchain.toml
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.99.1
         with:
           components: rustfmt
 
@@ -287,7 +326,7 @@ jobs:
    Why: removes the daily cron (P0-01), non-Linux/nightly legs (P0-02), `make clippy` (P0-03), the broken musl matrix/apt/target/install steps (P0-04), the five upstream-only jobs (P0-05), fmt without --all (P0-06), the unpinned source-built cargo-deny (P1-01), and the cache-key / `rustup override` drift (P2-01). The clippy and deny steps will stay red in CI until Phases 2–3 land; that is expected.
 
 [POST_GATE]
-cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && python3 -c 'import yaml; yaml.safe_load(open(".github/workflows/ci.yml"))' && ! grep -qE '^[[:space:]]+schedule:' .github/workflows/ci.yml && ! grep -qE 'macos-latest|windows-latest|nightly|armkeil|actions-rs/|rustup override|make clippy' .github/workflows/ci.yml && grep -qE 'rust: \[stable, "1\.88"\]' .github/workflows/ci.yml && grep -qF 'cargo clippy --workspace --all-targets -- -D warnings' .github/workflows/ci.yml && grep -qF 'cargo fmt --all -- --check' .github/workflows/ci.yml && grep -qF 'tool: cargo-deny@0.20.2' .github/workflows/ci.yml && grep -qF 'sudo apt-get update && sudo apt-get install -y musl-tools gpgsm' .github/workflows/ci.yml
+cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && { ! python3 -c 'import yaml' 2>/dev/null || python3 -c 'import yaml; yaml.safe_load(open(".github/workflows/ci.yml"))'; } && ! grep -qE '^[[:space:]]+schedule:' .github/workflows/ci.yml && ! grep -qE 'macos-latest|windows-latest|nightly|armkeil|actions-rs/|rustup override|make clippy' .github/workflows/ci.yml && grep -qE 'rust: \[stable, "1\.88"\]' .github/workflows/ci.yml && grep -qF 'cargo clippy --workspace --all-targets -- -D warnings' .github/workflows/ci.yml && grep -qF 'cargo fmt --all -- --check' .github/workflows/ci.yml && grep -qF 'tool: cargo-deny@0.20.2' .github/workflows/ci.yml && grep -qF 'uses: dtolnay/rust-toolchain@1.99.1' .github/workflows/ci.yml && grep -qF 'sudo apt-get update && sudo apt-get install -y musl-tools gpgsm' .github/workflows/ci.yml
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
@@ -313,7 +352,7 @@ FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES. Don't edit ci.yml or Makefile.
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. Delete `.github/workflows/nightly.yml` (P0-07: upstream S3 nightly cron with missing secrets).
@@ -373,7 +412,7 @@ jobs:
             ./release/*.tar.gz
 
 [POST_GATE]
-cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && test ! -e .github/workflows/nightly.yml && test ! -e .github/workflows/brew.yml && python3 -c 'import yaml; yaml.safe_load(open(".github/workflows/cd.yml"))' && ! grep -qE 'macos|windows|ubuntu-22\.04|homebrew|BREW_TOKEN|armkeil|workflow_dispatch|apt-get -qq' .github/workflows/cd.yml && grep -qF 'run: make release-linux-musl' .github/workflows/cd.yml && grep -qF 'sudo apt-get update && sudo apt-get install -y musl-tools gpgsm' .github/workflows/cd.yml
+cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && test ! -e .github/workflows/nightly.yml && test ! -e .github/workflows/brew.yml && { ! python3 -c 'import yaml' 2>/dev/null || python3 -c 'import yaml; yaml.safe_load(open(".github/workflows/cd.yml"))'; } && ! grep -qE 'macos|windows|ubuntu-22\.04|homebrew|BREW_TOKEN|armkeil|workflow_dispatch|apt-get -qq' .github/workflows/cd.yml && grep -qF 'run: make release-linux-musl' .github/workflows/cd.yml && grep -qF 'sudo apt-get update && sudo apt-get install -y musl-tools gpgsm' .github/workflows/cd.yml
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
@@ -405,7 +444,7 @@ FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES. No dependency changes. These are mechanical manifest edits, which is why this step lists more than 3 files.
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. Cargo.toml [workspace] members: anchor `  "git2-testing",` → insert `  "invalidstring",` on the next line, so the list reads asyncgit, filetreelist, git2-hooks, git2-testing, invalidstring, scopetime (alphabetical).
@@ -439,7 +478,7 @@ FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES. Don't add advisory ignores. Keep the existing RUSTSEC-2025-0141 ignore and the license allow list unchanged.
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. [advisories]: delete the line `version = 2`. Keep the `ignore = [...]` entry for RUSTSEC-2025-0141 as is.
@@ -489,7 +528,7 @@ FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES. Keep the `chrono` dependency lines in Cargo.toml (STEP 2G removes them; logitems.rs still uses chrono until STEP 2F). Keep the signature `pub fn time_to_string(secs: i64, short: bool) -> String`.
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. Cargo.toml [dependencies]: insert `jiff = "0.2"` on the line after `itertools = "0.14"` (alphabetical order for tombi).
@@ -736,7 +775,7 @@ FORBIDDEN_SCOPE:
   - Any file not listed in ALLOWED_FILES.
 
 [PRE_GATE]
-true
+grep -qE '^channel = "1\.99\.1"$' rust-toolchain.toml
 
 [MUTATION_SPEC]
 1. Makefile: replace the whole file with exactly this content (recipe lines start with one TAB):

@@ -6,6 +6,10 @@ user = "FETCH"
 title = "Warm the host crate cache"
 
 [[queue]]
+step = "2J"
+item = "TASK-0022"
+
+[[queue]]
 step = "2A"
 item = "TASK-0011"
 

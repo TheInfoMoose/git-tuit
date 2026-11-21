@@ -590,3 +590,24 @@ title = "Makefile matches Linux CI"
 status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:43:55Z"
+
+[[items.tasks]]
+id = "TASK-0020"
+title = "Fix rustfmt 1.100.0 diffs blocking POST_GATE outside STEP 2A scope"
+status = "open"
+severity = "high"
+created_at = "2026-11-21T05:59:11Z"
+
+[[items.tasks]]
+id = "TASK-0021"
+title = "Replace PyYAML check in STEP 2A POST_GATE or install PyYAML"
+status = "closed"
+severity = "high"
+created_at = "2026-11-21T05:59:11Z"
+
+[[items.tasks]]
+id = "TASK-0022"
+title = "Pin the Rust toolchain to 1.99.1"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:05:26Z"
