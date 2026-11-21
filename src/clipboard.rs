@@ -1,6 +1,5 @@
 use anyhow::{anyhow, Result};
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use which::which;
 
@@ -11,8 +10,7 @@ fn exec_copy_with_args(
 	pipe_stderr: bool,
 ) -> Result<()> {
 	let binary = which(command)
-		.ok()
-		.unwrap_or_else(|| PathBuf::from(command));
+		.map_err(|e| anyhow!("`{command}` not found: {e}"))?;
 
 	let mut process = Command::new(binary)
 		.args(args)
@@ -80,6 +78,7 @@ fn copy_string_osc52(text: &str, out: &mut impl Write) -> Result<()> {
 		destination = OSC52_DESTINATION_CLIPBOARD,
 		encoded_text = BASE64_STANDARD.encode(text)
 	)?;
+	out.flush()?;
 	Ok(())
 }
 
@@ -116,7 +115,7 @@ fn copy_string_x(text: &str) -> Result<()> {
 
 #[cfg(all(target_family = "unix", not(target_os = "macos")))]
 pub fn copy_string(text: &str) -> Result<()> {
-	if std::env::var("WAYLAND_DISPLAY").is_ok() {
+	if std::env::var("WAYLAND_DISPLAY").is_ok_and(|v| !v.is_empty()) {
 		return copy_string_wayland(text);
 	}
 
