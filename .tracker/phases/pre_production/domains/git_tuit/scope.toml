@@ -839,7 +839,7 @@ created_at = "2026-11-21T20:28:02Z"
 [[items.tasks]]
 id = "TASK-0071"
 title = "Search/highlight finish while tab hidden"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:03Z"
 
