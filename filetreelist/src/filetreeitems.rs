@@ -215,7 +215,9 @@ impl FileTreeItems {
 			if item.info().indent() == current_folder.1 {
 				item.show();
 				shown += 1;
-			} else if item.info().indent() == current_folder.1 - 1 {
+			} else if current_folder.1.checked_sub(1)
+				== Some(item.info().indent())
+			{
 				// this must be our parent
 
 				item.expand_path();
@@ -255,7 +257,9 @@ impl FileTreeItems {
 				item.show();
 				shown += 1;
 			}
-			if item.info().indent() == current_folder.1 - 1 {
+			if current_folder.1.checked_sub(1)
+				== Some(item.info().indent())
+			{
 				// this must be our parent
 
 				item.show();
@@ -914,6 +918,21 @@ mod tests {
 				true, //
 			]
 		);
+	}
+
+	#[test]
+	fn test_show_element_top_level_no_underflow() {
+		let items = vec![
+			Path::new("a.txt"),   //
+			Path::new("b/c.txt"), //
+		];
+
+		let mut tree =
+			FileTreeItems::new(&items, &BTreeSet::new()).unwrap();
+
+		assert_eq!(tree.tree_items[0].info().indent(), 0);
+		assert!(tree.show_element(0).is_some());
+		assert!(tree.tree_items[0].info().is_visible());
 	}
 }
 

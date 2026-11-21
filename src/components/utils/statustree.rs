@@ -228,7 +228,7 @@ impl StatusTree {
 				}
 
 				// Find the closest to the index, usually this shouldn't happen
-				if current_index == 0 {
+				if cur_index_find == 0 {
 					// This should never happen
 					current_index_in_available_selections = 0;
 					break;
@@ -951,5 +951,30 @@ mod tests {
 
 		assert!(res.move_selection(MoveSelection::Left)); // jump to 0
 		assert_eq!(res.selection, Some(0));
+	}
+
+	#[test]
+	fn test_selection_updown_missing_index_no_underflow() {
+		let items = string_vec_to_status(&["a", "b/c"]);
+
+		let mut res = StatusTree::default();
+		res.update(&items).unwrap();
+
+		// Collapse "b" so index 2 ("b/c") is hidden and remove it from available_selections.
+		res.collapse("b", 1);
+		res.available_selections.retain(|&i| i != 2);
+
+		let _ = res.selection_updown(2, true);
+		let _ = res.selection_updown(2, false);
+
+		// Also exercise cur_index_find reaching 0 when no entry <= current_index exists.
+		res.expand("b", 1);
+		res.available_selections = vec![2];
+
+		let up = res.selection_updown(1, true);
+		assert_eq!(up.new_index, 2);
+
+		let down = res.selection_updown(1, false);
+		assert_eq!(down.new_index, 1);
 	}
 }
