@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0068"
 type = "task"
 title = "Blame errors stop the spinner"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "inbox"
 created_at = "2026-11-21T20:28:02Z"
-updated_at = "2026-11-21T20:28:02Z"
+updated_at = "2026-11-21T21:15:51Z"
 source_ref = "STEP 6J"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 2
 iteration_count = 1
+last_timer_session = "TASK-0068@2026-11-21T21:13:24Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "b9e2efe9"
+summary = "STEP 6J: Blame Errors Stop the Spinner (phased check PASS)"
