@@ -415,7 +415,7 @@ impl RemoteListPopup {
 
 	const fn valid_selection(&self) -> bool {
 		!self.remote_names.is_empty()
-			&& self.remote_names.len() >= self.selection as usize
+			&& self.remote_names.len() > self.selection as usize
 	}
 
 	fn set_selection(&mut self, selection: u16) -> Result<()> {
