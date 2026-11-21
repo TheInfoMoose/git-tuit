@@ -1,0 +1,23 @@
+[scope]
+id = "filetreelist"
+target = "filetreelist"
+tech_stack = ["rust"]
+description = "Promoted from component 'filetreelist' (filetreelist)"
+bound_component = "filetreelist"
+tracked_files = [
+    "filetreelist/Cargo.toml",
+    "filetreelist/LICENSE.md",
+    "filetreelist/README.md",
+    "filetreelist/demo.gif",
+    "filetreelist/src/error.rs",
+    "filetreelist/src/filetree.rs",
+    "filetreelist/src/filetreeitems.rs",
+    "filetreelist/src/item.rs",
+    "filetreelist/src/lib.rs",
+    "filetreelist/src/tree_iter.rs",
+    "filetreelist/src/treeitems_iter.rs",
+]
+
+[items]
+bugs = []
+features = []

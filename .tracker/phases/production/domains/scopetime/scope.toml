@@ -1,0 +1,16 @@
+[scope]
+id = "scopetime"
+target = "scopetime"
+tech_stack = ["rust"]
+description = "Promoted from component 'scopetime' (scopetime)"
+bound_component = "scopetime"
+tracked_files = [
+    "scopetime/Cargo.toml",
+    "scopetime/LICENSE.md",
+    "scopetime/README.md",
+    "scopetime/src/lib.rs",
+]
+
+[items]
+bugs = []
+features = []

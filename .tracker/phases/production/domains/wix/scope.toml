@@ -1,0 +1,15 @@
+[scope]
+id = "wix"
+target = "wix"
+tech_stack = []
+description = "Promoted from component 'wix' (wix)"
+bound_component = "wix"
+tracked_files = [
+    "wix/License.rtf",
+    "wix/Microsoft_VC142_CRT_x64.msm",
+    "wix/main.wxs",
+]
+
+[items]
+bugs = []
+features = []

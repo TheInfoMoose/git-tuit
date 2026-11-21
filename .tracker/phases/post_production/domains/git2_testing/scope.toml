@@ -1,0 +1,16 @@
+[scope]
+id = "git2_testing"
+target = "git2-testing"
+tech_stack = ["rust"]
+description = "Promoted from component 'git2-testing' (git2-testing)"
+bound_component = "git2_testing"
+tracked_files = [
+    "git2-testing/Cargo.toml",
+    "git2-testing/LICENSE.md",
+    "git2-testing/README.md",
+    "git2-testing/src/lib.rs",
+]
+
+[items]
+bugs = []
+features = []

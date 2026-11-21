@@ -1,0 +1,17 @@
+[item]
+id = "BUG-0041"
+type = "bug"
+title = "Name targets and warn on untracked deletes in confirm prompts"
+status = "pending"
+severity = "high"
+scope_ref = "git_tuit"
+created_at = "2026-11-21T05:36:39Z"
+updated_at = "2026-11-21T05:36:39Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []

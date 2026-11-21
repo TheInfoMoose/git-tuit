@@ -1,0 +1,19 @@
+schema_version = 2
+
+[item]
+id = "TASK-0003"
+type = "task"
+title = "Migrate chrono usage to jiff (RUSTSEC-2026-0543)"
+status = "open"
+severity = "high"
+scope_ref = "git_tuit"
+created_at = "2026-11-21T05:36:39Z"
+updated_at = "2026-11-21T05:44:07Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []

@@ -1,0 +1,16 @@
+[scope]
+id = "invalidstring"
+target = "invalidstring"
+tech_stack = ["rust"]
+description = "Promoted from component 'invalidstring' (invalidstring)"
+bound_component = "invalidstring"
+tracked_files = [
+    "invalidstring/Cargo.toml",
+    "invalidstring/LICENSE.md",
+    "invalidstring/README.md",
+    "invalidstring/src/lib.rs",
+]
+
+[items]
+bugs = []
+features = []

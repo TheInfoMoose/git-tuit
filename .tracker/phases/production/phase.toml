@@ -1,0 +1,59 @@
+[phase]
+id = "production"
+title = "Production"
+status = "planned"
+start_date = "2026-11-21"
+
+[[scopes.manifest]]
+id = "inbox"
+type = "inbox"
+path = "domains/inbox"
+
+[[scopes.manifest]]
+id = "assets"
+type = "custom"
+path = "domains/assets"
+
+[[scopes.manifest]]
+id = "asyncgit"
+type = "rust_crate"
+path = "domains/asyncgit"
+
+[[scopes.manifest]]
+id = "filetreelist"
+type = "rust_crate"
+path = "domains/filetreelist"
+
+[[scopes.manifest]]
+id = "git2_hooks"
+type = "rust_crate"
+path = "domains/git2_hooks"
+
+[[scopes.manifest]]
+id = "git2_testing"
+type = "rust_crate"
+path = "domains/git2_testing"
+
+[[scopes.manifest]]
+id = "git_tuit"
+type = "rust_crate"
+path = "domains/git_tuit"
+
+[[scopes.manifest]]
+id = "invalidstring"
+type = "rust_crate"
+path = "domains/invalidstring"
+
+[[scopes.manifest]]
+id = "scopetime"
+type = "rust_crate"
+path = "domains/scopetime"
+
+[[scopes.manifest]]
+id = "wix"
+type = "custom"
+path = "domains/wix"
+
+[summary]
+total_items = 0
+completed_items = 0

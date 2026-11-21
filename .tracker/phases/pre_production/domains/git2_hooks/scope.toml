@@ -1,0 +1,45 @@
+[scope]
+id = "git2_hooks"
+target = "git2-hooks"
+tech_stack = ["rust"]
+description = "Promoted from component 'git2-hooks' (git2-hooks)"
+bound_component = "git2_hooks"
+tracked_files = [
+    "git2-hooks/Cargo.toml",
+    "git2-hooks/LICENSE.md",
+    "git2-hooks/README.md",
+    "git2-hooks/src/error.rs",
+    "git2-hooks/src/hookspath.rs",
+    "git2-hooks/src/lib.rs",
+]
+
+[items]
+features = []
+
+[[items.bugs]]
+id = "BUG-0018"
+title = "Harden hook path expansion, name traversal and exec checks"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0019"
+title = "Add option terminator to sh hook fallback"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0020"
+title = "Create COMMIT_EDITMSG safely in git2-hooks"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0021"
+title = "Replace chmod subprocess and unwraps in create_hook"
+status = "pending"
+severity = "high"
+created_at = "2026-11-21T05:36:39Z"

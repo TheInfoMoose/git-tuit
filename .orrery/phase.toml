@@ -1,0 +1,42 @@
+# Written by phased-step.sh new-phase from the plan's Up Next table.
+# Regenerated every phase; edits here are lost.
+
+[[queue]]
+user = "FETCH"
+title = "Warm the host crate cache"
+
+[[queue]]
+step = "2A"
+item = "TASK-0011"
+
+[[queue]]
+step = "2B"
+item = "TASK-0012"
+
+[[queue]]
+step = "2C"
+item = "TASK-0013"
+
+[[queue]]
+step = "2D"
+item = "TASK-0014"
+
+[[queue]]
+step = "2E"
+item = "TASK-0015"
+
+[[queue]]
+step = "2F"
+item = "TASK-0016"
+
+[[queue]]
+step = "2G"
+item = "TASK-0017"
+
+[[queue]]
+step = "2H"
+item = "TASK-0018"
+
+[[queue]]
+step = "2I"
+item = "TASK-0019"

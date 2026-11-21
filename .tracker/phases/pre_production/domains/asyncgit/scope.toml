@@ -1,0 +1,136 @@
+[scope]
+id = "asyncgit"
+target = "asyncgit"
+tech_stack = ["rust"]
+description = "Promoted from component 'asyncgit' (asyncgit)"
+bound_component = "asyncgit"
+tracked_files = [
+    "asyncgit/Cargo.toml",
+    "asyncgit/LICENSE.md",
+    "asyncgit/README.md",
+    "asyncgit/src/asyncjob/mod.rs",
+    "asyncgit/src/blame.rs",
+    "asyncgit/src/branches.rs",
+    "asyncgit/src/cached/branchname.rs",
+    "asyncgit/src/cached/mod.rs",
+    "asyncgit/src/commit_files.rs",
+    "asyncgit/src/diff.rs",
+    "asyncgit/src/error.rs",
+    "asyncgit/src/fetch_job.rs",
+    "asyncgit/src/filter_commits.rs",
+    "asyncgit/src/lib.rs",
+    "asyncgit/src/progress.rs",
+    "asyncgit/src/pull.rs",
+    "asyncgit/src/push.rs",
+    "asyncgit/src/push_tags.rs",
+    "asyncgit/src/remote_progress.rs",
+    "asyncgit/src/remote_tags.rs",
+    "asyncgit/src/revlog.rs",
+    "asyncgit/src/status.rs",
+    "asyncgit/src/sync/blame.rs",
+    "asyncgit/src/sync/branch/merge_commit.rs",
+    "asyncgit/src/sync/branch/merge_ff.rs",
+    "asyncgit/src/sync/branch/merge_rebase.rs",
+    "asyncgit/src/sync/branch/mod.rs",
+    "asyncgit/src/sync/branch/rename.rs",
+    "asyncgit/src/sync/commit.rs",
+    "asyncgit/src/sync/commit_details.rs",
+    "asyncgit/src/sync/commit_files.rs",
+    "asyncgit/src/sync/commit_filter.rs",
+    "asyncgit/src/sync/commit_revert.rs",
+    "asyncgit/src/sync/commits_info.rs",
+    "asyncgit/src/sync/config.rs",
+    "asyncgit/src/sync/cred.rs",
+    "asyncgit/src/sync/diff.rs",
+    "asyncgit/src/sync/hooks.rs",
+    "asyncgit/src/sync/hunks.rs",
+    "asyncgit/src/sync/ignore.rs",
+    "asyncgit/src/sync/logwalker.rs",
+    "asyncgit/src/sync/merge.rs",
+    "asyncgit/src/sync/mod.rs",
+    "asyncgit/src/sync/patches.rs",
+    "asyncgit/src/sync/rebase.rs",
+    "asyncgit/src/sync/remotes/callbacks.rs",
+    "asyncgit/src/sync/remotes/mod.rs",
+    "asyncgit/src/sync/remotes/push.rs",
+    "asyncgit/src/sync/remotes/tags.rs",
+    "asyncgit/src/sync/repository.rs",
+    "asyncgit/src/sync/reset.rs",
+    "asyncgit/src/sync/reword.rs",
+    "asyncgit/src/sync/sign.rs",
+    "asyncgit/src/sync/staging/discard_tracked.rs",
+    "asyncgit/src/sync/staging/mod.rs",
+    "asyncgit/src/sync/staging/stage_tracked.rs",
+    "asyncgit/src/sync/stash.rs",
+    "asyncgit/src/sync/state.rs",
+    "asyncgit/src/sync/status.rs",
+    "asyncgit/src/sync/submodules.rs",
+    "asyncgit/src/sync/tags.rs",
+    "asyncgit/src/sync/tree.rs",
+    "asyncgit/src/sync/utils.rs",
+    "asyncgit/src/tags.rs",
+    "asyncgit/src/treefiles.rs",
+]
+
+[[items.bugs]]
+id = "BUG-0014"
+title = "Guard GIT_DIR and GNUPGHOME env mutation in tests"
+status = "pending"
+severity = "high"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0015"
+title = "Stop running repo-local credential.helper and reject newline injection"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0016"
+title = "Prevent credential leaks across hosts, remotes and redirects"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0017"
+title = "Redact passwords from Debug output and trace logs"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0022"
+title = "Validate signing program and key arguments"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0023"
+title = "Validate pre-push hook ref names"
+status = "pending"
+severity = "high"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.bugs]]
+id = "BUG-0024"
+title = "Block path traversal and symlink overwrite in repo_write_file"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.features]]
+id = "FEAT-0001"
+title = "Add trusted global-only git config reader"
+status = "pending"
+severity = "high"
+created_at = "2026-11-21T05:36:39Z"
+
+[[items.tasks]]
+id = "TASK-0005"
+title = "Drop scc and pin-utils advisories from serial_test dev-dependency"
+status = "open"
+severity = "high"
+created_at = "2026-11-21T05:36:39Z"

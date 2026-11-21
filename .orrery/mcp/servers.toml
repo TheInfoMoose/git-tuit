@@ -1,0 +1,6 @@
+[[servers]]
+server_id = "phased"
+
+[servers.transport]
+type = "Stdio"
+command = "orrery-phased-gate"

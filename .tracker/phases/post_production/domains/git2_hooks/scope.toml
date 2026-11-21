@@ -1,0 +1,18 @@
+[scope]
+id = "git2_hooks"
+target = "git2-hooks"
+tech_stack = ["rust"]
+description = "Promoted from component 'git2-hooks' (git2-hooks)"
+bound_component = "git2_hooks"
+tracked_files = [
+    "git2-hooks/Cargo.toml",
+    "git2-hooks/LICENSE.md",
+    "git2-hooks/README.md",
+    "git2-hooks/src/error.rs",
+    "git2-hooks/src/hookspath.rs",
+    "git2-hooks/src/lib.rs",
+]
+
+[items]
+bugs = []
+features = []
