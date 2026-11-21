@@ -25,7 +25,7 @@ created_at = "2026-11-21T19:19:42Z"
 [[items.tasks]]
 id = "TASK-0067"
 title = "Show fetch errors"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:02Z"
 
