@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0039"
 type = "task"
 title = "Credential URL checks (http scheme, push URL, control chars)"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T14:42:35Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T14:51:36Z"
 source_ref = "STEP 4A"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 5
 iteration_count = 1
+last_timer_session = "TASK-0039@2026-11-21T14:45:57Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "90a3db8d"
+summary = "STEP 4A: Credential URL Checks (phased check PASS)"

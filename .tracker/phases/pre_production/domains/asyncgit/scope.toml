@@ -187,7 +187,7 @@ created_at = "2026-11-21T14:22:12Z"
 [[items.tasks]]
 id = "TASK-0039"
 title = "Credential URL checks (http scheme, push URL, control chars)"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T14:42:35Z"
 
