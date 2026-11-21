@@ -538,7 +538,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.tasks]]
 id = "TASK-0011"
 title = "Linux-only CI workflow"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-21T05:43:55Z"
 

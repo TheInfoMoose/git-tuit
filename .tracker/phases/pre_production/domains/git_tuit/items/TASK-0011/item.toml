@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0011"
 type = "task"
 title = "Linux-only CI workflow"
-status = "open"
+status = "pending"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:43:55Z"
-updated_at = "2026-11-21T06:08:01Z"
+updated_at = "2026-11-21T06:10:52Z"
 source_ref = "STEP 2A"
 
 [effort]
