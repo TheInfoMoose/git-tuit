@@ -1,6 +1,6 @@
 use asyncgit::sync::{CommitId, CommitInfo};
-use chrono::{DateTime, Duration, Local, Utc};
 use indexmap::IndexSet;
+use jiff::{tz::TimeZone, Timestamp, Zoned};
 use std::{rc::Rc, slice::Iter};
 
 #[cfg(feature = "ghemoji")]
@@ -12,7 +12,7 @@ type BoxStr = Box<str>;
 
 pub struct LogEntry {
 	//TODO: cache string representation
-	pub time: DateTime<Local>,
+	pub time: Zoned,
 	//TODO: use tinyvec here
 	pub author: BoxStr,
 	pub msg: BoxStr,
@@ -26,19 +26,15 @@ impl From<CommitInfo> for LogEntry {
 	fn from(c: CommitInfo) -> Self {
 		let hash_short = c.id.get_short_string().into();
 
-		let time = {
-			let date = DateTime::from_timestamp(c.time, 0)
-				.map(|d| d.naive_utc());
-			if date.is_none() {
-				log::error!("error reading commit date: {hash_short} - timestamp: {}",c.time);
-			}
-			DateTime::<Local>::from(
-				DateTime::<Utc>::from_naive_utc_and_offset(
-					date.unwrap_or_default(),
-					Utc,
-				),
-			)
-		};
+		let time = Timestamp::from_second(c.time)
+			.unwrap_or_else(|_| {
+				log::error!(
+					"error reading commit date: {hash_short} - timestamp: {}",
+					c.time
+				);
+				Timestamp::UNIX_EPOCH
+			})
+			.to_zoned(TimeZone::system());
 
 		let author = c.author;
 		let msg = c.message;
@@ -59,21 +55,20 @@ impl From<CommitInfo> for LogEntry {
 }
 
 impl LogEntry {
-	pub fn time_to_string(&self, now: DateTime<Local>) -> String {
-		let delta = now - self.time;
-		if delta < Duration::try_minutes(30).unwrap_or_default() {
-			let delta_str = if delta
-				< Duration::try_minutes(1).unwrap_or_default()
-			{
+	pub fn time_to_string(&self, now: &Zoned) -> String {
+		let delta = now.timestamp().as_second()
+			- self.time.timestamp().as_second();
+		if delta < 30 * 60 {
+			let delta_str = if delta < 60 {
 				"<1m ago".to_string()
 			} else {
-				format!("{:0>2}m ago", delta.num_minutes())
+				format!("{:0>2}m ago", delta / 60)
 			};
 			format!("{delta_str: <10}")
-		} else if self.time.date_naive() == now.date_naive() {
-			self.time.format("%T  ").to_string()
+		} else if self.time.date() == now.date() {
+			self.time.strftime("%T  ").to_string()
 		} else {
-			self.time.format("%Y-%m-%d").to_string()
+			self.time.strftime("%Y-%m-%d").to_string()
 		}
 	}
 }
@@ -202,5 +197,39 @@ mod tests {
 			"This :should_not_convert:"
 		);
 		assert_eq!(&test_conversion(":gopher:"), ":gopher:");
+	}
+
+	fn entry_at(secs: i64) -> LogEntry {
+		LogEntry::from(CommitInfo {
+			message: "msg".into(),
+			time: secs,
+			author: "testuser".into(),
+			id: CommitId::default(),
+		})
+	}
+
+	#[test]
+	fn time_to_string_recent() {
+		let e = entry_at(1_000_000);
+		let now = Timestamp::from_second(1_000_030)
+			.unwrap()
+			.to_zoned(TimeZone::UTC);
+		assert_eq!(e.time_to_string(&now), "<1m ago   ");
+		let now = Timestamp::from_second(1_000_000 + 5 * 60)
+			.unwrap()
+			.to_zoned(TimeZone::UTC);
+		assert_eq!(e.time_to_string(&now), "05m ago   ");
+	}
+
+	#[test]
+	fn time_to_string_old_is_date() {
+		let e = entry_at(0);
+		let now = Timestamp::from_second(400 * 86_400)
+			.unwrap()
+			.to_zoned(TimeZone::system());
+		assert_eq!(
+			e.time_to_string(&now),
+			e.time.strftime("%Y-%m-%d").to_string()
+		);
 	}
 }

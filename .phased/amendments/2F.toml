@@ -1,0 +1,4 @@
+step = "2F"
+lapse = "L1"
+reason = "grep -E treats \\t as a literal t, so '^\\tpub time: Zoned,$' can't match the hard-tab line rustfmt writes; same pattern under grep -P (TASK-0023)"
+post_gate = "cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && cargo test -p gitui --locked time_to_string && ! grep -qE '\\bchrono\\b' src/components/utils/logitems.rs src/components/commitlist.rs src/popups/file_revlog.rs && grep -qP '^\\tpub time: Zoned,$' src/components/utils/logitems.rs && grep -qF 'pub fn time_to_string(&self, now: &Zoned) -> String' src/components/utils/logitems.rs && grep -qF 'let now = Zoned::now();' src/components/commitlist.rs && grep -qF 'let rows = self.get_rows(&now);' src/popups/file_revlog.rs && grep -qE '\\bfn time_to_string_recent\\b' src/components/utils/logitems.rs"

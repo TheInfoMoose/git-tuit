@@ -18,9 +18,9 @@ use asyncgit::{
 	},
 	AsyncDiff, AsyncGitNotification, AsyncLog, DiffParams, DiffType,
 };
-use chrono::{DateTime, Local};
 use crossbeam_channel::Sender;
 use crossterm::event::Event;
+use jiff::Zoned;
 use ratatui::{
 	layout::{Constraint, Direction, Layout, Rect},
 	text::{Line, Span, Text},
@@ -263,7 +263,7 @@ impl FileRevlogPopup {
 		)
 	}
 
-	fn get_rows(&self, now: DateTime<Local>) -> Vec<Row<'_>> {
+	fn get_rows(&self, now: &Zoned) -> Vec<Row<'_>> {
 		self.items
 			.iter()
 			.map(|entry| {
@@ -381,10 +381,10 @@ impl FileRevlogPopup {
 			Constraint::Percentage(100),
 		];
 
-		let now = Local::now();
+		let now = Zoned::now();
 
 		let title = self.get_title();
-		let rows = self.get_rows(now);
+		let rows = self.get_rows(&now);
 
 		let table = Table::new(rows, constraints)
 			.column_spacing(1)

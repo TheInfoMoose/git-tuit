@@ -17,10 +17,10 @@ use asyncgit::sync::{
 	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
 	RepoPathRef, Tags,
 };
-use chrono::{DateTime, Local};
 use crossterm::event::Event;
 use indexmap::IndexSet;
 use itertools::Itertools;
+use jiff::Zoned;
 use ratatui::{
 	layout::{Alignment, Rect},
 	style::Style,
@@ -449,7 +449,7 @@ impl CommitList {
 		remote_branches: Option<String>,
 		theme: &Theme,
 		width: usize,
-		now: DateTime<Local>,
+		now: &Zoned,
 		marked: Option<bool>,
 	) -> Line<'a> {
 		let mut txt: Vec<Span> = Vec::with_capacity(
@@ -570,7 +570,7 @@ impl CommitList {
 
 		let mut txt: Vec<Line> = Vec::with_capacity(height);
 
-		let now = Local::now();
+		let now = Zoned::now();
 
 		let any_marked = !self.marked.is_empty();
 
@@ -614,7 +614,7 @@ impl CommitList {
 				self.remote_branches_string(e),
 				&self.theme,
 				width,
-				now,
+				&now,
 				marked,
 			));
 		}
