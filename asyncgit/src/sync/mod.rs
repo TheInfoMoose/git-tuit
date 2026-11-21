@@ -113,6 +113,8 @@ pub use git2::ResetType;
 
 /// test utils
 #[cfg(test)]
+// LogWalker::read fills a Vec<CommitId>; it is not io::Read, so this nursery lint is a false positive here
+#[allow(clippy::read_zero_byte_vec)]
 pub mod tests {
 	use super::{
 		commit,
@@ -316,11 +318,10 @@ pub mod tests {
 		let tree_id = index.write_tree().unwrap();
 		let tree = repo.find_tree(tree_id).unwrap();
 
-		let parents = if let Ok(id) = get_head_repo(&repo) {
-			vec![repo.find_commit(id.into()).unwrap()]
-		} else {
-			Vec::new()
-		};
+		let parents = get_head_repo(&repo).map_or_else(
+			|_| Vec::new(),
+			|id| vec![repo.find_commit(id.into()).unwrap()],
+		);
 
 		let parents = parents.iter().collect::<Vec<_>>();
 

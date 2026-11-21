@@ -186,11 +186,11 @@ mod test {
 
 		assert!(!clone2.head_detached().unwrap());
 
-		let commits = get_commit_ids(&clone2, 10);
-		assert_eq!(commits.len(), 3);
-		assert_eq!(commits[0], merge_commit);
-		assert_eq!(commits[1], commit2);
-		assert_eq!(commits[2], commit1);
+		let commit_ids = get_commit_ids(&clone2, 10);
+		assert_eq!(commit_ids.len(), 3);
+		assert_eq!(commit_ids[0], merge_commit);
+		assert_eq!(commit_ids[1], commit2);
+		assert_eq!(commit_ids[2], commit1);
 
 		//verify commit msg
 		let details = crate::sync::get_commit_details(

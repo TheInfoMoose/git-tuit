@@ -177,6 +177,8 @@ impl<'a> LogWalkerWithoutFilter<'a> {
 }
 
 #[cfg(test)]
+// LogWalker::read fills a Vec<CommitId>; it is not io::Read, so this nursery lint is a false positive here
+#[allow(clippy::read_zero_byte_vec)]
 mod tests {
 	use super::*;
 	use crate::error::Result;
@@ -325,11 +327,12 @@ mod tests {
 
 		assert_eq!(items.len(), 0);
 
-		let diff_contains_bar = diff_contains_file("bar".into());
+		let diff_contains_bar_filter =
+			diff_contains_file("bar".into());
 
 		let mut items = Vec::new();
 		let mut walker = LogWalker::new(&repo, 100)?
-			.filter(Some(diff_contains_bar));
+			.filter(Some(diff_contains_bar_filter));
 		walker.read(&mut items).unwrap();
 
 		assert_eq!(items.len(), 0);
