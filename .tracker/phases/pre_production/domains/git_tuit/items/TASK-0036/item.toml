@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0036"
 type = "task"
 title = "gitui clippy: reflow, key_config; full gate"
-status = "open"
+status = "pending"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T06:58:38Z"
-updated_at = "2026-11-21T06:58:38Z"
+updated_at = "2026-11-21T14:14:52Z"
 source_ref = "STEP 3K"
 
 [effort]
