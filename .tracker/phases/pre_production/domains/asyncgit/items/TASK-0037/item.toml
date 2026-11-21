@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0037"
 type = "task"
 title = "GIT_DIR test in a child process, GNUPGHOME guard (re-queued 3I)"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T14:22:12Z"
-updated_at = "2026-11-21T14:22:12Z"
+updated_at = "2026-11-21T14:30:10Z"
 source_ref = "STEP 3L"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 2
 iteration_count = 1
+last_timer_session = "TASK-0037@2026-11-21T14:27:31Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "d9580191"
+summary = "STEP 3L: Stop Tests Mutating `GIT_DIR` / Leaking `GNUPGHOME` (phased check PASS)"
