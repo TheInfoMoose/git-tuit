@@ -755,7 +755,7 @@ created_at = "2026-11-21T19:19:42Z"
 [[items.tasks]]
 id = "TASK-0056"
 title = "Tag delete without remote, stage-remove-all errors"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
 
