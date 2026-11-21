@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0061"
 type = "task"
 title = "Cancelling credentials cancels push/push-tags"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T19:19:42Z"
-updated_at = "2026-11-21T19:19:42Z"
+updated_at = "2026-11-21T19:57:48Z"
 source_ref = "STEP 5H"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0061@2026-11-21T19:56:19Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "f1d5782d"
+summary = "STEP 5H: Cancelling Credentials Cancels Push and Push-Tags (phased check PASS)"
