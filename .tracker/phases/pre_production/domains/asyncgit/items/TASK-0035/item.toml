@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0035"
 type = "task"
 title = "GIT_DIR test in a child process, GNUPGHOME guard"
-status = "open"
+status = "pending"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T06:58:38Z"
-updated_at = "2026-11-21T06:58:38Z"
+updated_at = "2026-11-21T14:14:52Z"
 source_ref = "STEP 3I"
 
 [effort]
