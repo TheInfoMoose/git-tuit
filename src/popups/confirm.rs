@@ -128,9 +128,9 @@ impl ConfirmPopup {
 	fn get_text(&self) -> (String, String) {
 		if let Some(ref a) = self.target {
 			return match a {
-                Action::Reset(_) => (
+                Action::Reset(item) => (
                     strings::confirm_title_reset(),
-                    strings::confirm_msg_reset(),
+                    strings::confirm_msg_reset(&item.path),
                 ),
                 Action::StashDrop(ids) => (
                     strings::confirm_title_stashdrop(

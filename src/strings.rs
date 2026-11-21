@@ -199,8 +199,8 @@ pub fn confirm_msg_abortrebase() -> String {
 	"This will revert all uncommitted changes. Are you sure?"
 		.to_string()
 }
-pub fn confirm_msg_reset() -> String {
-	"confirm file reset?".to_string()
+pub fn confirm_msg_reset(path: &str) -> String {
+	format!("discard changes to '{path}'?\nuntracked files are deleted permanently and can't be recovered.")
 }
 pub fn confirm_msg_reset_lines(lines: usize) -> String {
 	format!(
@@ -1955,5 +1955,12 @@ mod tests {
 			output,
 			"feature/auto-replace-spaces-in-branch-name"
 		);
+	}
+
+	#[test]
+	fn test_confirm_msg_reset_names_path() {
+		let msg = confirm_msg_reset("src/main.rs");
+		assert!(msg.contains("'src/main.rs'"));
+		assert!(msg.contains("deleted permanently"));
 	}
 }
