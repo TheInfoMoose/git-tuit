@@ -313,9 +313,18 @@ impl App {
 
 			let mut flags = NeedsUpdate::empty();
 
-			if event_pump(&ev, self.components_mut().as_mut_slice())?
-				.is_consumed()
-			{
+			let pump_result =
+				event_pump(&ev, self.components_mut().as_mut_slice());
+			if let Err(err) = &pump_result {
+				log::error!("event handler failed: {err:?}");
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("{err}"),
+				));
+				flags.insert(NeedsUpdate::ALL);
+			} else if matches!(
+				pump_result,
+				Ok(state) if state.is_consumed()
+			) {
 				flags.insert(NeedsUpdate::COMMANDS);
 			} else if let Event::Key(k) = &ev {
 				let new_flags = if key_match(
@@ -378,9 +387,11 @@ impl App {
 							Path::new(&path),
 						)
 					} else {
-						let changes =
-							self.status_tab.get_files_changes()?;
-						self.commit_popup.show_editor(changes)
+						self.status_tab.get_files_changes().and_then(
+							|changes| {
+								self.commit_popup.show_editor(changes)
+							},
+						)
 					};
 
 				if let Err(e) = result {
@@ -667,7 +678,7 @@ impl App {
 
 	fn process_queue(&mut self, flags: NeedsUpdate) -> Result<()> {
 		let mut flags = flags;
-		let new_flags = self.process_internal_events()?;
+		let new_flags = self.process_internal_events();
 		flags.insert(new_flags);
 
 		if flags.contains(NeedsUpdate::ALL) {
@@ -719,20 +730,31 @@ impl App {
 		Ok(())
 	}
 
-	fn process_internal_events(&mut self) -> Result<NeedsUpdate> {
+	fn process_internal_events(&mut self) -> NeedsUpdate {
 		let mut flags = NeedsUpdate::empty();
 
 		loop {
 			let front = self.queue.pop();
 			if let Some(e) = front {
-				flags.insert(self.process_internal_event(e)?);
+				let is_error_msg =
+					matches!(e, InternalEvent::ShowErrorMsg(_));
+				let result = self.process_internal_event(e);
+				if let Err(err) = &result {
+					log::error!("internal event failed: {err:?}");
+					if !is_error_msg {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!("{err}"),
+						));
+					}
+				}
+				flags.insert(result.unwrap_or(NeedsUpdate::ALL));
 			} else {
 				break;
 			}
 		}
 		self.queue.clear();
 
-		Ok(flags)
+		flags
 	}
 
 	#[allow(clippy::too_many_lines)]
