@@ -1,3 +1,6 @@
+[graph]
+targets = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+
 [licenses]
 allow = [
   "MIT",
@@ -12,7 +15,6 @@ allow = [
 ]
 
 [advisories]
-version = 2
 ignore = [
   # See https://github.com/trishume/syntect/issues/606
   { id = "RUSTSEC-2025-0141", reason = "Only brought in via syntect" },
@@ -23,41 +25,45 @@ multiple-versions = "deny"
 skip-tree = [
   # currently needed due to:
   # * `dirs-sys v0.4.1` (https://github.com/dirs-dev/dirs-sys-rs/issues/29)
-  { name = "windows-sys" },
+  { crate = "windows-sys" },
   # this is needed for:
   #  `bwrap v1.3.0` (https://github.com/micl2e2/bwrap/pull/4)
-  { name = "unicode-width" },
-  # currently needed due to `ratatui v0.29.0`
-  { name = "unicode-truncate" },
+  { crate = "unicode-width" },
   # currently needed due to:
   # * `redox_users v0.4.6`
   # * `syntect v5.2.0`
-  { name = "thiserror" },
+  { crate = "thiserror" },
   # currently needed due to:
   # * `windows v0.57.0`
   # * `iana-time-zone v0.1.60`
-  { name = "windows-core" },
-  # currently needed due to:
-  # * `parking_lot_core v0.9.10`
-  # * `filetime v0.2.23`
-  { name = "redox_syscall" },
+  { crate = "windows-core" },
   # currently needed due to:
   # * `gix-hashtable v0.6.0`
-  { name = "hashbrown" },
+  { crate = "hashbrown" },
   # 2022-10-26 `getrandom` and `rustix` were added when `gitoxide` was
   # upgraded from 0.71.0 to 0.74.1.
   # currently needed due to:
   # * `tempfile v3.23.0`
   # * `rand_core v0.6.4`
   # * `redox_users v0.5.0`
-  { name = "getrandom" },
+  { crate = "getrandom" },
   # currently needed due to:
   # * `crossterm v0.28.1`
   # * `which v7.0.2`
   # * `gix-index v0.42.1`
   # * `tempfile v3.23.0`
-  { name = "rustix" },
-  # 2026-06-18 `gix-hash` still needs `sha1-checked` 0.10 while `ssh-key` 0.7
-  # already needs `sha1-checked` 0.11.
-  { name = "sha1-checked" },
+  { crate = "rustix" },
+  # currently needed due to:
+  # * `sha1 v0.10.6` / `sha1-checked v0.10.0`
+  # * `sha2 v0.11.0`
+  { crate = "digest" },
+  # currently needed due to:
+  # * `sha1 v0.10.6`
+  # * `sha2 v0.11.0`
+  { crate = "cpufeatures" },
 ]
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
