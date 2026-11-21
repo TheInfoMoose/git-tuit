@@ -1083,24 +1083,26 @@ impl App {
 		&mut self,
 		branch_ref: &str,
 	) -> Result<()> {
-		self.queue.push(
-			//TODO: check if this is correct based on the fix in `c6abbaf`
-			branch_ref.rsplit('/').next().map_or_else(
-				|| {
-					InternalEvent::ShowErrorMsg(format!(
-						    "Failed to find the branch name in {branch_ref}"
-					    ))
-				},
-				|name| {
-					InternalEvent::Push(
-						name.to_string(),
-						PushType::Branch,
-						false,
-						true,
-					)
-				},
-			),
-		);
+		let remotes = match sync::get_remotes(&self.repo.borrow()) {
+			Ok(remotes) => remotes,
+			Err(error) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					error.to_string(),
+				));
+				return Ok(());
+			}
+		};
+
+		if let Some((remote, branch)) =
+			split_remote_branch_ref(branch_ref, &remotes)
+		{
+			self.push_popup
+				.delete_remote_branch(remote, branch.to_string())?;
+		} else {
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"Failed to find the remote and branch in {branch_ref}"
+			)));
+		}
 
 		self.select_branch_popup.update_branches()?;
 
@@ -1246,6 +1248,75 @@ impl App {
 			)]))
 			.alignment(Alignment::Right),
 			text_area,
+		);
+	}
+}
+
+/// split `refs/remotes/<remote>/<branch>` into (remote, branch),
+/// matching the longest configured remote name (remote and branch
+/// names may both contain `/`)
+fn split_remote_branch_ref<'a>(
+	branch_ref: &'a str,
+	remotes: &[String],
+) -> Option<(String, &'a str)> {
+	let rest = branch_ref.strip_prefix("refs/remotes/")?;
+	remotes
+		.iter()
+		.filter(|r| {
+			rest.len() > r.len() + 1
+				&& rest.starts_with(r.as_str())
+				&& rest.as_bytes()[r.len()] == b'/'
+		})
+		.max_by_key(|r| r.len())
+		.map(|r| (r.clone(), &rest[r.len() + 1..]))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::split_remote_branch_ref;
+
+	#[test]
+	fn test_split_remote_branch_ref() {
+		let remotes = vec![
+			String::from("origin"),
+			String::from("upstream"),
+			String::from("team/fork"),
+		];
+		assert_eq!(
+			split_remote_branch_ref(
+				"refs/remotes/upstream/feat/login",
+				&remotes
+			),
+			Some((String::from("upstream"), "feat/login"))
+		);
+		assert_eq!(
+			split_remote_branch_ref(
+				"refs/remotes/origin/main",
+				&remotes
+			),
+			Some((String::from("origin"), "main"))
+		);
+		assert_eq!(
+			split_remote_branch_ref(
+				"refs/remotes/team/fork/x/y",
+				&remotes
+			),
+			Some((String::from("team/fork"), "x/y"))
+		);
+		assert_eq!(
+			split_remote_branch_ref(
+				"refs/remotes/unknown/main",
+				&remotes
+			),
+			None
+		);
+		assert_eq!(
+			split_remote_branch_ref("refs/heads/main", &remotes),
+			None
+		);
+		assert_eq!(
+			split_remote_branch_ref("refs/remotes/origin/", &remotes),
+			None
 		);
 	}
 }

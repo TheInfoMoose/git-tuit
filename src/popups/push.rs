@@ -59,6 +59,7 @@ pub struct PushPopup {
 	pending: bool,
 	branch: String,
 	push_type: PushType,
+	remote_override: Option<String>,
 	queue: Queue,
 	theme: SharedTheme,
 	key_config: SharedKeyConfig,
@@ -76,6 +77,7 @@ impl PushPopup {
 			visible: false,
 			branch: String::new(),
 			push_type: PushType::Branch,
+			remote_override: None,
 			git_push: AsyncPush::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
@@ -89,6 +91,27 @@ impl PushPopup {
 
 	///
 	pub fn push(
+		&mut self,
+		branch: String,
+		push_type: PushType,
+		force: bool,
+		delete: bool,
+	) -> Result<()> {
+		self.remote_override = None;
+		self.start_push(branch, push_type, force, delete)
+	}
+
+	/// delete `branch` on the given `remote` (not the upstream/default remote)
+	pub fn delete_remote_branch(
+		&mut self,
+		remote: String,
+		branch: String,
+	) -> Result<()> {
+		self.remote_override = Some(remote);
+		self.start_push(branch, PushType::Branch, false, true)
+	}
+
+	fn start_push(
 		&mut self,
 		branch: String,
 		push_type: PushType,
@@ -127,7 +150,16 @@ impl PushPopup {
 		cred: Option<BasicAuthCredential>,
 		force: bool,
 	) -> Result<()> {
-		let remote = if let Ok(Some(remote)) =
+		let remote = if let Some(remote) =
+			self.remote_override.clone()
+		{
+			log::info!(
+				"push: branch '{}' to explicit remote '{}'",
+				self.branch,
+				remote
+			);
+			remote
+		} else if let Ok(Some(remote)) =
 			get_branch_remote(&self.repo.borrow(), &self.branch)
 		{
 			log::info!("push: branch '{}' has upstream for remote '{}' - using that",self.branch,remote);
