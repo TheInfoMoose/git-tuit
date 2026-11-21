@@ -1,0 +1,19 @@
+schema_version = 2
+
+[item]
+id = "TASK-0050"
+type = "task"
+title = "Relax STEP 4E POST_GATE grep for clippy::option_if_let_else and rustfmt"
+status = "pending"
+severity = "high"
+scope_ref = "asyncgit"
+created_at = "2026-11-21T14:57:39Z"
+updated_at = "2026-11-21T14:57:39Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []
