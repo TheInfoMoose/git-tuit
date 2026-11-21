@@ -203,27 +203,39 @@ impl SignBuilder {
 							err.to_string(),
 						)
 					})?;
-				// `key::<literal>` is git's syntax for an inline key
-				let signing_key = signing_key
-					.strip_prefix("key::")
-					.map(str::to_string)
-					.unwrap_or(signing_key);
+				// `key::<literal>` is git's syntax for an inline key; a bare
+				// `ssh-…` value is also treated as a literal (legacy git behavior)
+				let literal;
+				let signing_key =
+					match signing_key.strip_prefix("key::") {
+						Some(rest) => {
+							literal = true;
+							rest.to_string()
+						}
+						None if signing_key.starts_with("ssh-") => {
+							literal = true;
+							signing_key
+						}
+						None => {
+							literal = false;
+							signing_key
+						}
+					};
 
 				// A literal public key has to be written to a temp
 				// file so `ssh-keygen -f` can read it; the file must
 				// outlive the signer, hence it is kept in the struct.
-				let (signing_key_path, pub_key_temp_file) =
-					if signing_key.starts_with("ssh-") {
-						let temp_file =
-							Self::write_signing_key_to_temp_file(
-								&signing_key,
-							)?;
-						let path =
-							temp_file.path().display().to_string();
-						(path, Some(temp_file))
-					} else {
-						(signing_key, None)
-					};
+				let (signing_key_path, pub_key_temp_file) = if literal
+				{
+					let temp_file =
+						Self::write_signing_key_to_temp_file(
+							&signing_key,
+						)?;
+					let path = temp_file.path().display().to_string();
+					(path, Some(temp_file))
+				} else {
+					(signing_key, None)
+				};
 
 				Ok(Box::new(SSHSign {
 					program,
@@ -535,6 +547,29 @@ mod tests {
 		assert_eq!("ssh-keygen", sign.program());
 		assert!(PathBuf::from(sign.signing_key()).is_file());
 
+		Ok(())
+	}
+
+	#[test]
+	fn test_ssh_key_prefixed_literal_any_type() -> Result<()> {
+		use std::path::PathBuf;
+		let (_tmp_dir, repo) = repo_init_empty()?;
+		{
+			let mut config = repo.config()?;
+			config.set_str("gpg.format", "ssh")?;
+			config.set_str(
+				"user.signingKey",
+				"key::ecdsa-sha2-nistp256 test",
+			)?;
+		}
+		let sign =
+			SignBuilder::from_gitconfig(&repo, &repo.config()?)?;
+		let path = PathBuf::from(sign.signing_key());
+		assert!(path.is_file());
+		assert_eq!(
+			std::fs::read_to_string(path)?.trim_end(),
+			"ecdsa-sha2-nistp256 test"
+		);
 		Ok(())
 	}
 
