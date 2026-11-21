@@ -146,6 +146,7 @@ mod tests {
 	}
 
 	#[test]
+	#[allow(clippy::too_many_lines)] // one end-to-end symlinked-config scenario
 	fn test_symbolic_links() {
 		let app_home = get_app_config_path().unwrap();
 		fs::create_dir_all(&app_home).unwrap();

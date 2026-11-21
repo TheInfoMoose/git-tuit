@@ -239,8 +239,10 @@ impl<'a> LineComposer<'a> for LineTruncator<'a, '_> {
 #[cfg(test)]
 mod test {
 	use super::*;
+	use ratatui::style::Style;
 	use unicode_segmentation::UnicodeSegmentation;
 
+	#[derive(Clone, Copy)]
 	enum Composer {
 		WordWrapper { trim: bool },
 		LineTruncator,
@@ -251,7 +253,7 @@ mod test {
 		text: &str,
 		text_area_width: u16,
 	) -> (Vec<String>, Vec<u16>) {
-		let style = Default::default();
+		let style = Style::default();
 		let mut styled = UnicodeSegmentation::graphemes(text, true)
 			.map(|g| StyledGrapheme { symbol: g, style });
 		let mut composer: Box<dyn LineComposer> = match which {
@@ -285,12 +287,12 @@ mod test {
 			let (word_wrapper, _) = run_composer(
 				Composer::WordWrapper { trim: true },
 				&text,
-				width as u16,
+				u16::try_from(width).unwrap(),
 			);
 			let (line_truncator, _) = run_composer(
 				Composer::LineTruncator,
 				&text,
-				width as u16,
+				u16::try_from(width).unwrap(),
 			);
 			let expected = vec![text];
 			assert_eq!(word_wrapper, expected);
@@ -323,10 +325,13 @@ mod test {
 		let (word_wrapper, _) = run_composer(
 			Composer::WordWrapper { trim: true },
 			text,
-			width as u16,
+			u16::try_from(width).unwrap(),
 		);
-		let (line_truncator, _) =
-			run_composer(Composer::LineTruncator, text, width as u16);
+		let (line_truncator, _) = run_composer(
+			Composer::LineTruncator,
+			text,
+			u16::try_from(width).unwrap(),
+		);
 
 		let wrapped = vec![
 			&text[..width],
@@ -353,15 +358,18 @@ mod test {
 		let (word_wrapper_single_space, _) = run_composer(
 			Composer::WordWrapper { trim: true },
 			text,
-			width as u16,
+			u16::try_from(width).unwrap(),
 		);
 		let (word_wrapper_multi_space, _) = run_composer(
 			Composer::WordWrapper { trim: true },
 			text_multi_space,
-			width as u16,
+			u16::try_from(width).unwrap(),
 		);
-		let (line_truncator, _) =
-			run_composer(Composer::LineTruncator, text, width as u16);
+		let (line_truncator, _) = run_composer(
+			Composer::LineTruncator,
+			text,
+			u16::try_from(width).unwrap(),
+		);
 
 		let word_wrapped = vec![
 			"abcd efghij",
