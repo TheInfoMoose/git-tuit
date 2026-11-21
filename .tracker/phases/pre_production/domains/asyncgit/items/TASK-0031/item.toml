@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0031"
 type = "task"
 title = "asyncgit clippy: logwalker, sync/mod, merge_commit"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T06:58:37Z"
-updated_at = "2026-11-21T06:58:37Z"
+updated_at = "2026-11-21T07:14:49Z"
 source_ref = "STEP 3E"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0031@2026-11-21T07:12:56Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "914a716c"
+summary = "STEP 3E: asyncgit Clippy — logwalker, sync/mod, merge_commit (phased check PASS)"
