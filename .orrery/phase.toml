@@ -2,49 +2,13 @@
 # Regenerated every phase; edits here are lost.
 
 [[queue]]
-step = "2K"
-item = "TASK-0025"
+user = "IMAGE"
+title = "Rebuild the agent image with gpg/gpgsm/ssh-keygen"
 
 [[queue]]
-step = "3A"
-item = "TASK-0026"
+step = "3L"
+item = "TASK-0037"
 
 [[queue]]
-step = "3B"
-item = "TASK-0027"
-
-[[queue]]
-step = "3C"
-item = "TASK-0028"
-
-[[queue]]
-step = "3J"
-item = "TASK-0029"
-
-[[queue]]
-step = "3D"
-item = "TASK-0030"
-
-[[queue]]
-step = "3E"
-item = "TASK-0031"
-
-[[queue]]
-step = "3F"
-item = "TASK-0032"
-
-[[queue]]
-step = "3G"
-item = "TASK-0033"
-
-[[queue]]
-step = "3H"
-item = "TASK-0034"
-
-[[queue]]
-step = "3I"
-item = "TASK-0035"
-
-[[queue]]
-step = "3K"
-item = "TASK-0036"
+step = "3M"
+item = "TASK-0038"

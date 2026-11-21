@@ -42,7 +42,7 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 3 goal:** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass reliably on the pinned toolchain, `cargo deny check` fails on transitive unsound crates and passes cleanly, and the Linux-only CI workflow (deferred 2A) lands.
+**Phase 3 goal (continued after the Phase 3 review, 2026-11-21: 10 of 12 landed; 3L/3M re-queue the two deferrals):** `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace` pass reliably on the pinned toolchain, `cargo deny check` fails on transitive unsound crates and passes cleanly, and the Linux-only CI workflow (deferred 2A) lands.
 
 _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only and correct, `deny.toml` works with cargo-deny 0.20, `chrono` is replaced by `jiff`, `cargo deny check` passes, and the `Makefile` matches CI. Everything but 2A landed; 2A is re-queued as 2K.
 
@@ -52,18 +52,9 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 2K** | `/goal` | Linux-only CI workflow (re-queued 2A) | `.github/workflows/ci.yml` | — |
-| 2 | **STEP 3A** | `/goal` | deny.toml unsound scope, heapless ignores, dead skip-tree | `deny.toml` | — |
-| 3 | **STEP 3B** | `/goal` | Allow unwrap/expect/panic in tests | `.clippy.toml` | — |
-| 4 | **STEP 3C** | `/goal` | git2-hooks clippy and python3 hook tests | `git2-hooks/src/lib.rs` | — |
-| 5 | **STEP 3J** | `/goal` | gitui clippy: app, options, diff | `src/app.rs`, `src/options.rs`, `src/components/diff.rs` | — |
-| 6 | **STEP 3D** | `/goal` | asyncgit clippy: blame, commit, commit_details | `asyncgit/src/sync/{blame,commit,commit_details}.rs` | — |
-| 7 | **STEP 3E** | `/goal` | asyncgit clippy: logwalker, sync/mod, merge_commit | `asyncgit/src/sync/logwalker.rs`, `asyncgit/src/sync/mod.rs`, `asyncgit/src/sync/branch/merge_commit.rs` | — |
-| 8 | **STEP 3F** | `/goal` | asyncgit clippy: merge_ff, commits_info, hooks | `asyncgit/src/sync/branch/merge_ff.rs`, `asyncgit/src/sync/commits_info.rs`, `asyncgit/src/sync/hooks.rs` | — |
-| 9 | **STEP 3G** | `/goal` | asyncgit clippy: cred, sign, stash | `asyncgit/src/sync/{cred,sign,stash}.rs` | — |
-| 10 | **STEP 3H** | `/goal` | asyncgit clippy: remotes push and tags | `asyncgit/src/sync/remotes/{push,tags}.rs` | — |
-| 11 | **STEP 3I** | `/boost` | GIT_DIR test in a child process, GNUPGHOME guard | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` | — |
-| 12 | **STEP 3K** | `/goal` | gitui clippy: reflow, key_config; full gate | `src/ui/reflow.rs`, `src/keys/key_config.rs` | — |
+| 1 | **[USER] IMAGE** | — | Rebuild the agent image with gpg/gpgsm/ssh-keygen | `orrery-cli-agents:…-neb` | **[USER]** runs the commands under "User Step: IMAGE". |
+| 2 | **STEP 3L** | `/boost` | GIT_DIR test in a child process, GNUPGHOME guard (re-queued 3I) | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` | [USER] IMAGE |
+| 3 | **STEP 3M** | `/goal` | gitui clippy: reflow, key_config; full gate (re-queued 3K) | `src/ui/reflow.rs`, `src/keys/key_config.rs` | [USER] IMAGE |
 
 ### Completed
 
@@ -80,6 +71,34 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 2G | ✅ 72ded3fd | `/goal` | Drop `chrono` | `Cargo.toml`, `Cargo.lock` |
 | STEP 2H | ✅ 16b2a7b8 | `/goal` | Lockfile advisory updates (+ ratatui-widgets 0.3.2 for strum dedupe) | `Cargo.lock`, `asyncgit/Cargo.toml` |
 | STEP 2I | ✅ 3afc634c | `/goal` | `Makefile` matches Linux CI | `Makefile`, `.cargo/config.toml` |
+| STEP 2K | ✅ ee00a44b | `/goal` | Linux-only CI workflow (re-queued 2A) | `.github/workflows/ci.yml` |
+| STEP 3A | ✅ 258d4080 | `/goal` | deny.toml unsound scope, heapless ignores, dead skip-tree | `deny.toml` |
+| STEP 3B | ✅ 1ecb26bc | `/goal` | Allow unwrap/expect/panic in tests | `.clippy.toml` |
+| STEP 3C | ✅ 556a257d | `/goal` | git2-hooks clippy and python3 hook tests | `git2-hooks/src/lib.rs` |
+| STEP 3J | ✅ 2d7ba5cd | `/goal` | gitui clippy: app, options, diff | `src/app.rs`, `src/options.rs`, `src/components/diff.rs` |
+| STEP 3D | ✅ 7de34871 | `/goal` | asyncgit clippy: blame, commit, commit_details | `asyncgit/src/sync/{blame,commit,commit_details}.rs` |
+| STEP 3E | ✅ 914a716c | `/goal` | asyncgit clippy: logwalker, sync/mod, merge_commit | `asyncgit/src/sync/logwalker.rs`, `asyncgit/src/sync/mod.rs`, `asyncgit/src/sync/branch/merge_commit.rs` |
+| STEP 3F | ✅ 92b8df61 | `/goal` | asyncgit clippy: merge_ff, commits_info, hooks | `asyncgit/src/sync/branch/merge_ff.rs`, `asyncgit/src/sync/commits_info.rs`, `asyncgit/src/sync/hooks.rs` |
+| STEP 3G | ✅ be414586 | `/goal` | asyncgit clippy: cred, sign, stash | `asyncgit/src/sync/{cred,sign,stash}.rs` |
+| STEP 3H | ✅ 88ccd87b | `/goal` | asyncgit clippy: remotes push and tags | `asyncgit/src/sync/remotes/{push,tags}.rs` |
+| STEP 3I | ↪ withdrawn | `/boost` | Deferred (agent image lacked gpg tools); re-queued as STEP 3L | `asyncgit/src/revlog.rs`, `asyncgit/src/sync/sign.rs` |
+| STEP 3K | ↪ withdrawn | `/goal` | Deferred (PRE_GATE waited on 3I); re-queued as STEP 3M | `src/ui/reflow.rs`, `src/keys/key_config.rs` |
+
+### User Step: IMAGE
+
+The Orrery agent image now installs `gnupg gpgsm openssh-client python3-yaml` (Dockerfile at `/srv/docker-llms/orrery/cli-agents/Dockerfile`). Rebuild it under the same tag, then check the tools:
+
+```bash
+rm -rf /tmp/nebsrc && mkdir -p /tmp/nebsrc && git -C /srv/devshare/Nebulous archive HEAD | tar -x -C /tmp/nebsrc
+```
+
+```bash
+docker build --build-context agybin="$HOME/.gemini/bin" --build-context geminicfg="$HOME/.gemini/config" --build-context nebsrc=/tmp/nebsrc -t orrery-cli-agents:cc2.1.318-agy1.5.13-rs1.99.1-neb /srv/docker-llms/orrery/cli-agents
+```
+
+```bash
+docker run --rm --entrypoint bash orrery-cli-agents:cc2.1.318-agy1.5.13-rs1.99.1-neb -c 'command -v gpg gpgsm ssh-keygen && python3 -c "import yaml" && echo IMAGE_OK'
+```
 
 ### User Step: FETCH
 
@@ -1461,6 +1480,117 @@ cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && 
 Halt immediately after POST_GATE exits 0 and report verification status.
 ```
 
+### STEP 3L: Stop Tests Mutating `GIT_DIR` / Leaking `GNUPGHOME`
+
+* **Recommended Command:** `/boost`
+
+Re-queue of STEP 3I (deferred in Phase 3: the agent image had no gpg/gpgsm/ssh-keygen, so asyncgit's signing e2e tests failed in the container; the image now installs them, see User Step: IMAGE). Block otherwise unchanged.
+
+```text
+[STEP_ID]
+STEP 3L: Run the GIT_DIR test in a child process so it no longer sets GIT_DIR for the whole test binary (the flaky test_commit race), and restore GNUPGHOME through a Drop guard in the two gpg e2e tests.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/revlog.rs
+  - asyncgit/src/sync/sign.rs
+READ_ONLY_REFS:
+  - revlog.rs:372-403 (`#[test] #[serial] fn test_env_variables()`: `std::env::set_var("GIT_DIR", git_dir);` … `std::env::remove_var("GIT_DIR");` … `assert_eq!(result.unwrap(), ());`)
+  - revlog.rs:325-340 (tests module imports: serial, TempDir, repo_init, RepoPath, AsyncLog, AsyncLogResult)
+  - sign.rs:704 test_x509_sign_and_verify_e2e: `std::env::set_var("GNUPGHOME", home);` at :755, `std::env::remove_var("GNUPGHOME");` at :870
+  - sign.rs:879 test_openpgp_sign_and_verify_e2e: set at :907, remove at :991
+  - Root cause (BUG-0014): `#[serial]` only orders tests that also carry `#[serial]`. While test_env_variables runs, GIT_DIR is set for every concurrently running test, so their `Repository::open_ext` calls can open the wrong repo (baseline: sync::commit::tests::test_commit saw (0, 0) instead of (1, 0) once).
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No production code changes. Don't change the SSH_AUTH_SOCK handling in test_ssh_sign_and_verify_e2e.
+
+[PRE_GATE]
+grep -qF '#[allow(clippy::too_many_lines)]' asyncgit/src/sync/remotes/push.rs
+
+[MUTATION_SPEC]
+1. revlog.rs test_env_variables: keep its body, but make it run in a child copy of the test binary with GIT_DIR set only there. New shape:
+	#[test]
+	fn test_env_variables() {
+		const CHILD: &str = "ASYNCGIT_TEST_ENV_VARIABLES_CHILD";
+		if std::env::var_os(CHILD).is_none() {
+			let (_td, repo) = repo_init().unwrap();
+			let status = std::process::Command::new(
+				std::env::current_exe().unwrap(),
+			)
+			.args(["--exact", "revlog::tests::test_env_variables"])
+			.env(CHILD, "1")
+			.env("GIT_DIR", repo.path())
+			.status()
+			.unwrap();
+			assert!(status.success(), "child test failed: {status}");
+			return;
+		}
+		// child process: GIT_DIR was set by the parent for this process only
+		<existing body from `let (tx_git, _rx_git) = unbounded();` through `assert_eq!(result.unwrap(), ());`, minus the set_var/remove_var lines and minus the parent's repo_init/git_dir lines>
+	}
+   Remove `#[serial]` from it. Remove the `std::env::set_var("GIT_DIR", git_dir);` and `std::env::remove_var("GIT_DIR");` lines. If `serial` is then unused in revlog.rs's tests module, remove `use serial_test::serial;`.
+2. sign.rs tests module: add a restore guard
+	struct EnvRestore(&'static str, Option<std::ffi::OsString>);
+	impl EnvRestore {
+		fn set(key: &'static str, value: &std::path::Path) -> Self {
+			let old = std::env::var_os(key);
+			std::env::set_var(key, value);
+			Self(key, old)
+		}
+	}
+	impl Drop for EnvRestore {
+		fn drop(&mut self) {
+			match self.1.take() {
+				Some(v) => std::env::set_var(self.0, v),
+				None => std::env::remove_var(self.0),
+			}
+		}
+	}
+3. sign.rs both gpg e2e tests: replace `std::env::set_var("GNUPGHOME", home);` with `let _gnupghome = EnvRestore::set("GNUPGHOME", home);` and delete the matching `std::env::remove_var("GNUPGHOME");`. Why: a failing assert used to leave GNUPGHOME pointing at a deleted temp dir for the rest of the run. Both tests stay `#[serial]`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && cargo clippy -p asyncgit --all-targets -- -D warnings && cargo test -p asyncgit --locked && ! grep -qF 'set_var("GIT_DIR"' asyncgit/src/revlog.rs && grep -qF 'ASYNCGIT_TEST_ENV_VARIABLES_CHILD' asyncgit/src/revlog.rs && grep -qF '.env("GIT_DIR", repo.path())' asyncgit/src/revlog.rs && ! grep -qF 'set_var("GNUPGHOME"' asyncgit/src/sync/sign.rs && test "$(grep -cF 'EnvRestore::set("GNUPGHOME", home)' asyncgit/src/sync/sign.rs)" = 2 && grep -qF 'impl Drop for EnvRestore' asyncgit/src/sync/sign.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 3M: gitui Clippy — reflow, key_config; Full Gate Green
+
+* **Recommended Command:** `/goal`
+
+Re-queue of STEP 3K (deferred in Phase 3: the agent image had no gpg/gpgsm/ssh-keygen, so asyncgit's signing e2e tests failed in the container; the image now installs them, see User Step: IMAGE). Block otherwise unchanged.
+
+```text
+[STEP_ID]
+STEP 3M: Clear the last gitui clippy errors (ui/reflow.rs, keys/key_config.rs) so the full workspace gate (clippy --all-targets -D warnings + cargo test --workspace) passes.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/reflow.rs
+  - src/keys/key_config.rs
+READ_ONLY_REFS:
+  - src/ui/reflow.rs:239 (`#[cfg(test)]`), the test-only `enum Composer` ending at :247 (`LineTruncator,`), `fn run_composer(which: Composer, ...)` at :249-251 (clippy::needless_pass_by_value), `let style = Default::default();` at :254, `width as u16` at :288, :293, :326, :329, :356, :361, :364 (clippy::cast_possible_truncation; `width` is usize)
+  - src/keys/key_config.rs:148-149 (`#[test]` / `fn test_symbolic_links() {`, 102 lines; too_many_lines)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No production code changes.
+
+[PRE_GATE]
+grep -qF 'OptionsData::default()' src/options.rs && grep -qF 'impl Drop for EnvRestore' asyncgit/src/sync/sign.rs && grep -qF 'assert_eq!(response.stderr, "");' git2-hooks/src/lib.rs
+
+[MUTATION_SPEC]
+1. reflow.rs: add `#[derive(Clone, Copy)]` on the line above the test-only `enum Composer {`.
+2. reflow.rs:254: `let style = Default::default();` → `let style = Style::default();` (add `use ratatui::style::Style;` to the tests module if it isn't imported).
+3. reflow.rs: every `width as u16` in the tests module → `u16::try_from(width).unwrap()`.
+4. key_config.rs: on the line between `#[test]` and `fn test_symbolic_links() {`, add
+	#[allow(clippy::too_many_lines)] // one end-to-end symlinked-config scenario
+   This is workaround-shaped: it silences too_many_lines for this single test only.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo build --workspace --all-targets --locked && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'width as u16' src/ui/reflow.rs && grep -qF 'u16::try_from(width).unwrap()' src/ui/reflow.rs && grep -qF '#[allow(clippy::too_many_lines)]' src/keys/key_config.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
 ---
 
 ## Phase 1: Parallel Subagent Component Audit (completed)

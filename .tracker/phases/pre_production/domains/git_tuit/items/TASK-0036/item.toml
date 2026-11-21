@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0036"
 type = "task"
 title = "gitui clippy: reflow, key_config; full gate"
-status = "pending"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T06:58:38Z"
-updated_at = "2026-11-21T14:14:52Z"
+updated_at = "2026-11-21T14:22:12Z"
 source_ref = "STEP 3K"
 
 [effort]
@@ -17,4 +17,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "fda56e5"
+summary = "withdrawn: STEP 3K deferred (PRE_GATE waited on 3I); re-queued as STEP 3M"

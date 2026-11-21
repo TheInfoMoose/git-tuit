@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0024"
 type = "task"
 title = "Remove dead windows skip-tree entries from deny.toml"
-status = "open"
+status = "closed"
 severity = "low"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T06:46:40Z"
-updated_at = "2026-11-21T06:53:06Z"
+updated_at = "2026-11-21T14:22:12Z"
 
 [effort]
 logged_time_minutes = 0
@@ -16,4 +16,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "258d4080"
+summary = "STEP 3A removed dead windows-sys and windows-core skip-tree entries"

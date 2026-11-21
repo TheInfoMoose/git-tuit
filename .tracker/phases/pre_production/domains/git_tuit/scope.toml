@@ -125,42 +125,42 @@ tracked_files = [
 [[items.bugs]]
 id = "BUG-0001"
 title = "Remove upstream daily cron trigger from CI workflow"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0002"
 title = "Restrict CI build matrix to ubuntu-latest stable and MSRV 1.88"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0003"
 title = "Run clippy on all targets with -D warnings in CI"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0004"
 title = "Fix broken build-linux-musl CI job"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0005"
 title = "Delete upstream-only arm, apple, udeps, log-test and homebrew CI jobs"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0006"
 title = "Check formatting of all workspace crates in CI lint job"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -447,7 +447,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0060"
 title = "Close transitive unsound advisories that cargo-deny lets through"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T06:46:40Z"
 
@@ -482,14 +482,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.tasks]]
 id = "TASK-0001"
 title = "Install pinned prebuilt cargo-deny in CI"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.tasks]]
 id = "TASK-0002"
 title = "Align CI cache keys, dependabot cadence and workspace rust-version"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -629,7 +629,7 @@ created_at = "2026-11-21T06:22:08Z"
 [[items.tasks]]
 id = "TASK-0024"
 title = "Remove dead windows skip-tree entries from deny.toml"
-status = "open"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T06:46:40Z"
 
@@ -664,6 +664,13 @@ created_at = "2026-11-21T06:58:37Z"
 [[items.tasks]]
 id = "TASK-0036"
 title = "gitui clippy: reflow, key_config; full gate"
-status = "pending"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T06:58:38Z"
+
+[[items.tasks]]
+id = "TASK-0038"
+title = "gitui clippy: reflow, key_config; full gate (re-queued 3K)"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T14:22:12Z"
