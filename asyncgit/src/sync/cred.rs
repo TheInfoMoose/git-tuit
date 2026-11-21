@@ -35,6 +35,23 @@ impl BasicAuthCredential {
 	}
 }
 
+/// true only for real http(s) URLs (a prefix check also matched `httpfoo://`)
+fn is_http_url(url: &str) -> bool {
+	url::Url::parse(url)
+		.is_ok_and(|u| matches!(u.scheme(), "http" | "https"))
+}
+
+/// a newline or other control character in the URL could inject
+/// lines into the credential-helper protocol (CVE-2020-5260 class)
+fn ensure_no_control_chars(url: &str) -> Result<()> {
+	if url.chars().any(char::is_control) {
+		return Err(Error::Generic(String::from(
+			"remote url contains control characters",
+		)));
+	}
+	Ok(())
+}
+
 /// know if username and password are needed for this url
 pub fn need_username_password(repo_path: &RepoPath) -> Result<bool> {
 	let repo = repo(repo_path)?;
@@ -47,7 +64,7 @@ pub fn need_username_password(repo_path: &RepoPath) -> Result<bool> {
 		.or_else(|| remote.url().ok())
 		.ok_or(Error::UnknownRemote)?
 		.to_owned();
-	let is_http = url.starts_with("http");
+	let is_http = is_http_url(&url);
 	Ok(is_http)
 }
 
@@ -62,7 +79,7 @@ pub fn need_username_password_for_fetch(
 		.find_remote(&get_default_remote_for_fetch_in_repo(&repo)?)?;
 	let url =
 		remote.url().map_err(|_| Error::UnknownRemote)?.to_owned();
-	let is_http = url.starts_with("http");
+	let is_http = is_http_url(&url);
 	Ok(is_http)
 }
 
@@ -82,7 +99,7 @@ pub fn need_username_password_for_push(
 		.or_else(|| remote.url().ok())
 		.ok_or(Error::UnknownRemote)?
 		.to_owned();
-	let is_http = url.starts_with("http");
+	let is_http = is_http_url(&url);
 	Ok(is_http)
 }
 
@@ -97,6 +114,7 @@ pub fn extract_username_password(
 		.ok()
 		.ok_or(Error::UnknownRemote)?
 		.to_owned();
+	ensure_no_control_chars(&url)?;
 	let mut helper = CredentialHelper::new(&url);
 
 	//TODO: look at Cred::credential_helper,
@@ -127,6 +145,7 @@ pub fn extract_username_password_for_fetch(
 		.ok()
 		.ok_or(Error::UnknownRemote)?
 		.to_owned();
+	ensure_no_control_chars(&url)?;
 	let mut helper = CredentialHelper::new(&url);
 
 	//TODO: look at Cred::credential_helper,
@@ -151,12 +170,16 @@ pub fn extract_username_password_for_push(
 	repo_path: &RepoPath,
 ) -> Result<BasicAuthCredential> {
 	let repo = repo(repo_path)?;
-	let url = repo
-		.find_remote(&get_default_remote_for_push_in_repo(&repo)?)?
-		.url()
+	let remote = repo
+		.find_remote(&get_default_remote_for_push_in_repo(&repo)?)?;
+	let url = remote
+		.pushurl()
 		.ok()
+		.flatten()
+		.or_else(|| remote.url().ok())
 		.ok_or(Error::UnknownRemote)?
 		.to_owned();
+	ensure_no_control_chars(&url)?;
 	let mut helper = CredentialHelper::new(&url);
 
 	//TODO: look at Cred::credential_helper,
@@ -194,6 +217,7 @@ pub fn extract_cred_from_url(url: &str) -> BasicAuthCredential {
 
 #[cfg(test)]
 mod tests {
+	use super::{ensure_no_control_chars, is_http_url};
 	use crate::sync::{
 		cred::{
 			extract_cred_from_url, extract_username_password,
@@ -367,5 +391,28 @@ mod tests {
 			&root.as_os_str().to_str().unwrap().into();
 
 		extract_username_password(repo_path).unwrap();
+	}
+
+	#[test]
+	fn test_is_http_url() {
+		assert!(is_http_url("https://example.com/repo.git"));
+		assert!(is_http_url("http://example.com/repo.git"));
+		assert!(!is_http_url("httpfoo://example.com/repo.git"));
+		assert!(!is_http_url("git@example.com:repo.git"));
+		assert!(!is_http_url("ssh://git@example.com/repo.git"));
+	}
+
+	#[test]
+	fn test_ensure_no_control_chars() {
+		assert!(ensure_no_control_chars(
+			"https://example.com/repo.git"
+		)
+		.is_ok());
+		assert!(ensure_no_control_chars(
+			"https://example.com/r\nhost=evil.example.com"
+		)
+		.is_err());
+		assert!(ensure_no_control_chars("https://example.com/r\r")
+			.is_err());
 	}
 }
