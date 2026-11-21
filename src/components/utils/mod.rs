@@ -1,4 +1,3 @@
-use chrono::{DateTime, Local, Utc};
 use unicode_width::UnicodeWidthStr;
 
 #[cfg(feature = "ghemoji")]
@@ -28,16 +27,11 @@ macro_rules! try_or_popup {
 
 /// helper func to convert unix time since epoch to formatted time string in local timezone
 pub fn time_to_string(secs: i64, short: bool) -> String {
-	let time = DateTime::<Local>::from(
-		DateTime::<Utc>::from_naive_utc_and_offset(
-			DateTime::from_timestamp(secs, 0)
-				.unwrap_or_default()
-				.naive_utc(),
-			Utc,
-		),
-	);
+	let time = jiff::Timestamp::from_second(secs)
+		.unwrap_or(jiff::Timestamp::UNIX_EPOCH)
+		.to_zoned(jiff::tz::TimeZone::system());
 
-	time.format(if short {
+	time.strftime(if short {
 		"%Y-%m-%d"
 	} else {
 		"%Y-%m-%d %H:%M:%S"
@@ -66,4 +60,26 @@ pub fn string_width_align(s: &str, width: usize) -> String {
 #[inline]
 fn find_truncate_point(s: &str, chars: usize) -> usize {
 	s.chars().take(chars).map(char::len_utf8).sum()
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn time_to_string_formats_short_and_long() {
+		let short = time_to_string(0, true);
+		let long = time_to_string(0, false);
+		assert_eq!(short.len(), 10);
+		assert_eq!(long.len(), 19);
+		assert!(long.starts_with(&short));
+	}
+
+	#[test]
+	fn time_to_string_out_of_range_falls_back() {
+		assert_eq!(
+			time_to_string(i64::MAX, false),
+			time_to_string(0, false)
+		);
+	}
 }
