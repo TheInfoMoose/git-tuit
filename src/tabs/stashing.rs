@@ -13,7 +13,10 @@ use crate::{
 };
 use anyhow::Result;
 use asyncgit::{
-	sync::{self, status::StatusType, RepoPathRef},
+	sync::{
+		self, status::StatusType, RepoPathRef,
+		ShowUntrackedFilesConfig,
+	},
 	AsyncGitNotification, AsyncStatus, StatusParams,
 };
 use crossterm::event::Event;
@@ -35,6 +38,7 @@ pub struct Stashing {
 	index: StatusTreeComponent,
 	visible: bool,
 	options: StashingOptions,
+	options_initialized: bool,
 	theme: SharedTheme,
 	git_status: AsyncStatus,
 	queue: Queue,
@@ -58,6 +62,7 @@ impl Stashing {
 				keep_index: false,
 				stash_untracked: true,
 			},
+			options_initialized: false,
 			theme: env.theme.clone(),
 			git_status: AsyncStatus::new(
 				env.repo.borrow().clone(),
@@ -71,9 +76,12 @@ impl Stashing {
 	///
 	pub fn update(&self) -> Result<()> {
 		if self.is_visible() {
-			self.git_status
-				//TODO: support options
-				.fetch(&StatusParams::new(StatusType::Both, None))?;
+			let untracked = (!self.options.stash_untracked)
+				.then_some(ShowUntrackedFilesConfig::No);
+			self.git_status.fetch(&StatusParams::new(
+				StatusType::Both,
+				untracked,
+			))?;
 		}
 
 		Ok(())
@@ -264,11 +272,14 @@ impl Component for Stashing {
 	}
 
 	fn show(&mut self) -> Result<()> {
-		let config_untracked_files =
-			sync::untracked_files_config(&self.repo.borrow())?;
+		if !self.options_initialized {
+			let config_untracked_files =
+				sync::untracked_files_config(&self.repo.borrow())?;
 
-		self.options.stash_untracked =
-			!config_untracked_files.include_none();
+			self.options.stash_untracked =
+				!config_untracked_files.include_none();
+			self.options_initialized = true;
+		}
 
 		self.index.show()?;
 		self.visible = true;
