@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0032"
 type = "task"
 title = "asyncgit clippy: merge_ff, commits_info, hooks"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T06:58:37Z"
-updated_at = "2026-11-21T06:58:37Z"
+updated_at = "2026-11-21T07:16:51Z"
 source_ref = "STEP 3F"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 2
 iteration_count = 1
+last_timer_session = "TASK-0032@2026-11-21T07:14:49Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "92b8df61"
+summary = "STEP 3F: asyncgit Clippy — merge_ff, commits_info, hooks (phased check PASS)"
