@@ -699,7 +699,7 @@ created_at = "2026-11-21T14:42:35Z"
 [[items.tasks]]
 id = "TASK-0047"
 title = "Credential prompt clears both inputs"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T14:42:35Z"
 
