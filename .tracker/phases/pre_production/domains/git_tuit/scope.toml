@@ -741,7 +741,7 @@ created_at = "2026-11-21T19:19:42Z"
 [[items.tasks]]
 id = "TASK-0054"
 title = "Tighten an existing trace log to 0600"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
 
