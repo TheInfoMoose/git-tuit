@@ -586,10 +586,13 @@ impl BranchListPopup {
 			&self.repo.borrow(),
 			StatusType::WorkingDir,
 			None,
-		)
-		.expect("Could not get status");
+		)?;
 
-		let selected_branch = &self.branches[self.selection as usize];
+		let Some(selected_branch) =
+			self.branches.get(self.selection as usize)
+		else {
+			return Ok(());
+		};
 		if status.is_empty() {
 			if self.local {
 				checkout_branch(
