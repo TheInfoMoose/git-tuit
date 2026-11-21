@@ -182,8 +182,15 @@ impl Callbacks {
 		username_from_url: Option<&str>,
 		allowed_types: git2::CredentialType,
 	) -> std::result::Result<Cred, GitError> {
+		let shown_url = url::Url::parse(url).map_or_else(
+			|_| String::from("<unparsable url>"),
+			|mut u| {
+				let _ = u.set_password(None);
+				u.to_string()
+			},
+		);
 		log::debug!(
-			"creds: '{url}' {username_from_url:?} ({allowed_types:?})",
+			"creds: '{shown_url}' {username_from_url:?} ({allowed_types:?})",
 		);
 
 		// This boolean is used to avoid multiple calls to credentials callback.

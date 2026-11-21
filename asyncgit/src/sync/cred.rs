@@ -13,12 +13,27 @@ use crate::error::{Error, Result};
 use git2::CredentialHelper;
 
 /// basic Authentication Credentials
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct BasicAuthCredential {
 	///
 	pub username: Option<String>,
 	///
 	pub password: Option<String>,
+}
+
+impl std::fmt::Debug for BasicAuthCredential {
+	fn fmt(
+		&self,
+		f: &mut std::fmt::Formatter<'_>,
+	) -> std::fmt::Result {
+		f.debug_struct("BasicAuthCredential")
+			.field("username", &self.username)
+			.field(
+				"password",
+				&self.password.as_ref().map(|_| "<redacted>"),
+			)
+			.finish()
+	}
 }
 
 impl BasicAuthCredential {
@@ -414,5 +429,17 @@ mod tests {
 		.is_err());
 		assert!(ensure_no_control_chars("https://example.com/r\r")
 			.is_err());
+	}
+
+	#[test]
+	fn test_debug_redacts_password() {
+		let cred = BasicAuthCredential::new(
+			Some(String::from("testuser")),
+			Some(String::from("s3cret-value")),
+		);
+		let shown = format!("{cred:?}");
+		assert!(shown.contains("testuser"));
+		assert!(!shown.contains("s3cret-value"));
+		assert!(shown.contains("<redacted>"));
 	}
 }
