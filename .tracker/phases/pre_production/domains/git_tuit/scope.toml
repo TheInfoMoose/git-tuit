@@ -832,7 +832,7 @@ created_at = "2026-11-21T20:28:02Z"
 [[items.tasks]]
 id = "TASK-0070"
 title = "Stash list keys, fuzzy nav, tab-switch refresh"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:02Z"
 
