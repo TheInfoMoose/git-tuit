@@ -110,6 +110,7 @@ impl ResetPopup {
 
 	///
 	pub fn open(&mut self, id: CommitId) -> Result<()> {
+		self.kind = ResetType::Soft;
 		self.show()?;
 
 		self.commit = Some(id);

@@ -78,6 +78,7 @@ impl CheckoutOptionPopup {
 
 	///
 	pub fn open(&mut self, branch: BranchInfo) -> Result<()> {
+		self.option = CheckoutOptions::KeepLocalChanges;
 		self.show()?;
 
 		self.branch = Some(branch);
