@@ -769,7 +769,7 @@ created_at = "2026-11-21T19:19:42Z"
 [[items.tasks]]
 id = "TASK-0059"
 title = "Tag, blame and remote list panics"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T19:19:42Z"
 
