@@ -408,11 +408,10 @@ impl CommitPopup {
 					.ok()
 					.flatten()
 					.and_then(|path| {
-						shellexpand::full(path.as_str())
-							.ok()
-							.and_then(|path| {
-								PathBuf::from_str(path.as_ref()).ok()
-							})
+						PathBuf::from_str(
+							shellexpand::tilde(path.as_str()).as_ref(),
+						)
+						.ok()
 					})
 					.and_then(|path| {
 						read_to_string(&path)
