@@ -188,6 +188,13 @@ pub(crate) fn repo_write_file(
 	let file_path = dir.to_str().ok_or_else(|| {
 		Error::Generic(String::from("invalid file path"))
 	})?;
+	if std::fs::symlink_metadata(file_path)
+		.is_ok_and(|m| m.file_type().is_symlink())
+	{
+		return Err(Error::Generic(format!(
+			"refusing to write through symlink: {file_path}"
+		)));
+	}
 	let mut file = File::create(file_path)?;
 	file.write_all(content.as_bytes())?;
 	Ok(())
@@ -504,5 +511,25 @@ mod tests {
 		assert!(get_head(repo_path).is_ok());
 
 		Ok(())
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_repo_write_file_refuses_symlink() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.workdir().unwrap();
+		let outside = tempfile::NamedTempFile::new().unwrap();
+		std::fs::write(outside.path(), "keep").unwrap();
+		std::os::unix::fs::symlink(
+			outside.path(),
+			root.join("link.txt"),
+		)
+		.unwrap();
+		assert!(repo_write_file(&repo, "link.txt", "overwritten")
+			.is_err());
+		assert_eq!(
+			std::fs::read_to_string(outside.path()).unwrap(),
+			"keep"
+		);
 	}
 }
