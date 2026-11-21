@@ -128,6 +128,7 @@ impl Component for RevisionFilesPopup {
 			if let Event::Key(key) = event {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.hide_stacked(false);
+					return Ok(EventState::Consumed);
 				}
 			}
 
@@ -138,7 +139,7 @@ impl Component for RevisionFilesPopup {
 				self.hide_stacked(true);
 			}
 
-			return Ok(res);
+			return Ok(EventState::Consumed);
 		}
 
 		Ok(EventState::NotConsumed)

@@ -188,7 +188,7 @@ impl Component for InspectCommitPopup {
 						));
 						return Ok(EventState::Consumed);
 					}
-					return Ok(EventState::NotConsumed);
+					return Ok(EventState::Consumed);
 				}
 
 				return Ok(EventState::Consumed);

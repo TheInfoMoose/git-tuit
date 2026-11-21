@@ -230,7 +230,7 @@ impl Component for TagListPopup {
 					self.key_config.keys.delete_tag,
 				) {
 					return self.selected_tag().map_or(
-						Ok(EventState::NotConsumed),
+						Ok(EventState::Consumed),
 						|tag| {
 							self.queue.push(
 								InternalEvent::ConfirmAction(
@@ -247,7 +247,7 @@ impl Component for TagListPopup {
 					self.key_config.keys.select_tag,
 				) {
 					return self.selected_tag().map_or(
-						Ok(EventState::NotConsumed),
+						Ok(EventState::Consumed),
 						|tag| {
 							self.queue.push(
 								InternalEvent::SelectCommitInRevlog(
