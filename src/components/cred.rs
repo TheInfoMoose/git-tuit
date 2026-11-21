@@ -146,6 +146,10 @@ impl Component for CredComponent {
 
 	fn hide(&mut self) {
 		self.cred = BasicAuthCredential::new(None, None);
+		self.input_username.hide();
+		self.input_username.clear();
+		self.input_password.hide();
+		self.input_password.clear();
 		self.visible = false;
 	}
 
