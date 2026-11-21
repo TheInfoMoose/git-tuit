@@ -188,6 +188,8 @@ pub fn commit_message_prettify(
 }
 
 #[cfg(test)]
+// LogWalker::read fills a Vec<CommitId>; it is not io::Read, so this nursery lint is a false positive here
+#[allow(clippy::read_zero_byte_vec)]
 mod tests {
 	use crate::error::Result;
 	use crate::sync::tags::Tag;

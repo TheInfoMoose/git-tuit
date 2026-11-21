@@ -199,21 +199,17 @@ mod tests {
 	}
 
 	#[test]
-	fn test_msg_linefeeds() -> Result<()> {
+	fn test_msg_linefeeds() {
 		let msg = CommitMessage::from("foo\nbar\r\ntest");
 
 		assert_eq!(msg.subject, String::from("foo"),);
 		assert_eq!(msg.body, Some(String::from("bar\ntest")),);
-
-		Ok(())
 	}
 
 	#[test]
-	fn test_commit_message_combine() -> Result<()> {
+	fn test_commit_message_combine() {
 		let msg = CommitMessage::from("foo\nbar\r\ntest");
 
 		assert_eq!(msg.combine(), String::from("foo\nbar\ntest"));
-
-		Ok(())
 	}
 }

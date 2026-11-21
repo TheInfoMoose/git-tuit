@@ -193,7 +193,7 @@ mod tests {
 			.append(true)
 			.open(root.join(file_path))?;
 
-		file.write(b"line 2\n")?;
+		file.write_all(b"line 2\n")?;
 
 		stage_add_file(repo_path, file_path)?;
 		commit(repo_path, "second commit")?;
@@ -223,7 +223,7 @@ mod tests {
 			] if author == "name" && first_line == "line 1" && second_line == "line 2"
 		));
 
-		file.write(b"line 3\n")?;
+		file.write_all(b"line 3\n")?;
 
 		let blame = blame_file(repo_path, "foo", None)?;
 
