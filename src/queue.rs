@@ -30,7 +30,7 @@ bitflags! {
 		/// branches have changed
 		const BRANCHES = 0b1000;
 		/// Remotes have changed
-		const REMOTES = 0b1001;
+		const REMOTES = 0b1_0000;
 	}
 }
 

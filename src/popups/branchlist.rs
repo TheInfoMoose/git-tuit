@@ -319,10 +319,7 @@ impl BranchListPopup {
 				get_branches_info(&self.repo.borrow(), self.local)?;
 			//remove remote branch called `HEAD`
 			if !self.local {
-				self.branches
-					.iter()
-					.position(|b| b.name.ends_with("/HEAD"))
-					.map(|idx| self.branches.remove(idx));
+				self.branches.retain(|b| !b.name.ends_with("/HEAD"));
 			}
 			self.set_selection(self.selection)?;
 		}
@@ -334,7 +331,12 @@ impl BranchListPopup {
 		&mut self,
 		ev: AsyncGitNotification,
 	) -> Result<()> {
-		if self.is_visible() && ev == AsyncGitNotification::Push {
+		if self.is_visible()
+			&& matches!(
+				ev,
+				AsyncGitNotification::Push
+					| AsyncGitNotification::Fetch
+			) {
 			self.update_branches()?;
 		}
 
@@ -503,10 +505,13 @@ impl BranchListPopup {
 			let mut commit_message =
 				displaybranch.top_commit_message.clone();
 			if commit_message.len() > commit_message_length {
-				commit_message.unicode_truncate(
-					commit_message_length
-						.saturating_sub(THREE_DOTS_LENGTH),
-				);
+				commit_message = commit_message
+					.unicode_truncate(
+						commit_message_length
+							.saturating_sub(THREE_DOTS_LENGTH),
+					)
+					.0
+					.to_string();
 				commit_message += THREE_DOTS;
 			}
 
