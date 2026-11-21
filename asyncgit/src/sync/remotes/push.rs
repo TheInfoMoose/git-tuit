@@ -298,6 +298,7 @@ mod tests {
 	}
 
 	#[test]
+	#[allow(clippy::too_many_lines)] // one end-to-end two-clone scenario; splitting it hides the sequence
 	fn test_force_push_rewrites_history() {
 		// This test mimics the scenario of 2 people having 2
 		// local branches and both modifying the same file then

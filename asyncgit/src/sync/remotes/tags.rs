@@ -291,7 +291,7 @@ mod tests {
 		push_tags(clone1_dir, "origin", None, None).unwrap();
 		let tags_missing =
 			tags_missing_remote(clone1_dir, "origin", None).unwrap();
-		assert!(tags_missing.is_empty());
+		assert_eq!(tags_missing, Vec::<String>::new());
 	}
 
 	#[test]
@@ -323,7 +323,7 @@ mod tests {
 		push_tags(clone1_dir, "origin", None, None).unwrap();
 		let tags_missing =
 			tags_missing_remote(clone1_dir, "origin", None).unwrap();
-		assert!(tags_missing.is_empty());
+		assert_eq!(tags_missing, Vec::<String>::new());
 
 		// clone 2 - pull
 
@@ -363,7 +363,7 @@ mod tests {
 		push_tags(clone1_dir, "origin", None, None).unwrap();
 		let tags_missing =
 			tags_missing_remote(clone1_dir, "origin", None).unwrap();
-		assert!(tags_missing.is_empty());
+		assert_eq!(tags_missing, Vec::<String>::new());
 
 		// clone 2 - pull
 
