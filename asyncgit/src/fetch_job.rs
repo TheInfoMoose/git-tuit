@@ -36,6 +36,15 @@ impl AsyncFetchJob {
 			)))),
 		}
 	}
+
+	/// the fetch's error message, once the job has finished with an error
+	pub fn error(&self) -> Option<String> {
+		let state = self.state.lock().ok()?;
+		match state.as_ref()? {
+			JobState::Response(Err(e)) => Some(e.to_string()),
+			_ => None,
+		}
+	}
 }
 
 impl AsyncJob for AsyncFetchJob {

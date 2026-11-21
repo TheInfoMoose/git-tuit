@@ -115,6 +115,15 @@ impl FetchPopup {
 		self.progress = self.async_fetch.progress();
 
 		if !self.pending {
+			if let Some(err) = self
+				.async_fetch
+				.take_last()
+				.and_then(|job| job.error())
+			{
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("fetch failed:\n{err}"),
+				));
+			}
 			self.hide();
 			self.queue
 				.push(InternalEvent::Update(NeedsUpdate::BRANCHES));
