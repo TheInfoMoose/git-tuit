@@ -246,6 +246,10 @@ impl Component for ChangesComponent {
 
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.files.event(ev)?.is_consumed() {
+			// the tree hides itself to open blame/history popups; the tab keeps it shown
+			if !self.files.is_visible() {
+				self.files.show()?;
+			}
 			return Ok(EventState::Consumed);
 		}
 

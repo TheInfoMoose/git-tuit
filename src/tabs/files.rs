@@ -94,7 +94,12 @@ impl Component for FilesTab {
 		ev: &crossterm::event::Event,
 	) -> Result<EventState> {
 		if self.visible {
-			return self.files.event(ev);
+			let res = self.files.event(ev)?;
+			// the tree hides itself to open blame/history popups; the tab keeps it shown
+			if !self.files.is_visible() {
+				self.files.show()?;
+			}
+			return Ok(res);
 		}
 
 		Ok(EventState::NotConsumed)

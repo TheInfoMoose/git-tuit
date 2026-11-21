@@ -209,9 +209,13 @@ impl Component for Stashing {
 		ev: &crossterm::event::Event,
 	) -> Result<EventState> {
 		if self.visible {
-			if event_pump(ev, self.components_mut().as_mut_slice())?
-				.is_consumed()
-			{
+			let res =
+				event_pump(ev, self.components_mut().as_mut_slice())?;
+			// the tree hides itself to open blame/history popups; the tab keeps it shown
+			if self.is_visible() && !self.index.is_visible() {
+				self.index.show()?;
+			}
+			if res.is_consumed() {
 				return Ok(EventState::Consumed);
 			}
 
