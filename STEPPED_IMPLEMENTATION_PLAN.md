@@ -42,7 +42,9 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 6 goal:** popups get keys in the order they're drawn and don't leak them; panes, searches, highlighting, blame and fetch never stay blank, stuck or silent; the file tree and stash list keep working selections and toggles.
+**Phase 7 goal:** nothing in the UI stays stuck or shows the wrong state: tab index, loading lists, diff focus and selection, fetch/push availability, hints, error popups for tag/remote-URL failures, single-line inputs, and a fuzzy finder that Esc can cancel.
+
+_Phase 6 goal (done, reviewed 2026-11-21):_ popups get keys in draw order and don't leak them; panes, searches, highlighting, blame and fetch never stay blank, stuck or silent; file tree and stash list keep working selections and toggles.
 
 _Phase 5 goal (done, reviewed 2026-11-21):_ no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete.
 
@@ -58,16 +60,15 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 6A** | `/goal` | Popup event order = reverse draw order; no tab keys under popups | `src/app.rs` | — |
-| 2 | **STEP 6D** | `/goal` | Panes come back after blame/file history | `src/tabs/files.rs`, `src/components/changes.rs`, `src/tabs/stashing.rs` | — |
-| 3 | **STEP 6F** | `/goal` | File tree keeps a valid selection | `filetreelist/src/filetree.rs`, `filetreelist/src/filetreeitems.rs` | — |
-| 4 | **STEP 6H** | `/goal` | REMOTES bit, branch list refresh, truncation | `src/queue.rs`, `src/popups/branchlist.rs`, `src/popups/submodules.rs` | — |
-| 5 | **STEP 6I** | `/goal` | Show fetch errors | `asyncgit/src/fetch_job.rs`, `src/popups/fetch.rs` | — |
-| 6 | **STEP 6J** | `/goal` | Blame errors stop the spinner | `asyncgit/src/blame.rs`, `src/popups/blame_file.rs` | — |
-| 7 | **STEP 6B** | `/goal` | Modal popups consume their keys | `src/popups/revision_files.rs`, `src/popups/taglist.rs`, `src/popups/inspect_commit.rs` | — |
-| 8 | **STEP 6C** | `/goal` | Stash list keys, fuzzy nav, tab-switch refresh | `src/tabs/stashlist.rs`, `src/popups/fuzzy_find.rs`, `src/app.rs` | — |
-| 9 | **STEP 6E** | `/goal` | Search/highlight finish while tab hidden | `src/tabs/revlog.rs`, `src/tabs/files.rs` | — |
-| 10 | **STEP 6G** | `/goal` | Stashing tab honors the untracked toggle | `src/tabs/stashing.rs` | — |
+| 1 | **STEP 7A** | `/goal` | Bad tab index, Typechange symbol, key symbol errors | `src/options.rs`, `src/components/status_tree.rs`, `src/keys/symbols.rs` | — |
+| 2 | **STEP 7B** | `/goal` | Diff selection end, is_empty, no 0-line discard | `src/components/diff.rs` | — |
+| 3 | **STEP 7D** | `/goal` | Revlog Esc, quit/home-end hints, force-push branch name | `src/tabs/revlog.rs`, `src/strings.rs`, `src/popups/confirm.rs` | — |
+| 4 | **STEP 7E** | `/goal` | Single-line inputs ignore multi-line keys; vim keymap | `src/components/textinput.rs`, `vim_style_key_config.ron` | — |
+| 5 | **STEP 7F** | `/goal` | Revision files never stuck at Loading | `src/components/revision_files.rs` | — |
+| 6 | **STEP 7G** | `/goal` | Status tree keeps selection; commit list clamps | `src/components/utils/statustree.rs`, `src/components/commitlist.rs` | — |
+| 7 | **STEP 7H** | `/goal` | Remote tag and remote URL errors shown | `src/popups/taglist.rs`, `src/popups/remotelist.rs` | — |
+| 8 | **STEP 7I** | `/goal` | Fuzzy finder: Enter picks, Esc cancels | `src/popups/fuzzy_find.rs` | — |
+| 9 | **STEP 7C** | `/goal` | Status focus, fetch/pull/push availability | `src/tabs/status.rs` | — |
 
 ### Completed
 
@@ -121,6 +122,16 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 5G | ✅ aa9ee1ec | `/goal` | Branch list status error | `src/popups/branchlist.rs` |
 | STEP 5H | ✅ f1d5782d | `/goal` | Cancel credentials cancels push/push-tags | `src/popups/push.rs`, `src/popups/push_tags.rs` |
 | STEP 5I | ✅ e6ec537b | `/goal` | Cancel and preflight errors in pull/fetch | `src/popups/pull.rs`, `src/popups/fetch.rs` |
+| STEP 6A | ✅ 4886b671 | `/goal` | Popup event order = reverse draw order | `src/app.rs` |
+| STEP 6D | ✅ 63a59df4 | `/goal` | Panes come back after blame/history | `src/tabs/files.rs`, `src/components/changes.rs`, `src/tabs/stashing.rs` |
+| STEP 6F | ✅ e50b2d2d | `/goal` | File tree keeps a valid selection | `filetreelist/src/filetree.rs`, `filetreelist/src/filetreeitems.rs` |
+| STEP 6H | ✅ 34faeed8 | `/goal` | REMOTES bit, branch list refresh, truncation | `src/queue.rs`, `src/popups/branchlist.rs`, `src/popups/submodules.rs` |
+| STEP 6I | ✅ 8f8fe527 | `/goal` | Show fetch errors | `asyncgit/src/fetch_job.rs`, `src/popups/fetch.rs` |
+| STEP 6J | ✅ b9e2efe9 | `/goal` | Blame errors stop the spinner | `asyncgit/src/blame.rs`, `src/popups/blame_file.rs` |
+| STEP 6B | ✅ 352989c7 | `/goal` | Modal popups consume their keys | `src/popups/revision_files.rs`, `src/popups/taglist.rs`, `src/popups/inspect_commit.rs` |
+| STEP 6C | ✅ 62d80cf9 | `/goal` | Stash list keys, fuzzy nav, tab-switch refresh | `src/tabs/stashlist.rs`, `src/popups/fuzzy_find.rs`, `src/app.rs` |
+| STEP 6E | ✅ 433f8465 | `/goal` | Search/highlight finish while tab hidden | `src/tabs/revlog.rs`, `src/tabs/files.rs` |
+| STEP 6G | ✅ 6c1f2f14 | `/goal` | Stashing tab honors the untracked toggle | `src/tabs/stashing.rs` |
 
 ### User Step: IMAGE
 
@@ -154,8 +165,8 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 7 — Remaining usability.** Goal: confirmations, key hints, small-terminal layout, keymap, selection and input-validation polish. P2-08 (confirm dialogs for revert/merge/rebase/detached checkout/submodule update), P2-12 (key hints), P2-16 (80x24 layout, scroll clamping), P2-19 (vim keymap collision, singleline Ctrl+n/p), P2-20 (status tree lookup, commit list marks/widths), P2-22 (stuck loading, stale tab index, focus), P2-23 (pre-submit input validation), rest of P2-18 (Status remote/detached-HEAD state), rest of P2-21 (tag/remote-URL errors), BUG-0062.
-- **Phase 8 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
+- **Phase 8 — Confirmations, hints, layout, input validation.** P2-08 (confirm dialogs for revert/merge/rebase/detached checkout/submodule update), P2-12 (key-hint mismatches), P2-16 (80x24 details layout, scroll clamping), P2-23 (pre-submit ref/input validation), the remaining P2-20 (commit-list marks across batches, display widths) and P2-22 (unborn-HEAD Files tab, RevisionFiles focus/`e` behind popup) parts.
+- **Phase 9 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
   - Shared plain-border block helpers (P3-03)
@@ -3084,6 +3095,328 @@ true
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE 'pub fn take_last_error\(&self\)' asyncgit/src/blame.rs && grep -qF 'last_error' asyncgit/src/blame.rs && grep -qF 'blame failed:' src/popups/blame_file.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+## Phase 7: Stuck and wrong states
+
+Same conventions as Phases 5–6: snippets show intent and shape; follow clippy's preferred form where it rejects one; markers are short fixed strings.
+
+### STEP 7A: Bad Tab Index, Typechange Symbol, Key Symbol Errors
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7A: A persisted tab index out of range falls back to the Status tab instead of failing every draw; type-changed files show `T`; a broken key_symbols.ron is logged instead of silently ignored.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/options.rs
+  - src/components/status_tree.rs
+  - src/keys/symbols.rs
+READ_ONLY_REFS:
+  - src/options.rs:61-63 (`pub const fn current_tab(&self) -> usize { self.data.tab }`); src/app.rs:290-297 draws tabs 0..=4 and hits `_ => bail!("unknown tab")` for anything else
+  - src/components/status_tree.rs:141-150 (item_status_char: `StatusItemType::Typechange => ' ',`)
+  - src/keys/symbols.rs:55-63 (`KeySymbolsFile::read_file(file).unwrap_or_default();`); compare src/keys/key_list.rs:235-246, which logs `KeysList parse error`
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Keep the options file format.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. options.rs current_tab: return `self.data.tab` when it is `<= 4` (the five tabs), else `0`. Add a `// tabs 0..=4 exist; an older or hand-edited options file may hold more` comment.
+2. status_tree.rs: `StatusItemType::Typechange => ' ',` → `StatusItemType::Typechange => 'T',`.
+3. symbols.rs init: replace `.unwrap_or_default()` with `.unwrap_or_else(|e| { log::error!("KeySymbols parse error: {e}"); KeySymbolsFile::default() })`.
+4. Test, in options.rs (add `#[cfg(test)] mod tests` if absent, using the existing `test_env()` constructor at options.rs:35-42): set `data.tab = 7` and assert `current_tab() == 0`; set `data.tab = 3` and assert `current_tab() == 3`. Name it `test_current_tab_out_of_range`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF "StatusItemType::Typechange => 'T'," src/components/status_tree.rs && grep -qF 'KeySymbols parse error' src/keys/symbols.rs && ! grep -qF 'read_file(file).unwrap_or_default()' src/keys/symbols.rs && grep -qE '\bfn test_current_tab_out_of_range\b' src/options.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7B: Diff Selection, Emptiness and Empty Line Discards
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7B: Shift+Down in the diff no longer selects one line past the end; the diff exposes whether it has content; discarding lines with nothing selected doesn't open a "discard 0 lines?" prompt.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/diff.rs
+READ_ONLY_REFS:
+  - src/components/diff.rs:75-88 (`Selection::modify(&mut self, direction, max: usize)`: Down → `cmp::min(old_end + 1, max)`), :274-278 (`fn modify_selection`: `self.selection.modify(direction, self.lines_count());` — passes the line *count*, so the end can reach an index one past the last line), :224-227 (move_selection uses `diff.lines.saturating_sub(1)` as max)
+  - src/components/diff.rs:265-267 (`fn lines_count(&self) -> usize`)
+  - src/components/diff.rs:562-569 (`fn reset_lines(&self)`: always queues `Action::ResetLines(path, self.selected_lines())`), :593 (`fn selected_lines(&self) -> Vec<DiffLinePosition>`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. modify_selection: pass `self.lines_count().saturating_sub(1)` as the max.
+2. Add `pub fn is_empty(&self) -> bool { self.lines_count() == 0 }` to DiffComponent (make it `const` only if clippy asks).
+3. reset_lines: `let lines = self.selected_lines(); if lines.is_empty() { return; }` then queue the action with `lines`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'self.lines_count().saturating_sub(1)' src/components/diff.rs && grep -qE 'pub (const )?fn is_empty\(&self\) -> bool' src/components/diff.rs && grep -qF 'if lines.is_empty() {' src/components/diff.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7C: Status Tab Focus, Fetch and Push Availability
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7C: When the diff the Status tab focused goes empty (last hunk staged), focus returns to the file list; fetch is offered whenever a fetch remote exists (no upstream needed); push isn't offered on a detached HEAD; remotes are re-checked on every update.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/status.rs
+READ_ONLY_REFS:
+  - src/tabs/status.rs:458-482 (`fn update_status`: re-sets items, `self.update_diff()?;`, then the git_action_executed focus fallback for WorkDir/Stage only)
+  - src/tabs/status.rs:69 (`diff_target: DiffTarget`), :332-352 (`fn switch_focus(&mut self, f: Focus) -> Result<bool>`)
+  - src/tabs/status.rs:384-400 (`pub fn update(&mut self)`), :417-428 (`fn check_remotes(&mut self)`, today only run on AsyncGitNotification::Branches and in show())
+  - src/tabs/status.rs:612-624 (`fn can_push`: `is_none_or(|state| state.ahead > 0) && has_remote_for_push` — a detached HEAD has no branch state, so push is offered; `const fn can_fetch`: `has_remote_for_fetch && self.git_branch_state.is_some()` — fetch is blocked without an upstream)
+  - src/tabs/status.rs:884-896 (fetch and pull keys both gated by can_fetch)
+  - DiffComponent::is_empty (STEP 7B); `self.git_branch_name.last()` is the HEAD shorthand, which is `"HEAD"` when detached (asyncgit/src/sync/branch/mod.rs:31-45)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+grep -qE 'pub (const )?fn is_empty\(&self\) -> bool' src/components/diff.rs
+
+[MUTATION_SPEC]
+1. update_status: at the end, `if self.focus == Focus::Diff && self.diff.is_empty() { self.switch_focus(if self.diff_target == DiffTarget::Stage { Focus::Stage } else { Focus::WorkDir })?; }`.
+2. update(): call `self.check_remotes();` (inside the visible branch).
+3. can_fetch → `self.remotes.has_remote_for_fetch` only. Add `fn can_pull(&self) -> bool` with the old condition (`has_remote_for_fetch && git_branch_state.is_some()`) and use it for the pull key and pull command hint; the fetch key and hint use can_fetch.
+4. can_push: also require `self.git_branch_name.last().is_some_and(|name| name != "HEAD")` (comment `// detached HEAD: nothing to push to`).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'self.diff.is_empty()' src/tabs/status.rs && grep -qE '\bfn can_pull\(&self\)' src/tabs/status.rs && grep -qF 'detached HEAD: nothing to push to' src/tabs/status.rs && ! grep -A3 -F 'fn can_fetch' src/tabs/status.rs | grep -qF 'git_branch_state'
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7D: Revlog Esc, Command Hints, Force-Push Branch Name
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7D: Esc in the log closes the commit details pane when no search is active; the Quit hint shows the real quit key; the diff Home/End hint lists only Home/End; the force-push confirm shows the full branch name.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/tabs/revlog.rs
+  - src/strings.rs
+  - src/popups/confirm.rs
+READ_ONLY_REFS:
+  - src/tabs/revlog.rs:467-477 (exit_popup branch: cancels/clears search, always `return Ok(EventState::Consumed)`; never closes details), :464 (`self.commit_details.toggle_visible()?;` on enter)
+  - src/strings.rs:1324-1333 (`pub fn quit`: `"Quit [{}]"` with `key_config.keys.exit` only; the quit key is `key_config.keys.quit`, used by App::check_quit)
+  - src/strings.rs:754-768 (`pub fn diff_home_end`: "Jump up/down [{},{},{},{}]" with home, end, move_up, move_down; diff.rs only jumps on home/end)
+  - src/popups/confirm.rs:188-196 (ForcePush: `branch.rsplit('/').next().expect(...)` — `feat/login` shows as `login`; the action carries the branch shorthand from src/tabs/status.rs:567-570)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. revlog.rs exit_popup branch: add a final `else if self.commit_details.is_visible() { self.commit_details.toggle_visible()?; self.update()?; }` after the two search branches. Comment above it: `// Esc closes the details pane when no search is active`.
+2. strings.rs quit: `"Quit [{}/{}]"` with `key_config.get_hint(key_config.keys.quit)` and `key_config.get_hint(key_config.keys.exit)`.
+3. strings.rs diff_home_end: `"Jump up/down [{},{}]"` with home and end only.
+4. confirm.rs ForcePush: pass `branch` itself (strip a leading `refs/heads/` if present: `branch.strip_prefix("refs/heads/").unwrap_or(branch)`), removing the rsplit/expect.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'Esc closes the details pane when no search is active' src/tabs/revlog.rs && grep -qF '"Quit [{}/{}]"' src/strings.rs && grep -qF '"Jump up/down [{},{}]"' src/strings.rs && ! grep -qF 'There was no / in the head reference' src/popups/confirm.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7E: Single-Line Inputs Ignore Multi-Line Keys; Vim Keymap Collision
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7E: Single-line and password text inputs no longer insert a Tab or swallow Ctrl+n/Ctrl+p/Up/Down (so popups bound to popup_down/popup_up still get them), the character counter counts characters not bytes, and the vim example keymap no longer binds status_reset_item to the undo-commit key.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/textinput.rs
+  - vim_style_key_config.ron
+READ_ONLY_REFS:
+  - src/components/textinput.rs:27 (`pub enum InputType`), :51 (`input_type: InputType`), :263 (`fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool` — handles `Key::Tab` → `ta.insert_tab()`, Ctrl+n / Down → CursorMove::Down, Ctrl+p / Up → CursorMove::Up, for every input type)
+  - src/components/textinput.rs:675-711 (event: exit_popup, newline (Multiline only), else `Self::process_inputs(ta, &input)`; returns Consumed only when `modified`)
+  - src/components/textinput.rs:205-206 (`let count = self.get_text().len();` in draw_char_count)
+  - vim_style_key_config.ron:29 (`status_reset_item: Some(( code: Char('U'), modifiers: "SHIFT")),`); src/keys/key_list.rs:207 (default `undo_commit` is Shift+U); the default status_reset_item is Shift+D (key_list.rs:172), which doesn't collide in the Status tab
+  - src/keys/key_list.rs:257-264 (test_apply_vim_style_example parses the ron file)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Multiline inputs keep every current key.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. textinput.rs: add
+	/// keys that only make sense in a multi-line editor
+	fn is_multiline_only(input: &Input) -> bool {
+		matches!(
+			input,
+			Input { key: Key::Tab, ctrl: false, alt: false, .. }
+				| Input { key: Key::Char('n' | 'p'), ctrl: true, alt: false, .. }
+				| Input { key: Key::Up | Key::Down, ctrl: false, alt: false, .. }
+		)
+	}
+   and in event, before `Self::process_inputs(ta, &input)`: `} else if self.input_type != InputType::Multiline && Self::is_multiline_only(&input) { false } else { Self::process_inputs(ta, &input) }` so these keys return NotConsumed for single-line and password inputs.
+2. textinput.rs draw_char_count: `self.get_text().len()` → `self.get_text().chars().count()`.
+3. vim_style_key_config.ron: delete the `status_reset_item: Some(( code: Char('U'), modifiers: "SHIFT")),` line (falls back to the default Shift+D).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn is_multiline_only\(' src/components/textinput.rs && grep -qF 'get_text().chars().count()' src/components/textinput.rs && ! grep -qF 'status_reset_item' vim_style_key_config.ron
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7F: Revision Files Don't Stay at "Loading ..."
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7F: If listing a commit's files fails, show the error and an empty list instead of "Loading ..." forever.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/revision_files.rs
+READ_ONLY_REFS:
+  - src/components/revision_files.rs:125-150 (`fn refresh_files`: `if let Ok(last) = result.result { ... self.files = Some(last); }` — on Err nothing is set, so `self.files` stays None)
+  - src/components/revision_files.rs:330-345 (draw: `if self.files.is_some() { list } else { loading_text }`)
+  - the component holds `queue: Queue` (revision_files.rs:47); `FileTree` derives Default (filetreelist/src/filetree.rs:33)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. refresh_files: turn the `if let Ok(last) = result.result` into a match; on `Err(e)`: `log::error!("tree files error: {e}")`, push `InternalEvent::ShowErrorMsg(format!("listing files failed:\n{e}"))`, set `self.tree = FileTree::default()` and `self.files = Some(Vec::new())`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'tree files error' src/components/revision_files.rs && grep -qF 'self.files = Some(Vec::new())' src/components/revision_files.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7G: Status Tree Keeps Its Selection; Commit List Clamps
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7G: After a status refresh the file tree re-finds the previously selected file by exact path (the binary search assumed sorted paths, which tree order isn't, so the selection jumped); the commit list clamps its selection when the list shrinks.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/utils/statustree.rs
+  - src/components/commitlist.rs
+READ_ONLY_REFS:
+  - src/components/utils/statustree.rs:192-208 (`fn find_last_selection`: `self.tree.items().binary_search_by(|e| e.info.full_path.as_str().cmp(last_selection))`; tree order interleaves folders and files, e.g. `a-b` sorts before `a/`, so the search misses)
+  - src/components/commitlist.rs:208-215 (`pub fn set_commits(&mut self, commits: IndexSet<CommitId>)`: replaces commits without touching `self.selection`)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. statustree.rs find_last_selection: first look for an exact match with `self.tree.items().iter().position(|e| e.info.full_path == last_selection)`; if none, fall back to the index of the first item whose path sorts after `last_selection`, else the last item. Remove the `binary_search_by`.
+2. commitlist.rs set_commits: after replacing commits, `self.selection = self.selection.min(self.commits.len().saturating_sub(1));`.
+3. Test, in statustree.rs tests: `test_keep_selection_with_dash_and_slash` — items `["a-b", "a/c"]` (tree order puts the `a/` folder and `a/c` relative to `a-b` differently than string order), select `a/c`, call `update` with the same items again, assert the selected item's path is still `a/c`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && ! grep -qF 'binary_search_by' src/components/utils/statustree.rs && grep -qF 'self.selection.min(self.commits.len().saturating_sub(1))' src/components/commitlist.rs && grep -qE '\bfn test_keep_selection_with_dash_and_slash\b' src/components/utils/statustree.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7H: Remote Tag and Remote URL Errors Are Shown
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7H: The tag list reports a failed remote-tags lookup, and "update remote URL" tells the user when the URL can't be read instead of doing nothing.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/taglist.rs
+  - src/popups/remotelist.rs
+READ_ONLY_REFS:
+  - src/popups/taglist.rs:344-353 (`if let Some(Ok(missing_remote_tags)) = job.result() { ... }` — an Err is dropped)
+  - src/popups/remotelist.rs:461-472 (`fn update_remote_url(&self)`: `if let Ok(Some(url)) = remote_url { push UpdateRemoteUrl }` — Ok(None) and Err do nothing)
+  - both popups hold `queue: Queue`; InternalEvent::ShowErrorMsg(String)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+1. taglist.rs: match `job.result()`: `Some(Ok(tags))` as now; `Some(Err(e))` → `self.queue.push(InternalEvent::ShowErrorMsg(format!("checking remote tags failed:\n{e}")))`.
+2. remotelist.rs update_remote_url: `Ok(None)` → ShowErrorMsg(format!("remote '{remote_name}' has no URL")); `Err(e)` → ShowErrorMsg(format!("reading remote URL failed:\n{e}")).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF 'checking remote tags failed' src/popups/taglist.rs && grep -qF 'has no URL' src/popups/remotelist.rs && grep -qF 'reading remote URL failed' src/popups/remotelist.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7I: Fuzzy Finder: Enter Picks, Esc Cancels
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7I: The fuzzy finder applies a match only on Enter; Esc closes it without changing the branch list or file tree selection.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/fuzzy_find.rs
+READ_ONLY_REFS:
+  - src/popups/fuzzy_find.rs:108-127 (`fn refresh_selection`: pushes `InternalEvent::FuzzyFinderChanged(idx, self.contents[idx].clone(), target)` whenever the highlighted match changes — live preview, so Esc can't undo it)
+  - src/popups/fuzzy_find.rs event (after STEP 6C): exit_popup or enter → `self.hide(); return Ok(EventState::Consumed);`
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Don't change FuzzyFinderChanged's shape or the app.rs handler.
+
+[PRE_GATE]
+grep -qF 'self.find_text.hide();' src/popups/fuzzy_find.rs
+
+[MUTATION_SPEC]
+1. refresh_selection: keep updating `self.selected_index`, but stop pushing FuzzyFinderChanged there.
+2. Add `fn commit_selection(&self)` that pushes FuzzyFinderChanged for `self.selected_index` (when both it and `self.target` are Some) — the code moved out of refresh_selection.
+3. event: split the exit/enter branch — enter → `self.commit_selection(); self.hide();`; exit_popup → `self.hide();` only. Both return Consumed.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn commit_selection\(&self\)' src/popups/fuzzy_find.rs && test "$(grep -cF 'InternalEvent::FuzzyFinderChanged(' src/popups/fuzzy_find.rs)" = 1 && grep -qF 'self.commit_selection();' src/popups/fuzzy_find.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

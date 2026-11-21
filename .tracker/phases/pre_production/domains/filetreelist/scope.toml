@@ -24,7 +24,7 @@ features = []
 [[items.bugs]]
 id = "BUG-0049"
 title = "Keep file tree selection valid after select_file miss"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 

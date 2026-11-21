@@ -342,7 +342,7 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0043"
 title = "Match popup event order to draw order"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -356,7 +356,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0045"
 title = "Stop modal popups leaking key events"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -370,14 +370,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0047"
 title = "Restore pane visibility after closing blame or file revlog"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0048"
 title = "Process search and highlight updates while tab is hidden"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -391,7 +391,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0051"
 title = "Apply stash untracked and keep-index toggles to stashing list"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -405,14 +405,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0053"
 title = "Fix vim keymap collision and singleline Ctrl+n/p capture"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0054"
 title = "Fix status tree lookup and commit list selection bugs"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -426,7 +426,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0056"
 title = "Fix stuck loading states, stale tab index and focus bugs"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -461,9 +461,16 @@ created_at = "2026-11-21T18:13:08Z"
 [[items.bugs]]
 id = "BUG-0062"
 title = "Guard the 0-line discard prompt and show the full branch in force-push confirm"
-status = "pending"
+status = "open"
 severity = "low"
 created_at = "2026-11-21T20:03:58Z"
+
+[[items.bugs]]
+id = "BUG-0063"
+title = "Restore the previous selection when the fuzzy finder is cancelled"
+status = "open"
+severity = "low"
+created_at = "2026-11-21T21:33:44Z"
 
 [[items.features]]
 id = "FEAT-0002"
@@ -849,3 +856,66 @@ title = "Stashing tab honors the untracked toggle"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:03Z"
+
+[[items.tasks]]
+id = "TASK-0073"
+title = "Bad tab index, Typechange symbol, key symbol errors"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0074"
+title = "Diff selection end, is_empty, no 0-line discard"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0075"
+title = "Revlog Esc, quit/home-end hints, force-push branch name"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0076"
+title = "Single-line inputs ignore multi-line keys; vim keymap"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0077"
+title = "Revision files never stuck at Loading"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0078"
+title = "Status tree keeps selection; commit list clamps"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0079"
+title = "Remote tag and remote URL errors shown"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0080"
+title = "Fuzzy finder: Enter picks, Esc cancels"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0081"
+title = "Status focus, fetch/pull/push availability"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T21:40:36Z"

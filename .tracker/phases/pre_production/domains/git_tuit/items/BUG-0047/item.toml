@@ -2,11 +2,11 @@
 id = "BUG-0047"
 type = "bug"
 title = "Restore pane visibility after closing blame or file revlog"
-status = "open"
+status = "closed"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:40Z"
-updated_at = "2026-11-21T20:28:03Z"
+updated_at = "2026-11-21T21:33:44Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "63a59df4"
+summary = "STEP 6D: Files, Status and Stashing tabs re-show their tree after blame/history popups"
