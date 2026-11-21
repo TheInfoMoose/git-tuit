@@ -825,7 +825,7 @@ created_at = "2026-11-21T20:28:02Z"
 [[items.tasks]]
 id = "TASK-0069"
 title = "Modal popups consume their keys"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T20:28:02Z"
 
