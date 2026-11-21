@@ -327,34 +327,32 @@ impl App {
 			) {
 				flags.insert(NeedsUpdate::COMMANDS);
 			} else if let Event::Key(k) = &ev {
-				let new_flags = if key_match(
-					k,
-					self.key_config.keys.tab_toggle,
-				) {
+				let popup_open = self.any_popup_visible();
+				let new_flags = if !popup_open
+					&& key_match(k, self.key_config.keys.tab_toggle)
+				{
 					self.toggle_tabs(false)?;
 					NeedsUpdate::COMMANDS
-				} else if key_match(
-					k,
-					self.key_config.keys.tab_toggle_reverse,
-				) {
+				} else if !popup_open
+					&& key_match(
+						k,
+						self.key_config.keys.tab_toggle_reverse,
+					) {
 					self.toggle_tabs(true)?;
 					NeedsUpdate::COMMANDS
-				} else if key_match(
-					k,
-					self.key_config.keys.tab_status,
-				) || key_match(
-					k,
-					self.key_config.keys.tab_log,
-				) || key_match(
-					k,
-					self.key_config.keys.tab_files,
-				) || key_match(
-					k,
-					self.key_config.keys.tab_stashing,
-				) || key_match(
-					k,
-					self.key_config.keys.tab_stashes,
-				) {
+				} else if !popup_open
+					&& (key_match(k, self.key_config.keys.tab_status)
+						|| key_match(k, self.key_config.keys.tab_log)
+						|| key_match(
+							k,
+							self.key_config.keys.tab_files,
+						) || key_match(
+						k,
+						self.key_config.keys.tab_stashing,
+					) || key_match(
+						k,
+						self.key_config.keys.tab_stashes,
+					)) {
 					self.switch_tab(k)?;
 					NeedsUpdate::COMMANDS
 				} else if key_match(
@@ -363,10 +361,9 @@ impl App {
 				) {
 					self.cmdbar.borrow_mut().toggle_more();
 					NeedsUpdate::empty()
-				} else if key_match(
-					k,
-					self.key_config.keys.open_options,
-				) {
+				} else if !popup_open
+					&& key_match(k, self.key_config.keys.open_options)
+				{
 					self.options_popup.show()?;
 					NeedsUpdate::ALL
 				} else {
@@ -503,40 +500,41 @@ impl App {
 
 // private impls
 impl App {
+	// event order: reverse of the draw order in setup_popups! below (topmost popup first)
 	accessors!(
 		self,
 		[
-			log_search_popup,
-			fuzzy_find_popup,
+			goto_line_popup,
 			msg_popup,
 			confirm_popup,
-			commit_popup,
-			goto_line_popup,
-			blame_file_popup,
-			file_revlog_popup,
-			stashmsg_popup,
-			inspect_commit_popup,
-			compare_commits_popup,
-			external_editor_popup,
-			push_popup,
-			push_tags_popup,
-			pull_popup,
-			fetch_popup,
-			tag_commit_popup,
-			reset_popup,
-			checkout_option_popup,
-			create_branch_popup,
-			create_remote_popup,
-			rename_remote_popup,
-			update_remote_url_popup,
-			remotes_popup,
-			rename_branch_popup,
-			select_branch_popup,
-			revision_files_popup,
-			submodule_popup,
-			tags_popup,
 			options_popup,
+			fetch_popup,
+			pull_popup,
+			push_tags_popup,
+			push_popup,
+			log_search_popup,
+			fuzzy_find_popup,
+			revision_files_popup,
+			rename_branch_popup,
+			create_branch_popup,
+			checkout_option_popup,
+			reset_popup,
+			tags_popup,
+			submodule_popup,
+			update_remote_url_popup,
+			rename_remote_popup,
+			create_remote_popup,
+			remotes_popup,
+			select_branch_popup,
+			tag_commit_popup,
+			external_editor_popup,
+			file_revlog_popup,
+			blame_file_popup,
+			compare_commits_popup,
+			inspect_commit_popup,
 			help_popup,
+			stashmsg_popup,
+			commit_popup,
 			revlog,
 			status_tab,
 			files_tab,
