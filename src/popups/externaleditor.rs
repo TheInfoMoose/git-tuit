@@ -24,7 +24,6 @@ use ratatui::{
 	Frame,
 };
 use scopeguard::defer;
-use std::ffi::OsStr;
 use std::{env, io, path::Path, process::Command};
 
 ///
@@ -63,7 +62,9 @@ impl ExternalEditorPopup {
 
 		io::stdout().execute(LeaveAlternateScreen)?;
 		defer! {
-			io::stdout().execute(EnterAlternateScreen).expect("reset terminal");
+			if let Err(e) = io::stdout().execute(EnterAlternateScreen) {
+				log::error!("reset terminal failed: {e}");
+			}
 		}
 
 		let environment_options = ["GIT_EDITOR", "VISUAL", "EDITOR"];
@@ -77,46 +78,83 @@ impl ExternalEditorPopup {
 			.or_else(|| env::var(environment_options[2]).ok())
 			.unwrap_or_else(|| String::from("vi"));
 
-		// TODO: proper handling arguments containing whitespaces
-		// This does not do the right thing if the input is `editor --something "with spaces"`
+		#[cfg(unix)]
+		{
+			if editor.trim().is_empty() {
+				bail!(
+					"editor env variable found empty: {}",
+					environment_options.join(" or ")
+				);
+			}
+			run_editor(&editor, Path::new(&work_dir), &path)?;
+		}
 
-		// deal with "editor name with spaces" p1 p2 p3
-		// and with "editor_no_spaces" p1 p2 p3
-		// does not address spaces in pn
-		let mut echars = editor.chars().peekable();
+		#[cfg(not(unix))]
+		{
+			// TODO: proper handling arguments containing whitespaces
+			// This does not do the right thing if the input is `editor --something "with spaces"`
 
-		let first_char = *echars.peek().ok_or_else(|| {
-			anyhow!(
-				"editor env variable found empty: {}",
-				environment_options.join(" or ")
-			)
-		})?;
-		let command: String = if first_char == '\"' {
-			echars
-				.by_ref()
-				.skip(1)
-				.take_while(|c| *c != '\"')
-				.collect()
-		} else {
-			echars.by_ref().take_while(|c| *c != ' ').collect()
-		};
+			// deal with "editor name with spaces" p1 p2 p3
+			// and with "editor_no_spaces" p1 p2 p3
+			// does not address spaces in pn
+			let mut echars = editor.chars().peekable();
 
-		let remainder_str = echars.collect::<String>();
-		let remainder = remainder_str.split_whitespace();
+			let first_char = *echars.peek().ok_or_else(|| {
+				anyhow!(
+					"editor env variable found empty: {}",
+					environment_options.join(" or ")
+				)
+			})?;
+			let command: String = if first_char == '\"' {
+				echars
+					.by_ref()
+					.skip(1)
+					.take_while(|c| *c != '\"')
+					.collect()
+			} else {
+				echars.by_ref().take_while(|c| *c != ' ').collect()
+			};
 
-		let mut args: Vec<&OsStr> =
-			remainder.map(OsStr::new).collect();
+			let remainder_str = echars.collect::<String>();
+			let remainder = remainder_str.split_whitespace();
 
-		args.push(path.as_os_str());
+			let mut args: Vec<&std::ffi::OsStr> =
+				remainder.map(std::ffi::OsStr::new).collect();
 
-		Command::new(command.clone())
-			.current_dir(work_dir)
-			.args(args)
-			.status()
-			.map_err(|e| anyhow!("\"{command}\": {e}"))?;
+			args.push(path.as_os_str());
+
+			let status = Command::new(command.clone())
+				.current_dir(work_dir)
+				.args(args)
+				.status()
+				.map_err(|e| anyhow!("\"{command}\": {e}"))?;
+			if !status.success() {
+				bail!("editor \"{editor}\" exited with {status}");
+			}
+		}
 
 		Ok(())
 	}
+}
+
+#[cfg(unix)]
+fn run_editor(
+	editor: &str,
+	work_dir: &Path,
+	path: &Path,
+) -> Result<()> {
+	let status = Command::new("sh")
+		.current_dir(work_dir)
+		.arg("-c")
+		.arg(format!("{editor} \"$@\""))
+		.arg(editor)
+		.arg(path)
+		.status()
+		.map_err(|e| anyhow!("\"{editor}\": {e}"))?;
+	if !status.success() {
+		bail!("editor \"{editor}\" exited with {status}");
+	}
+	Ok(())
 }
 
 impl DrawableComponent for ExternalEditorPopup {
@@ -183,5 +221,35 @@ impl Component for ExternalEditorPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	#[cfg(unix)]
+	use super::run_editor;
+
+	#[cfg(unix)]
+	#[test]
+	fn test_run_editor_quoted_command() {
+		let dir = tempfile::tempdir().unwrap();
+		let file = dir.path().join("msg.txt");
+		std::fs::write(&file, "").unwrap();
+		run_editor(
+			"sh -c 'printf edited > \"$1\"' sh",
+			dir.path(),
+			&file,
+		)
+		.unwrap();
+		assert_eq!(std::fs::read_to_string(&file).unwrap(), "edited");
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_run_editor_nonzero_exit_is_error() {
+		let dir = tempfile::tempdir().unwrap();
+		let file = dir.path().join("msg.txt");
+		std::fs::write(&file, "").unwrap();
+		assert!(run_editor("false", dir.path(), &file).is_err());
 	}
 }
