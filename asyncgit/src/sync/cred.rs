@@ -305,7 +305,7 @@ mod tests {
 
 	#[test]
 	#[serial]
-	#[should_panic]
+	#[should_panic(expected = "NoDefaultRemoteFound")]
 	fn test_error_if_no_remote_when_trying_to_retrieve_if_need_username_password(
 	) {
 		let (_td, repo) = repo_init().unwrap();
@@ -358,7 +358,7 @@ mod tests {
 
 	#[test]
 	#[serial]
-	#[should_panic]
+	#[should_panic(expected = "NoDefaultRemoteFound")]
 	fn test_error_if_no_remote_when_trying_to_extract_username_password(
 	) {
 		let (_td, repo) = repo_init().unwrap();

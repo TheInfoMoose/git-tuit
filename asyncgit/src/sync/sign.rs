@@ -692,7 +692,7 @@ mod tests {
 								.bytes()
 								.all(|b| b.is_ascii_hexdigit())
 					})
-					.map(|field| field.to_string())
+					.map(ToString::to_string)
 			})
 	}
 
@@ -712,8 +712,7 @@ mod tests {
 				.stdout(std::process::Stdio::null())
 				.stderr(std::process::Stdio::null())
 				.status()
-				.map(|s| s.success())
-				.unwrap_or(false)
+				.is_ok_and(|s| s.success())
 		}
 
 		assert!(
@@ -886,8 +885,7 @@ mod tests {
 				.stdout(std::process::Stdio::null())
 				.stderr(std::process::Stdio::null())
 				.status()
-				.map(|s| s.success())
-				.unwrap_or(false)
+				.is_ok_and(|s| s.success())
 		}
 
 		assert!(

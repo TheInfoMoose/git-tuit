@@ -146,7 +146,7 @@ mod tests {
 
 		assert!(stash_save(repo_path, None, true, false).is_err());
 
-		assert!(get_stashes(repo_path).unwrap().is_empty());
+		assert_eq!(get_stashes(repo_path).unwrap(), Vec::new());
 	}
 
 	#[test]
