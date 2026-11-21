@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0043"
 type = "task"
 title = "No writes through symlinks on discard"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-21T14:42:35Z"
-updated_at = "2026-11-21T14:42:35Z"
+updated_at = "2026-11-21T15:06:12Z"
 source_ref = "STEP 4F"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0043@2026-11-21T15:04:24Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "80c47289"
+summary = "STEP 4F: Don't Write Through Symlinks When Discarding Lines (phased check PASS)"
