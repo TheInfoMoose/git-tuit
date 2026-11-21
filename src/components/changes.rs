@@ -146,6 +146,12 @@ impl ChangesComponent {
 		Ok(())
 	}
 
+	fn try_stage_or_popup(&self, msg: &str, res: Result<()>) -> bool {
+		let ok = res.is_ok();
+		try_or_popup!(self, msg, res);
+		ok
+	}
+
 	fn dispatch_reset_workdir(&self) -> bool {
 		if let Some(tree_item) = self.selection() {
 			self.queue.push(InternalEvent::ConfirmAction(
@@ -264,17 +270,21 @@ impl Component for ChangesComponent {
 					self.key_config.keys.status_stage_all,
 				) && !self.is_empty()
 				{
-					if self.is_working_dir {
-						try_or_popup!(
-							self,
+					let ok = if self.is_working_dir {
+						self.try_stage_or_popup(
 							"staging all error:",
-							self.index_add_all()
-						);
+							self.index_add_all(),
+						)
 					} else {
-						self.stage_remove_all()?;
+						self.try_stage_or_popup(
+							"unstaging all error:",
+							self.stage_remove_all(),
+						)
+					};
+					if ok {
+						self.queue
+							.push(InternalEvent::StatusLastFileMoved);
 					}
-					self.queue
-						.push(InternalEvent::StatusLastFileMoved);
 					Ok(EventState::Consumed)
 				} else if key_match(
 					e,

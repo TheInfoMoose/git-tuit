@@ -1067,14 +1067,14 @@ impl App {
 			self.queue
 				.push(InternalEvent::ShowErrorMsg(error.to_string()));
 		} else {
-			let remote =
-				sync::get_default_remote(&self.repo.borrow())?;
-
-			self.queue.push(InternalEvent::ConfirmAction(
-				Action::DeleteRemoteTag(tag_name, remote),
-			));
-
 			self.tags_popup.update_tags()?;
+
+			let repo = self.repo.borrow();
+			if let Ok(remote) = sync::get_default_remote(&repo) {
+				self.queue.push(InternalEvent::ConfirmAction(
+					Action::DeleteRemoteTag(tag_name, remote),
+				));
+			}
 		}
 		Ok(())
 	}
