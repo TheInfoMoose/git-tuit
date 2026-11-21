@@ -2,11 +2,11 @@
 id = "BUG-0010"
 type = "bug"
 title = "Update libz-sys past RUSTSEC-2026-0418 and RUSTSEC-2026-0544"
-status = "open"
+status = "closed"
 severity = "critical"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:39Z"
-updated_at = "2026-11-21T05:44:07Z"
+updated_at = "2026-11-21T06:47:21Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "16b2a7b8"
+summary = "STEP 2H updated libz-sys to 1.1.33"

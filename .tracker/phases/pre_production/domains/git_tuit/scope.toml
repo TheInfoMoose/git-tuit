@@ -167,49 +167,49 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0007"
 title = "Delete upstream nightly release workflow"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0008"
 title = "Delete upstream Homebrew bump workflow"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0009"
 title = "Trim tag release workflow to Linux-only"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0010"
 title = "Update libz-sys past RUSTSEC-2026-0418 and RUSTSEC-2026-0544"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0011"
 title = "Migrate deny.toml to cargo-deny 0.20 syntax"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0012"
 title = "Unblock clippy --all-targets for test modules"
-status = "pending"
+status = "open"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.bugs]]
 id = "BUG-0013"
 title = "Align Makefile fmt, clippy and test targets with CI"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -444,6 +444,13 @@ status = "pending"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
+[[items.bugs]]
+id = "BUG-0060"
+title = "Close transitive unsound advisories that cargo-deny lets through"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:46:40Z"
+
 [[items.features]]
 id = "FEAT-0002"
 title = "Ship amber-on-black CRT default theme"
@@ -489,21 +496,21 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.tasks]]
 id = "TASK-0003"
 title = "Migrate chrono usage to jiff (RUSTSEC-2026-0543)"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.tasks]]
 id = "TASK-0004"
 title = "Update lru, faster-hex, rustix and rand past unsound advisories"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:39Z"
 
 [[items.tasks]]
 id = "TASK-0006"
 title = "Add deny.toml sources/graph and guard build.rs panics"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -538,7 +545,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.tasks]]
 id = "TASK-0011"
 title = "Linux-only CI workflow"
-status = "pending"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:43:55Z"
 
@@ -594,7 +601,7 @@ created_at = "2026-11-21T05:43:55Z"
 [[items.tasks]]
 id = "TASK-0020"
 title = "Fix rustfmt 1.100.0 diffs blocking POST_GATE outside STEP 2A scope"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:59:11Z"
 
@@ -615,6 +622,48 @@ created_at = "2026-11-21T06:05:26Z"
 [[items.tasks]]
 id = "TASK-0023"
 title = "Fix POST_GATE tab regex in STEP 2F"
-status = "pending"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T06:22:08Z"
+
+[[items.tasks]]
+id = "TASK-0024"
+title = "Remove dead windows skip-tree entries from deny.toml"
+status = "open"
+severity = "low"
+created_at = "2026-11-21T06:46:40Z"
+
+[[items.tasks]]
+id = "TASK-0025"
+title = "Linux-only CI workflow (re-queued 2A)"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:58:37Z"
+
+[[items.tasks]]
+id = "TASK-0026"
+title = "deny.toml unsound scope, heapless ignores, dead skip-tree"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:58:37Z"
+
+[[items.tasks]]
+id = "TASK-0027"
+title = "Allow unwrap/expect/panic in tests"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:58:37Z"
+
+[[items.tasks]]
+id = "TASK-0029"
+title = "gitui clippy: app, options, diff"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:58:37Z"
+
+[[items.tasks]]
+id = "TASK-0036"
+title = "gitui clippy: reflow, key_config; full gate"
+status = "open"
+severity = "medium"
+created_at = "2026-11-21T06:58:38Z"

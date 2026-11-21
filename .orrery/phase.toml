@@ -2,45 +2,49 @@
 # Regenerated every phase; edits here are lost.
 
 [[queue]]
-user = "FETCH"
-title = "Warm the host crate cache"
+step = "2K"
+item = "TASK-0025"
 
 [[queue]]
-step = "2J"
-item = "TASK-0022"
+step = "3A"
+item = "TASK-0026"
 
 [[queue]]
-step = "2A"
-item = "TASK-0011"
+step = "3B"
+item = "TASK-0027"
 
 [[queue]]
-step = "2B"
-item = "TASK-0012"
+step = "3C"
+item = "TASK-0028"
 
 [[queue]]
-step = "2C"
-item = "TASK-0013"
+step = "3J"
+item = "TASK-0029"
 
 [[queue]]
-step = "2D"
-item = "TASK-0014"
+step = "3D"
+item = "TASK-0030"
 
 [[queue]]
-step = "2E"
-item = "TASK-0015"
+step = "3E"
+item = "TASK-0031"
 
 [[queue]]
-step = "2F"
-item = "TASK-0016"
+step = "3F"
+item = "TASK-0032"
 
 [[queue]]
-step = "2G"
-item = "TASK-0017"
+step = "3G"
+item = "TASK-0033"
 
 [[queue]]
-step = "2H"
-item = "TASK-0018"
+step = "3H"
+item = "TASK-0034"
 
 [[queue]]
-step = "2I"
-item = "TASK-0019"
+step = "3I"
+item = "TASK-0035"
+
+[[queue]]
+step = "3K"
+item = "TASK-0036"

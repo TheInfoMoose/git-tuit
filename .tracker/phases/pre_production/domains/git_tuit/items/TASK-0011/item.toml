@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0011"
 type = "task"
 title = "Linux-only CI workflow"
-status = "pending"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:43:55Z"
-updated_at = "2026-11-21T06:10:52Z"
+updated_at = "2026-11-21T06:47:22Z"
 source_ref = "STEP 2A"
 
 [effort]
@@ -18,4 +18,8 @@ last_timer_session = "TASK-0011@2026-11-21T06:10:52Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-21"
+commit = "4f67d2e"
+summary = "withdrawn: STEP 2A deferred before start (dirty ci.yml); re-queued as STEP 2K in Phase 3"
