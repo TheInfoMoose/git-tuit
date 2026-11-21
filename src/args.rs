@@ -1,5 +1,5 @@
 use crate::bug_report;
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use asyncgit::sync::RepoPath;
 use clap::{
 	builder::ArgPredicate, crate_authors, crate_description,
@@ -9,7 +9,7 @@ use simplelog::{Config, LevelFilter, WriteLogger};
 use std::{
 	env,
 	fs::{self, File},
-	path::PathBuf,
+	path::{Path, PathBuf},
 };
 
 const BUG_REPORT_FLAG_ID: &str = "bugreport";
@@ -206,10 +206,29 @@ fn setup_logging(path_override: Option<PathBuf>) -> Result<()> {
 	WriteLogger::init(
 		LevelFilter::Trace,
 		Config::default(),
-		File::create(path)?,
+		open_log_file(&path)?,
 	)?;
 
 	Ok(())
+}
+
+fn open_log_file(path: &Path) -> Result<File> {
+	if fs::symlink_metadata(path)
+		.is_ok_and(|m| m.file_type().is_symlink())
+	{
+		bail!(
+			"refusing to write log through symlink: {}",
+			path.display()
+		);
+	}
+	let mut options = fs::OpenOptions::new();
+	options.write(true).create(true).truncate(true);
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::OpenOptionsExt;
+		options.mode(0o600);
+	}
+	Ok(options.open(path)?)
 }
 
 fn get_app_cache_path() -> Result<PathBuf> {
@@ -241,4 +260,34 @@ pub fn get_app_config_path() -> Result<PathBuf> {
 #[test]
 fn verify_app() {
 	app().debug_assert();
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_mode_0600() {
+		use std::os::unix::fs::PermissionsExt;
+		let dir = tempfile::tempdir().unwrap();
+		let path = dir.path().join("gitui.log");
+		drop(open_log_file(&path).unwrap());
+		assert_eq!(
+			fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+			0o600
+		);
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_refuses_symlink() {
+		let dir = tempfile::tempdir().unwrap();
+		let target = dir.path().join("target.txt");
+		fs::write(&target, "keep").unwrap();
+		let link = dir.path().join("gitui.log");
+		std::os::unix::fs::symlink(&target, &link).unwrap();
+		assert!(open_log_file(&link).is_err());
+		assert_eq!(fs::read_to_string(&target).unwrap(), "keep");
+	}
 }
