@@ -228,7 +228,13 @@ fn open_log_file(path: &Path) -> Result<File> {
 		use std::os::unix::fs::OpenOptionsExt;
 		options.mode(0o600);
 	}
-	Ok(options.open(path)?)
+	let file = options.open(path)?;
+	#[cfg(unix)]
+	{
+		use std::os::unix::fs::PermissionsExt;
+		file.set_permissions(fs::Permissions::from_mode(0o600))?;
+	}
+	Ok(file)
 }
 
 fn get_app_cache_path() -> Result<PathBuf> {
@@ -289,5 +295,21 @@ mod tests {
 		std::os::unix::fs::symlink(&target, &link).unwrap();
 		assert!(open_log_file(&link).is_err());
 		assert_eq!(fs::read_to_string(&target).unwrap(), "keep");
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn test_open_log_file_tightens_existing_mode() {
+		use std::os::unix::fs::PermissionsExt;
+		let dir = tempfile::tempdir().unwrap();
+		let path = dir.path().join("gitui.log");
+		fs::write(&path, "old").unwrap();
+		fs::set_permissions(&path, fs::Permissions::from_mode(0o644))
+			.unwrap();
+		drop(open_log_file(&path).unwrap());
+		assert_eq!(
+			fs::metadata(&path).unwrap().permissions().mode() & 0o777,
+			0o600
+		);
 	}
 }
