@@ -545,7 +545,7 @@ created_at = "2026-11-21T05:43:55Z"
 [[items.tasks]]
 id = "TASK-0012"
 title = "Remove upstream workflows, Linux-only release"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:43:55Z"
 
