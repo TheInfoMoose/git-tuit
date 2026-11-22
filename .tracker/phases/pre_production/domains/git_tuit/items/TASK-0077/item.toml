@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0077"
 type = "task"
 title = "Revision files never stuck at Loading"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T21:40:36Z"
-updated_at = "2026-11-21T21:40:36Z"
+updated_at = "2026-11-22T01:19:14Z"
 source_ref = "STEP 7F"
 
 [effort]
@@ -17,4 +17,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "3e47fa0b"
+summary = "withdrawn: STEP 7F not run; replaced by STEP 7L (Phase 7 outcome-step pilot)"

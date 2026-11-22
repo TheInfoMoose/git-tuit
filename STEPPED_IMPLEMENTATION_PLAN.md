@@ -44,6 +44,8 @@
 
 **Phase 7 goal:** nothing in the UI stays stuck or shows the wrong state: tab index, loading lists, diff focus and selection, fetch/push availability, hints, error popups for tag/remote-URL failures, single-line inputs, and a fuzzy finder that Esc can cancel.
 
+**Phase 7 pilot (7J–7M, approved 2026-11-21):** outcome steps. Each MUTATION_SPEC item is a required behavior and the coder chooses the implementation. The "Outcome steps" section of `.orrery/skills/repo-rules.md` overrides the exact-wording rules for these steps. 7B–7I are withdrawn.
+
 _Phase 6 goal (done, reviewed 2026-11-21):_ popups get keys in draw order and don't leak them; panes, searches, highlighting, blame and fetch never stay blank, stuck or silent; file tree and stash list keep working selections and toggles.
 
 _Phase 5 goal (done, reviewed 2026-11-21):_ no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete.
@@ -60,15 +62,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 7A** | `/goal` | Bad tab index, Typechange symbol, key symbol errors | `src/options.rs`, `src/components/status_tree.rs`, `src/keys/symbols.rs` | — |
-| 2 | **STEP 7B** | `/goal` | Diff selection end, is_empty, no 0-line discard | `src/components/diff.rs` | — |
-| 3 | **STEP 7D** | `/goal` | Revlog Esc, quit/home-end hints, force-push branch name | `src/tabs/revlog.rs`, `src/strings.rs`, `src/popups/confirm.rs` | — |
-| 4 | **STEP 7E** | `/goal` | Single-line inputs ignore multi-line keys; vim keymap | `src/components/textinput.rs`, `vim_style_key_config.ron` | — |
-| 5 | **STEP 7F** | `/goal` | Revision files never stuck at Loading | `src/components/revision_files.rs` | — |
-| 6 | **STEP 7G** | `/goal` | Status tree keeps selection; commit list clamps | `src/components/utils/statustree.rs`, `src/components/commitlist.rs` | — |
-| 7 | **STEP 7H** | `/goal` | Remote tag and remote URL errors shown | `src/popups/taglist.rs`, `src/popups/remotelist.rs` | — |
-| 8 | **STEP 7I** | `/goal` | Fuzzy finder: Enter picks, Esc cancels | `src/popups/fuzzy_find.rs` | — |
-| 9 | **STEP 7C** | `/goal` | Status focus, fetch/pull/push availability | `src/tabs/status.rs` | — |
+| 1 | **STEP 7J** | `/goal` | Status Tab and Diff Behave Correctly | `src/components/*`, `src/tabs/status.rs`, `src/strings.rs` | — |
+| 2 | **STEP 7K** | `/goal` | Keys and Hints Do What They Say | `src/components/textinput.rs`, `src/popups/*`, `src/tabs/revlog.rs`, `src/strings.rs`, `vim_style_key_config.ron` | — |
+| 3 | **STEP 7L** | `/goal` | Failures and Confirmations Tell the Truth | `src/components/revision_files.rs`, `src/popups/*`, `src/strings.rs` | — |
+| 4 | **STEP 7M** | `/goal` | Selections Survive a Refresh | `src/components/utils/*`, `src/components/commitlist.rs` | — |
 
 ### Completed
 
@@ -132,6 +129,15 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 6C | ✅ 62d80cf9 | `/goal` | Stash list keys, fuzzy nav, tab-switch refresh | `src/tabs/stashlist.rs`, `src/popups/fuzzy_find.rs`, `src/app.rs` |
 | STEP 6E | ✅ 433f8465 | `/goal` | Search/highlight finish while tab hidden | `src/tabs/revlog.rs`, `src/tabs/files.rs` |
 | STEP 6G | ✅ 6c1f2f14 | `/goal` | Stashing tab honors the untracked toggle | `src/tabs/stashing.rs` |
+| STEP 7A | ✅ b4eecc8c | `/goal` | Bad tab index, Typechange symbol, key symbol errors | `src/options.rs`, `src/components/status_tree.rs`, `src/keys/symbols.rs` |
+| STEP 7B | ↪ withdrawn | `/goal` | Deferred (spec defect TASK-0082); replaced by STEP 7J | `src/components/diff.rs` |
+| STEP 7D | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7K and 7L | `src/tabs/revlog.rs`, `src/strings.rs`, `src/popups/confirm.rs` |
+| STEP 7E | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7K | `src/components/textinput.rs`, `vim_style_key_config.ron` |
+| STEP 7F | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7L | `src/components/revision_files.rs` |
+| STEP 7G | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7M | `src/components/utils/statustree.rs`, `src/components/commitlist.rs` |
+| STEP 7H | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7L | `src/popups/taglist.rs`, `src/popups/remotelist.rs` |
+| STEP 7I | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7K | `src/popups/fuzzy_find.rs` |
+| STEP 7C | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7J | `src/tabs/status.rs` |
 
 ### User Step: IMAGE
 
@@ -3417,6 +3423,169 @@ grep -qF 'self.find_text.hide();' src/popups/fuzzy_find.rs
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '\bfn commit_selection\(&self\)' src/popups/fuzzy_find.rs && test "$(grep -cF 'InternalEvent::FuzzyFinderChanged(' src/popups/fuzzy_find.rs)" = 1 && grep -qF 'self.commit_selection();' src/popups/fuzzy_find.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7J: Status Tab and Diff Behave Correctly
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7J: the diff selection, focus and fetch/pull/push availability are correct in the Status tab.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/*
+  - src/tabs/status.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0052, BUG-0062 (part), BUG-0056 (part), TASK-0082. Replaces 7B + 7C
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Pull availability keeps its current rule.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step: each item is a required behavior. The implementation is the coder's choice (repo-rules, Outcome steps).
+1. Extending the diff selection down stops at the last line.
+   Proof: test `t7j_selection_stops_at_last_line`.
+2. Discarding lines with no added or deleted line selected opens no prompt.
+   Proof: test `t7j_empty_discard_no_prompt`.
+3. If the focused diff has finished loading and has no content, focus returns to the file list it came from. A diff that is still loading keeps focus.
+   Proof: test `t7j_focus_leaves_only_loaded_empty_diff`.
+4. Fetch needs only a fetch remote, not an upstream. Pull still needs both.
+   Proof: test `t7j_fetch_without_upstream`.
+5. Push is not offered on a detached HEAD.
+   Proof: test `t7j_no_push_when_detached`.
+6. Remote availability is refreshed whenever the visible Status tab updates.
+   Proof: validator reads the code path.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7j_ 2>&1 | grep -cE 't7j_.* ok$')" -ge 5
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7K: Keys and Hints Do What They Say
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7K: keys reach the right handler and their hints are accurate.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/textinput.rs
+  - src/popups/*
+  - src/tabs/revlog.rs
+  - src/strings.rs
+  - vim_style_key_config.ron
+READ_ONLY_REFS:
+  - neb: BUG-0053, BUG-0063, BUG-0056 (part). Replaces 7E + 7I + the key and hint parts of 7D
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Multiline inputs keep every current key. The FuzzyFinderChanged event keeps its shape.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step: each item is a required behavior. The implementation is the coder's choice (repo-rules, Outcome steps).
+1. Single-line and password inputs don't consume Tab, Up, Down, Ctrl+n or Ctrl+p.
+   Proof: test `t7k_single_line_passes_keys_through`.
+2. The input character counter counts characters, not bytes.
+   Proof: test `t7k_counter_counts_chars`.
+3. The vim example keymap has no status_reset_item / undo_commit collision.
+   Proof: test `t7k_vim_keymap_no_collision`.
+4. The fuzzy finder applies a match only on Enter. Esc and moving the highlight apply nothing.
+   Proof: test `t7k_fuzzy_applies_only_on_enter`.
+5. The Quit hint includes the real quit key as well as the exit key.
+   Proof: test `t7k_quit_hint_shows_quit_key`.
+6. The diff jump hint lists only Home and End.
+   Proof: test `t7k_jump_hint_home_end_only`.
+7. In the log, Esc closes commit details when no search is active. An active search is still cancelled first.
+   Proof: validator reads the code path.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7k_ 2>&1 | grep -cE 't7k_.* ok$')" -ge 6
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7L: Failures and Confirmations Tell the Truth
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7L: failed lookups are shown and the force-push prompt names the real branch.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/revision_files.rs
+  - src/popups/*
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0055, BUG-0062 (rest), BUG-0056 (part). Replaces 7F + 7H + the force-push part of 7D
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Successful lookups behave as before.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step: each item is a required behavior. The implementation is the coder's choice (repo-rules, Outcome steps).
+1. The force-push prompt shows the full branch name (feat/login, not login), without a refs/heads/ prefix.
+   Proof: test `t7l_force_push_full_branch`.
+2. If listing a commit's files fails, an error is shown and Loading ends with an empty list, without retrying in a loop.
+   Proof: validator reads the code path.
+3. A failed remote-tag lookup shows an error.
+   Proof: validator reads the code path.
+4. Updating a remote URL shows an error when the URL is missing or unreadable.
+   Proof: validator reads the code path.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7l_ 2>&1 | grep -cE 't7l_.* ok$')" -ge 1
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7M: Selections Survive a Refresh
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 7M: lists keep a valid, expected selection after refresh.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/utils/*
+  - src/components/commitlist.rs
+READ_ONLY_REFS:
+  - neb: BUG-0054 (part). Replaces 7G
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. When the selected path is gone, selection still moves to its nearest neighbor as the existing tests expect.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step: each item is a required behavior. The implementation is the coder's choice (repo-rules, Outcome steps).
+1. With files a-b and a/c and a-b selected, refreshing the same list keeps a-b selected.
+   Proof: test `t7m_refresh_keeps_dash_path`.
+2. Shrinking the commit list clamps the selection to the last commit. An empty list is safe.
+   Proof: test `t7m_commit_selection_clamps`.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7m_ 2>&1 | grep -cE 't7m_.* ok$')" -ge 2
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

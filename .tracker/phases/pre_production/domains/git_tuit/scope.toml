@@ -867,56 +867,56 @@ created_at = "2026-11-21T21:40:36Z"
 [[items.tasks]]
 id = "TASK-0074"
 title = "Diff selection end, is_empty, no 0-line discard"
-status = "pending"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0075"
 title = "Revlog Esc, quit/home-end hints, force-push branch name"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0076"
 title = "Single-line inputs ignore multi-line keys; vim keymap"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0077"
 title = "Revision files never stuck at Loading"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0078"
 title = "Status tree keeps selection; commit list clamps"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0079"
 title = "Remote tag and remote URL errors shown"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0080"
 title = "Fuzzy finder: Enter picks, Esc cancels"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
 [[items.tasks]]
 id = "TASK-0081"
 title = "Status focus, fetch/pull/push availability"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
@@ -926,3 +926,31 @@ title = "Resolve dead_code error for DiffComponent::is_empty in STEP 7B"
 status = "pending"
 severity = "high"
 created_at = "2026-11-22T00:25:33Z"
+
+[[items.tasks]]
+id = "TASK-0083"
+title = "Status Tab and Diff Behave Correctly"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T01:19:19Z"
+
+[[items.tasks]]
+id = "TASK-0084"
+title = "Keys and Hints Do What They Say"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T01:19:19Z"
+
+[[items.tasks]]
+id = "TASK-0085"
+title = "Failures and Confirmations Tell the Truth"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T01:19:20Z"
+
+[[items.tasks]]
+id = "TASK-0086"
+title = "Selections Survive a Refresh"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T01:19:20Z"

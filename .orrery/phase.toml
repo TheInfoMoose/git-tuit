@@ -2,37 +2,17 @@
 # Regenerated every phase; edits here are lost.
 
 [[queue]]
-step = "7A"
-item = "TASK-0073"
+step = "7J"
+item = "TASK-0083"
 
 [[queue]]
-step = "7B"
-item = "TASK-0074"
+step = "7K"
+item = "TASK-0084"
 
 [[queue]]
-step = "7D"
-item = "TASK-0075"
+step = "7L"
+item = "TASK-0085"
 
 [[queue]]
-step = "7E"
-item = "TASK-0076"
-
-[[queue]]
-step = "7F"
-item = "TASK-0077"
-
-[[queue]]
-step = "7G"
-item = "TASK-0078"
-
-[[queue]]
-step = "7H"
-item = "TASK-0079"
-
-[[queue]]
-step = "7I"
-item = "TASK-0080"
-
-[[queue]]
-step = "7C"
-item = "TASK-0081"
+step = "7M"
+item = "TASK-0086"

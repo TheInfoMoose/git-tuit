@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0074"
 type = "task"
 title = "Diff selection end, is_empty, no 0-line discard"
-status = "pending"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T21:40:36Z"
-updated_at = "2026-11-22T01:17:59Z"
+updated_at = "2026-11-22T01:19:14Z"
 source_ref = "STEP 7B"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 54
 iteration_count = 1
+last_timer_session = "TASK-0074@2026-11-22T00:24:18Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "3e47fa0b"
+summary = "withdrawn: STEP 7B deferred (TASK-0082); replaced by STEP 7J (Phase 7 outcome-step pilot)"
