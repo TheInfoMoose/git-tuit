@@ -120,9 +120,7 @@ impl Component for MsgPopup {
 		));
 		out.push(
 			CommandInfo::new(
-				strings::commands::navigate_commit_message(
-					&self.key_config,
-				),
+				strings::commands::scroll_popup(&self.key_config),
 				true,
 				self.visible,
 			)
@@ -145,6 +143,11 @@ impl Component for MsgPopup {
 				} else if key_match(e, self.key_config.keys.popup_up)
 				{
 					self.scroll.move_top(ScrollType::Up);
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 			Ok(EventState::Consumed)
@@ -205,5 +208,55 @@ impl MsgPopup {
 			msg,
 			strings::msg_title_info(&self.key_config),
 		)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::keys::KeyConfig;
+	use crossterm::event::{KeyCode, KeyModifiers};
+	use std::rc::Rc;
+
+	#[test]
+	fn t8k_msg_hint_uses_popup_keys() {
+		let mut env = Environment::test_env();
+		let mut kc = KeyConfig::default();
+		kc.keys.popup_up.code = KeyCode::Char('u');
+		kc.keys.popup_up.modifiers = KeyModifiers::empty();
+		kc.keys.popup_down.code = KeyCode::Char('d');
+		kc.keys.popup_down.modifiers = KeyModifiers::empty();
+		kc.keys.move_up.code = KeyCode::Char('k');
+		kc.keys.move_up.modifiers = KeyModifiers::empty();
+		kc.keys.move_down.code = KeyCode::Char('j');
+		kc.keys.move_down.modifiers = KeyModifiers::empty();
+		env.key_config = Rc::new(kc);
+
+		let mut popup = MsgPopup::new(&env);
+		popup.show_info("hello").unwrap();
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		let scroll_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text.name.contains("Scroll")
+					|| c.text.name.contains("Nav")
+			})
+			.expect("scroll/nav hint should be present");
+
+		assert!(
+			scroll_cmd.text.name.contains('u')
+				&& scroll_cmd.text.name.contains('d'),
+			"msg popup scroll hint must use popup_up/popup_down, got: {}",
+			scroll_cmd.text.name
+		);
+		assert!(
+			!scroll_cmd.text.name.contains('k')
+				&& !scroll_cmd.text.name.contains('j'),
+			"msg popup scroll hint must not use move_up/move_down, got: {}",
+			scroll_cmd.text.name
+		);
 	}
 }

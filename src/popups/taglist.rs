@@ -267,6 +267,11 @@ impl Component for TagListPopup {
 					&& self.has_remotes
 				{
 					self.queue.push(InternalEvent::PushTags);
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 

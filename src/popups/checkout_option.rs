@@ -227,7 +227,9 @@ impl Component for CheckoutOptionPopup {
 
 			out.push(
 				CommandInfo::new(
-					strings::commands::reset_commit(&self.key_config),
+					strings::commands::checkout_option_confirm(
+						&self.key_config,
+					),
 					true,
 					true,
 				)
@@ -236,7 +238,9 @@ impl Component for CheckoutOptionPopup {
 
 			out.push(
 				CommandInfo::new(
-					strings::commands::reset_type(&self.key_config),
+					strings::commands::checkout_option_type(
+						&self.key_config,
+					),
 					true,
 					true,
 				)
@@ -275,6 +279,11 @@ impl Component for CheckoutOptionPopup {
 							self.handle_event()
 						);
 					}
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 
@@ -685,5 +694,35 @@ mod tests {
 			"staged.txt should remain staged"
 		);
 		assert_eq!(local_branch_names(&repo_path), branches_before);
+	}
+
+	#[test]
+	fn t8k_checkout_option_wording() {
+		let env = Environment::test_env();
+		let mut popup = CheckoutOptionPopup::new(&env);
+		popup.show().unwrap();
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		for cmd in &cmds {
+			assert!(
+				!cmd.text.name.to_lowercase().contains("reset")
+					&& !cmd.text.desc.to_lowercase().contains("reset"),
+				"CheckoutOptionPopup hint must not mention reset: {} ({})",
+				cmd.text.name,
+				cmd.text.desc
+			);
+		}
+		assert!(
+			cmds.iter()
+				.filter(|c| c.text.desc.to_lowercase().contains("checkout"))
+				.count()
+				>= 2,
+			"CheckoutOptionPopup confirm and option hints must describe checkout: {:?}",
+			cmds.iter()
+				.map(|c| (&c.text.name, c.text.desc))
+				.collect::<Vec<_>>()
+		);
 	}
 }

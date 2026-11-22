@@ -1105,16 +1105,68 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
-	pub fn close_msg(key_config: &SharedKeyConfig) -> CommandText {
+	pub fn options_select(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
 		CommandText::new(
 			format!(
-				"Close [{}]",
-				key_config.get_hint(key_config.keys.enter),
+				"Select [{}{}]",
+				key_config.get_hint(key_config.keys.move_up),
+				key_config.get_hint(key_config.keys.move_down),
 			),
-			"close msg popup (e.g msg)",
+			"select option",
 			CMD_GROUP_GENERAL,
 		)
-		.hide_help()
+	}
+	pub fn options_change(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Change [{}{}]",
+				key_config.get_hint(key_config.keys.move_left),
+				key_config.get_hint(key_config.keys.move_right),
+			),
+			"change option value",
+			CMD_GROUP_GENERAL,
+		)
+	}
+	pub fn checkout_option_confirm(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Confirm [{}]",
+				key_config.get_hint(key_config.keys.enter),
+			),
+			"confirm checkout",
+			CMD_GROUP_BRANCHES,
+		)
+	}
+	pub fn checkout_option_type(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Change Option [{}{}]",
+				key_config.get_hint(key_config.keys.move_up),
+				key_config.get_hint(key_config.keys.move_down),
+			),
+			"change checkout option",
+			CMD_GROUP_BRANCHES,
+		)
+	}
+	pub fn log_search_back(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		CommandText::new(
+			format!(
+				"Back [{}]",
+				key_config.get_hint(key_config.keys.exit_popup),
+			),
+			"back to search",
+			CMD_GROUP_LOG,
+		)
 	}
 	pub fn validate_msg(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(

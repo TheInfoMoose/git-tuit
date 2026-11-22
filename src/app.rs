@@ -4,7 +4,7 @@ use crate::{
 	cmdbar::CommandBar,
 	components::{
 		command_pump, event_pump, CommandInfo, Component,
-		DrawableComponent, FuzzyFinderTarget,
+		DrawableComponent, EventState, FuzzyFinderTarget,
 	},
 	input::{Input, InputEvent, InputState},
 	keys::{key_match, KeyConfig, SharedKeyConfig},
@@ -313,8 +313,9 @@ impl App {
 
 			let mut flags = NeedsUpdate::empty();
 
+			let popup_open = self.any_popup_visible();
 			let pump_result =
-				event_pump(&ev, self.components_mut().as_mut_slice());
+				self.dispatch_component_event(&ev, popup_open);
 			if let Err(err) = &pump_result {
 				log::error!("event handler failed: {err:?}");
 				self.queue.push(InternalEvent::ShowErrorMsg(
@@ -327,7 +328,8 @@ impl App {
 			) {
 				flags.insert(NeedsUpdate::COMMANDS);
 			} else if let Event::Key(k) = &ev {
-				let popup_open = self.any_popup_visible();
+				let popup_open =
+					popup_open || self.any_popup_visible();
 				let new_flags = if !popup_open
 					&& key_match(k, self.key_config.keys.tab_toggle)
 				{
@@ -516,6 +518,51 @@ impl App {
 	pub(crate) const fn revlog_mut(&mut self) -> &mut Revlog {
 		&mut self.revlog
 	}
+
+	#[cfg(test)]
+	pub(crate) fn cmdbar_height(&self) -> u16 {
+		self.cmdbar.borrow().height()
+	}
+
+	#[cfg(test)]
+	pub(crate) fn show_msg_popup(&mut self, msg: &str) {
+		self.msg_popup.show_info(msg).unwrap();
+		self.update_commands();
+	}
+
+	#[cfg(test)]
+	pub(crate) fn show_options_popup(&mut self) {
+		self.options_popup.show().unwrap();
+		self.update_commands();
+	}
+
+	#[cfg(test)]
+	pub(crate) fn open_commit_popup(&mut self) {
+		self.commit_popup.open(None).unwrap();
+		self.update_commands();
+	}
+
+	#[cfg(test)]
+	pub(crate) fn commit_popup_text(&self) -> &str {
+		self.commit_popup.text()
+	}
+
+	#[cfg(test)]
+	pub(crate) fn open_branch_list_popup(&mut self) {
+		self.select_branch_popup.open().unwrap();
+		self.update_commands();
+	}
+
+	#[cfg(test)]
+	pub(crate) fn open_goto_line_popup(&mut self) {
+		self.goto_line_popup.open(10);
+		self.update_commands();
+	}
+
+	#[cfg(test)]
+	pub(crate) fn log_search_text(&self) -> &str {
+		self.log_search_popup.search_text()
+	}
 }
 
 // private impls
@@ -599,6 +646,23 @@ impl App {
 			goto_line_popup
 		]
 	);
+
+	fn dispatch_component_event(
+		&mut self,
+		ev: &Event,
+		popup_open: bool,
+	) -> Result<EventState> {
+		if popup_open {
+			self.components_mut()
+				.into_iter()
+				.find(|c| c.is_visible())
+				.map_or(Ok(EventState::NotConsumed), |top| {
+					top.event(ev)
+				})
+		} else {
+			event_pump(ev, self.components_mut().as_mut_slice())
+		}
+	}
 
 	fn check_quit(&mut self, ev: &Event) -> bool {
 		if self.any_popup_visible() {

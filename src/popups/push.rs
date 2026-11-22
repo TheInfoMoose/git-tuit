@@ -381,7 +381,7 @@ impl Component for PushPopup {
 				return self.input_cred.commands(out, force_all);
 			}
 			out.push(CommandInfo::new(
-				strings::commands::close_msg(&self.key_config),
+				strings::commands::close_popup(&self.key_config),
 				!self.pending,
 				self.visible,
 			));
@@ -412,6 +412,11 @@ impl Component for PushPopup {
 				) && !self.pending
 				{
 					self.hide();
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 			return Ok(EventState::Consumed);
@@ -432,5 +437,94 @@ impl Component for PushPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{keys::KeyConfig, popups::PushTagsPopup};
+	use crossterm::event::{KeyCode, KeyModifiers};
+	use std::rc::Rc;
+
+	#[test]
+	fn t8k_push_close_hint() {
+		let mut env = Environment::test_env();
+		let mut kc = KeyConfig::default();
+		kc.keys.exit_popup.code = KeyCode::Char('x');
+		kc.keys.exit_popup.modifiers = KeyModifiers::empty();
+		kc.keys.enter.code = KeyCode::Char('e');
+		kc.keys.enter.modifiers = KeyModifiers::empty();
+		env.key_config = Rc::new(kc);
+
+		// PushPopup: not pending -> enabled, shows exit_popup
+		let mut push = PushPopup::new(&env);
+		push.show().unwrap();
+		push.pending = false;
+		let mut cmds = Vec::new();
+		push.commands(&mut cmds, false);
+		let close = cmds
+			.iter()
+			.find(|c| c.text.name.starts_with("Close"))
+			.expect("PushPopup should have a Close hint");
+		assert!(
+			close.text.name.contains("[x]"),
+			"PushPopup close hint must show exit_popup, got: {}",
+			close.text.name
+		);
+		assert!(
+			close.enabled,
+			"PushPopup close must be enabled when not pending"
+		);
+
+		// PushPopup: pending -> disabled
+		push.pending = true;
+		cmds.clear();
+		push.commands(&mut cmds, false);
+		let close = cmds
+			.iter()
+			.find(|c| c.text.name.starts_with("Close"))
+			.expect(
+				"PushPopup should have a Close hint when pending",
+			);
+		assert!(
+			!close.enabled,
+			"PushPopup close must be disabled when pending"
+		);
+
+		// PushTagsPopup: not pending -> enabled, shows exit_popup
+		let mut push_tags = PushTagsPopup::new(&env);
+		push_tags.show().unwrap();
+		push_tags.set_pending(false);
+		cmds.clear();
+		push_tags.commands(&mut cmds, false);
+		let close = cmds
+			.iter()
+			.find(|c| c.text.name.starts_with("Close"))
+			.expect("PushTagsPopup should have a Close hint");
+		assert!(
+			close.text.name.contains("[x]"),
+			"PushTagsPopup close hint must show exit_popup, got: {}",
+			close.text.name
+		);
+		assert!(
+			close.enabled,
+			"PushTagsPopup close must be enabled when not pending"
+		);
+
+		// PushTagsPopup: pending -> disabled
+		push_tags.set_pending(true);
+		cmds.clear();
+		push_tags.commands(&mut cmds, false);
+		let close = cmds
+			.iter()
+			.find(|c| c.text.name.starts_with("Close"))
+			.expect(
+				"PushTagsPopup should have a Close hint when pending",
+			);
+		assert!(
+			!close.enabled,
+			"PushTagsPopup close must be disabled when pending"
+		);
 	}
 }

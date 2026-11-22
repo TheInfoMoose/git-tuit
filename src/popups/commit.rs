@@ -97,6 +97,11 @@ impl CommitPopup {
 		self.git_branch_name.lookup().ok();
 	}
 
+	#[cfg(test)]
+	pub(crate) fn text(&self) -> &str {
+		self.input.get_text()
+	}
+
 	fn draw_branch_name(&self, f: &mut Frame) {
 		if let Some(name) = self.git_branch_name.last() {
 			let w = Paragraph::new(format!("{{{name}}}"))

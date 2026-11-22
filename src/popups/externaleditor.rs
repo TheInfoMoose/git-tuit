@@ -4,7 +4,7 @@ use crate::{
 		visibility_blocking, CommandBlocking, CommandInfo, Component,
 		DrawableComponent, EventState,
 	},
-	keys::SharedKeyConfig,
+	keys::{key_match, SharedKeyConfig},
 	strings,
 	ui::{self, style::SharedTheme},
 };
@@ -201,8 +201,13 @@ impl Component for ExternalEditorPopup {
 		visibility_blocking(self)
 	}
 
-	fn event(&mut self, _ev: &Event) -> Result<EventState> {
+	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.visible {
+			if let Event::Key(e) = ev {
+				if key_match(e, self.key_config.keys.cmd_bar_toggle) {
+					return Ok(EventState::NotConsumed);
+				}
+			}
 			return Ok(EventState::Consumed);
 		}
 

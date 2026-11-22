@@ -4,7 +4,7 @@ use crate::{
 		visibility_blocking, CommandBlocking, CommandInfo, Component,
 		CredComponent, DrawableComponent, EventState,
 	},
-	keys::SharedKeyConfig,
+	keys::{key_match, SharedKeyConfig},
 	queue::{InternalEvent, NeedsUpdate, Queue},
 	strings,
 	ui::{self, style::SharedTheme},
@@ -176,11 +176,6 @@ impl Component for FetchPopup {
 			if self.input_cred.is_visible() {
 				return self.input_cred.commands(out, force_all);
 			}
-			out.push(CommandInfo::new(
-				strings::commands::close_msg(&self.key_config),
-				!self.pending,
-				self.visible,
-			));
 		}
 
 		visibility_blocking(self)
@@ -188,7 +183,7 @@ impl Component for FetchPopup {
 
 	fn event(&mut self, ev: &Event) -> Result<EventState> {
 		if self.visible {
-			if let Event::Key(_) = ev {
+			if let Event::Key(e) = ev {
 				if self.input_cred.is_visible() {
 					self.input_cred.event(ev)?;
 
@@ -201,6 +196,11 @@ impl Component for FetchPopup {
 						// credential prompt cancelled: don't fetch
 						self.hide();
 					}
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 			return Ok(EventState::Consumed);
@@ -220,5 +220,36 @@ impl Component for FetchPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::popups::PullPopup;
+
+	#[test]
+	fn t8k_fetch_has_no_false_close() {
+		let env = Environment::test_env();
+
+		let mut fetch = FetchPopup::new(&env);
+		fetch.show().unwrap();
+		let mut cmds = Vec::new();
+		fetch.commands(&mut cmds, false);
+		assert!(
+			!cmds.iter().any(|c| c.text.name.starts_with("Close")),
+			"FetchPopup must not show a Close hint outside credential prompt, got: {:?}",
+			cmds.iter().map(|c| &c.text.name).collect::<Vec<_>>()
+		);
+
+		let mut pull = PullPopup::new(&env);
+		pull.show().unwrap();
+		cmds.clear();
+		pull.commands(&mut cmds, false);
+		assert!(
+			!cmds.iter().any(|c| c.text.name.starts_with("Close")),
+			"PullPopup must not show a Close hint outside credential prompt, got: {:?}",
+			cmds.iter().map(|c| &c.text.name).collect::<Vec<_>>()
+		);
 	}
 }

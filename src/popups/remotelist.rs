@@ -155,6 +155,11 @@ impl Component for RemoteListPopup {
 			) && self.valid_selection()
 			{
 				self.update_remote_url();
+			} else if key_match(
+				e,
+				self.key_config.keys.cmd_bar_toggle,
+			) {
+				return Ok(EventState::NotConsumed);
 			}
 		}
 		Ok(EventState::Consumed)
@@ -192,6 +197,7 @@ impl RemoteListPopup {
 	fn move_event(&mut self, e: &KeyEvent) -> Result<EventState> {
 		if key_match(e, self.key_config.keys.exit_popup) {
 			self.hide();
+			return Ok(EventState::Consumed);
 		} else if key_match(e, self.key_config.keys.move_down) {
 			return self
 				.move_selection(ScrollType::Up)

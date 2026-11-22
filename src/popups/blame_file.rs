@@ -336,6 +336,11 @@ impl Component for BlameFilePopup {
 							),
 						);
 					}
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 
 				return Ok(EventState::Consumed);

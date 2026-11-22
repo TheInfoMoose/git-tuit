@@ -134,6 +134,11 @@ impl Component for CompareCommitsPopup {
 				} else if key_match(e, self.key_config.keys.move_left)
 				{
 					self.hide_stacked(false);
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 
 				return Ok(EventState::Consumed);

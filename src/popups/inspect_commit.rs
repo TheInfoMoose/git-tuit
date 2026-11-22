@@ -189,6 +189,11 @@ impl Component for InspectCommitPopup {
 						return Ok(EventState::Consumed);
 					}
 					return Ok(EventState::Consumed);
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 
 				return Ok(EventState::Consumed);

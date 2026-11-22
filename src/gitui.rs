@@ -865,4 +865,180 @@ mod tests {
 			"whole message including detached warning must fit at 80x24:\n{screen}"
 		);
 	}
+
+	#[test]
+	fn t8k_dot_toggles_over_popup() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let (mut gitui, kc, _terminal) = open_gitui_on_log(td.path());
+		// Narrow terminal so even 2-command popups have an expandable cmdbar.
+		let mut narrow =
+			Terminal::new(TestBackend::new(18, 12)).unwrap();
+		let dot = kc.keys.cmd_bar_toggle;
+
+		// 1. ConfirmPopup
+		gitui.input_event(
+			kc.keys.status_reset_item.code,
+			kc.keys.status_reset_item.modifiers,
+		);
+		assert!(gitui.app.is_confirm_popup_visible());
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert!(
+			gitui.app.cmdbar_height() > 1,
+			"cmdbar must expand over ConfirmPopup"
+		);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(
+			gitui.app.cmdbar_height(),
+			1,
+			"cmdbar must collapse again over ConfirmPopup"
+		);
+		gitui.input_event(
+			kc.keys.exit_popup.code,
+			kc.keys.exit_popup.modifiers,
+		);
+
+		// 2. MsgPopup
+		gitui.app.show_msg_popup("hello");
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert!(
+			gitui.app.cmdbar_height() > 1,
+			"cmdbar must expand over MsgPopup"
+		);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.input_event(
+			kc.keys.exit_popup.code,
+			kc.keys.exit_popup.modifiers,
+		);
+
+		// 3. OptionsPopup
+		gitui.app.show_options_popup();
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert!(
+			gitui.app.cmdbar_height() > 1,
+			"cmdbar must expand over OptionsPopup"
+		);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.input_event(
+			kc.keys.exit_popup.code,
+			kc.keys.exit_popup.modifiers,
+		);
+
+		// 4. LogSearchPopupPopup with a search option focused (not text input)
+		gitui.input_event(
+			kc.keys.log_find.code,
+			kc.keys.log_find.modifiers,
+		);
+		gitui.input_event(
+			kc.keys.popup_down.code,
+			kc.keys.popup_down.modifiers,
+		);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert!(
+			gitui.app.cmdbar_height() > 1,
+			"cmdbar must expand over LogSearchPopupPopup when an option is focused"
+		);
+	}
+
+	#[test]
+	fn t8k_dot_stays_in_text_input() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let (mut gitui, kc, _terminal) = open_gitui_on_log(td.path());
+		let mut narrow =
+			Terminal::new(TestBackend::new(18, 12)).unwrap();
+		let dot = kc.keys.cmd_bar_toggle;
+
+		// 1. LogSearchPopupPopup with text input focused
+		gitui.input_event(
+			kc.keys.log_find.code,
+			kc.keys.log_find.modifiers,
+		);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(
+			gitui.app.cmdbar_height(),
+			1,
+			"cmdbar must not toggle while search text input is focused"
+		);
+		assert_eq!(gitui.app.log_search_text(), ".");
+		gitui.input_event(
+			kc.keys.exit_popup.code,
+			kc.keys.exit_popup.modifiers,
+		);
+
+		// 2. CommitPopup
+		gitui.app.open_commit_popup();
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(
+			gitui.app.cmdbar_height(),
+			1,
+			"cmdbar must not toggle while CommitPopup is focused"
+		);
+		assert_eq!(gitui.app.commit_popup_text(), ".");
+		gitui.input_event(
+			kc.keys.exit_popup.code,
+			kc.keys.exit_popup.modifiers,
+		);
+
+		// 3. GotoLinePopup
+		gitui.app.open_goto_line_popup();
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(
+			gitui.app.cmdbar_height(),
+			1,
+			"cmdbar must not toggle while GotoLinePopup is focused"
+		);
+	}
+
+	#[test]
+	fn t8k_dot_does_not_fall_through() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let (mut gitui, kc, _terminal) = open_gitui_on_log(td.path());
+		let mut narrow =
+			Terminal::new(TestBackend::new(18, 12)).unwrap();
+		let dot = kc.keys.cmd_bar_toggle;
+
+		// Open CommitPopup (text input) underneath, and BranchListPopup on top.
+		gitui.app.open_commit_popup();
+		assert_eq!(gitui.app.commit_popup_text(), "");
+		gitui.app.open_branch_list_popup();
+		gitui.draw(&mut narrow).unwrap();
+		assert_eq!(gitui.app.cmdbar_height(), 1);
+
+		gitui.input_event(dot.code, dot.modifiers);
+		gitui.draw(&mut narrow).unwrap();
+
+		assert_eq!(
+			gitui.app.commit_popup_text(),
+			"",
+			"underlying CommitPopup must never receive `.` when another popup is on top"
+		);
+		assert!(
+			gitui.app.cmdbar_height() > 1,
+			"cmdbar must still toggle when top popup passes `.` through"
+		);
+	}
 }

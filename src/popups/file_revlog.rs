@@ -569,6 +569,11 @@ impl Component for FileRevlogPopup {
 					self.key_config.keys.page_down,
 				) {
 					self.move_selection(ScrollType::PageDown)?;
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 

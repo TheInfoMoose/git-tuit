@@ -169,6 +169,11 @@ impl Component for ConfirmPopup {
 					self.hide();
 				} else if key_match(e, self.key_config.keys.enter) {
 					self.confirm();
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 
 				return Ok(EventState::Consumed);

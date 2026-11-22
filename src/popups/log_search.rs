@@ -91,6 +91,11 @@ impl LogSearchPopupPopup {
 		Ok(())
 	}
 
+	#[cfg(test)]
+	pub(crate) fn search_text(&self) -> &str {
+		self.find_text.get_text()
+	}
+
 	fn set_mode(&mut self, mode: &PopupMode) {
 		self.find_text.set_text(String::new());
 
@@ -493,6 +498,11 @@ impl LogSearchPopupPopup {
 				self.toggle_option();
 			} else if !self.option_selected() {
 				self.find_text.event(event)?;
+			} else if key_match(
+				key,
+				self.key_config.keys.cmd_bar_toggle,
+			) {
+				return Ok(EventState::NotConsumed);
 			}
 		}
 
@@ -547,16 +557,17 @@ impl Component for LogSearchPopupPopup {
 		force_all: bool,
 	) -> CommandBlocking {
 		if self.is_visible() || force_all {
-			out.push(
-				CommandInfo::new(
-					strings::commands::close_popup(&self.key_config),
-					true,
-					true,
-				)
-				.order(1),
-			);
-
-			if matches!(self.mode, PopupMode::Search) {
+			if matches!(self.mode, PopupMode::Search) || force_all {
+				out.push(
+					CommandInfo::new(
+						strings::commands::close_popup(
+							&self.key_config,
+						),
+						true,
+						true,
+					)
+					.order(1),
+				);
 				out.push(
 					CommandInfo::new(
 						strings::commands::scroll_popup(
@@ -580,6 +591,20 @@ impl Component for LogSearchPopupPopup {
 				out.push(
 					CommandInfo::new(
 						strings::commands::find_commit_sha(
+							&self.key_config,
+						),
+						true,
+						true,
+					)
+					.order(1),
+				);
+			}
+			if matches!(self.mode, PopupMode::JumpCommitSha)
+				|| force_all
+			{
+				out.push(
+					CommandInfo::new(
+						strings::commands::log_search_back(
 							&self.key_config,
 						),
 						true,
@@ -627,5 +652,88 @@ impl Component for LogSearchPopupPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::keys::KeyConfig;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+	use std::rc::Rc;
+
+	#[test]
+	fn t8k_search_hints_in_help() {
+		let env = Environment::test_env();
+		let mut popup = LogSearchPopupPopup::new(&env);
+		popup.open().unwrap();
+
+		// Switch to JumpCommitSha mode and close, simulating prior SHA jump.
+		let sha_key = Event::Key(KeyEvent::new(
+			env.key_config.keys.find_commit_sha.code,
+			env.key_config.keys.find_commit_sha.modifiers,
+		));
+		popup.event(&sha_key).unwrap();
+		popup.hide();
+
+		let mut help_cmds = Vec::new();
+		popup.commands(&mut help_cmds, true);
+
+		assert!(
+			help_cmds.iter().any(|c| {
+				!c.text.hide_help
+					&& c.text.name.starts_with("Search Hash")
+			}),
+			"full help must include find_commit_sha even after SHA mode: {:?}",
+			help_cmds.iter().map(|c| &c.text.name).collect::<Vec<_>>()
+		);
+		assert!(
+			help_cmds.iter().any(|c| {
+				!c.text.hide_help
+					&& c.text.name.starts_with("Toggle Option")
+			}),
+			"full help must include toggle_option even after SHA mode"
+		);
+		assert!(
+			help_cmds.iter().any(|c| {
+				!c.text.hide_help && c.text.name.starts_with("Scroll")
+			}),
+			"full help must include scroll_popup even after SHA mode"
+		);
+	}
+
+	#[test]
+	fn t8k_sha_mode_esc_is_back() {
+		let mut env = Environment::test_env();
+		let mut kc = KeyConfig::default();
+		kc.keys.exit_popup.code = KeyCode::Char('x');
+		kc.keys.exit_popup.modifiers = KeyModifiers::empty();
+		env.key_config = Rc::new(kc);
+
+		let mut popup = LogSearchPopupPopup::new(&env);
+		popup.open().unwrap();
+
+		let sha_key = Event::Key(KeyEvent::new(
+			env.key_config.keys.find_commit_sha.code,
+			env.key_config.keys.find_commit_sha.modifiers,
+		));
+		popup.event(&sha_key).unwrap();
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		assert!(
+			cmds.iter().any(|c| {
+				c.text.name.starts_with("Back")
+					&& c.text.name.contains("[x]")
+			}),
+			"JumpCommitSha mode must show exit_popup as Back, got: {:?}",
+			cmds.iter().map(|c| &c.text.name).collect::<Vec<_>>()
+		);
+		assert!(
+			!cmds.iter().any(|c| c.text.name.starts_with("Close")),
+			"JumpCommitSha mode must not show Close, got: {:?}",
+			cmds.iter().map(|c| &c.text.name).collect::<Vec<_>>()
+		);
 	}
 }

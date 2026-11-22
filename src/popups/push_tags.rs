@@ -162,6 +162,11 @@ impl PushTagsPopup {
 		self.pending
 	}
 
+	#[cfg(test)]
+	pub(crate) const fn set_pending(&mut self, pending: bool) {
+		self.pending = pending;
+	}
+
 	///
 	pub fn get_progress(
 		progress: Option<&PushTagsProgress>,
@@ -240,7 +245,7 @@ impl Component for PushTagsPopup {
 			}
 
 			out.push(CommandInfo::new(
-				strings::commands::close_msg(&self.key_config),
+				strings::commands::close_popup(&self.key_config),
 				!self.pending,
 				self.visible,
 			));
@@ -269,6 +274,11 @@ impl Component for PushTagsPopup {
 				) && !self.pending
 				{
 					self.hide();
+				} else if key_match(
+					e,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 			return Ok(EventState::Consumed);

@@ -137,6 +137,15 @@ impl Component for RevisionFilesPopup {
 			if res == EventState::Consumed && !self.files.is_visible()
 			{
 				self.hide_stacked(true);
+			} else if res == EventState::NotConsumed {
+				if let Event::Key(key) = event {
+					if key_match(
+						key,
+						self.key_config.keys.cmd_bar_toggle,
+					) {
+						return Ok(EventState::NotConsumed);
+					}
+				}
 			}
 
 			return Ok(EventState::Consumed);

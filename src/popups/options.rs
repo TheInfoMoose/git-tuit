@@ -301,7 +301,17 @@ impl Component for OptionsPopup {
 			);
 			out.push(
 				CommandInfo::new(
-					strings::commands::navigate_tree(
+					strings::commands::options_select(
+						&self.key_config,
+					),
+					true,
+					true,
+				)
+				.order(1),
+			);
+			out.push(
+				CommandInfo::new(
+					strings::commands::options_change(
 						&self.key_config,
 					),
 					true,
@@ -340,6 +350,11 @@ impl Component for OptionsPopup {
 					self.key_config.keys.move_left,
 				) {
 					self.switch_option(false);
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 
@@ -361,5 +376,71 @@ impl Component for OptionsPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::keys::KeyConfig;
+	use crossterm::event::{KeyCode, KeyModifiers};
+	use std::rc::Rc;
+
+	#[test]
+	fn t8k_options_hint() {
+		let mut env = Environment::test_env();
+		let mut kc = KeyConfig::default();
+		kc.keys.move_up.code = KeyCode::Char('u');
+		kc.keys.move_up.modifiers = KeyModifiers::empty();
+		kc.keys.move_down.code = KeyCode::Char('d');
+		kc.keys.move_down.modifiers = KeyModifiers::empty();
+		kc.keys.move_left.code = KeyCode::Char('l');
+		kc.keys.move_left.modifiers = KeyModifiers::empty();
+		kc.keys.move_right.code = KeyCode::Char('r');
+		kc.keys.move_right.modifiers = KeyModifiers::empty();
+		env.key_config = Rc::new(kc);
+
+		let mut popup = OptionsPopup::new(&env);
+		popup.show().unwrap();
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		for cmd in &cmds {
+			let lower_desc = cmd.text.desc.to_lowercase();
+			let lower_name = cmd.text.name.to_lowercase();
+			assert!(
+				!lower_desc.contains("tree")
+					&& !lower_desc.contains("collapse")
+					&& !lower_desc.contains("expand")
+					&& !lower_name.contains("tree"),
+				"OptionsPopup must not have tree wording: {} ({})",
+				cmd.text.name,
+				cmd.text.desc
+			);
+		}
+
+		assert!(
+			cmds.iter().any(|c| {
+				c.text.name.contains('u')
+					&& c.text.name.contains('d')
+					&& c.text.desc.to_lowercase().contains("select")
+			}),
+			"OptionsPopup must advertise move_up/move_down for selecting: {:?}",
+			cmds.iter()
+				.map(|c| (&c.text.name, c.text.desc))
+				.collect::<Vec<_>>()
+		);
+		assert!(
+			cmds.iter().any(|c| {
+				c.text.name.contains('l')
+					&& c.text.name.contains('r')
+					&& c.text.desc.to_lowercase().contains("change")
+			}),
+			"OptionsPopup must advertise move_left/move_right for changing value: {:?}",
+			cmds.iter()
+				.map(|c| (&c.text.name, c.text.desc))
+				.collect::<Vec<_>>()
+		);
 	}
 }

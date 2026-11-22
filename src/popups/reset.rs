@@ -274,6 +274,11 @@ impl Component for ResetPopup {
 					self.change_kind(false);
 				} else if key_match(key, self.key_config.keys.enter) {
 					self.reset();
+				} else if key_match(
+					key,
+					self.key_config.keys.cmd_bar_toggle,
+				) {
+					return Ok(EventState::NotConsumed);
 				}
 			}
 

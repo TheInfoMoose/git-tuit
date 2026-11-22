@@ -195,12 +195,6 @@ impl Component for BranchListPopup {
 						commit_id,
 					));
 				}
-			} else if key_match(
-				e,
-				self.key_config.keys.cmd_bar_toggle,
-			) {
-				//do not consume if its the more key
-				return Ok(EventState::NotConsumed);
 			} else if key_match(e, self.key_config.keys.branch_find) {
 				let branches = self
 					.branches
@@ -211,6 +205,12 @@ impl Component for BranchListPopup {
 					branches,
 					FuzzyFinderTarget::Branches,
 				));
+			} else if key_match(
+				e,
+				self.key_config.keys.cmd_bar_toggle,
+			) {
+				//do not consume if its the more key
+				return Ok(EventState::NotConsumed);
 			}
 		}
 
