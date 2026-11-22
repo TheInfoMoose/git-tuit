@@ -29,6 +29,7 @@ use super::style::Detail;
 
 pub struct DetailsComponent {
 	repo: RepoPathRef,
+	commit_id: Option<CommitId>,
 	data: Option<CommitDetails>,
 	tags: Vec<Tag>,
 	theme: SharedTheme,
@@ -47,6 +48,7 @@ impl DetailsComponent {
 	pub fn new(env: &Environment, focused: bool) -> Self {
 		Self {
 			repo: env.repo.clone(),
+			commit_id: None,
 			data: None,
 			tags: Vec::new(),
 			theme: env.theme.clone(),
@@ -63,13 +65,17 @@ impl DetailsComponent {
 		id: Option<CommitId>,
 		tags: Option<CommitTags>,
 	) {
+		let same_commit = id.is_some() && self.commit_id == id;
+		self.commit_id = id;
 		self.tags.clear();
 
 		self.data = id.and_then(|id| {
 			sync::get_commit_details(&self.repo.borrow(), id).ok()
 		});
 
-		self.scroll.reset();
+		if !same_commit {
+			self.scroll.reset();
+		}
 
 		if let Some(tags) = tags {
 			self.tags.extend(tags);
@@ -294,6 +300,7 @@ impl DetailsComponent {
 		data: Option<CommitDetails>,
 		tags: Vec<Tag>,
 	) {
+		self.commit_id = None;
 		self.data = data;
 		self.tags = tags;
 		self.scroll.reset();
@@ -568,5 +575,102 @@ mod test_line_count {
 			8,
 		);
 		assert_eq!(lines, 4);
+	}
+
+	fn make_repo_with_two_commits(
+	) -> (tempfile::TempDir, Environment, CommitId, CommitId) {
+		let (td, repo) = git2_testing::repo_init();
+		let long_msg = |prefix: &str| {
+			let body = (0..20)
+				.map(|i| format!("{prefix} body line {i}"))
+				.collect::<Vec<_>>()
+				.join("\n");
+			format!("{prefix} subject\n\n{body}")
+		};
+		let make_commit = |msg: &str| {
+			let mut index = repo.index().unwrap();
+			let tree_id = index.write_tree().unwrap();
+			let tree = repo.find_tree(tree_id).unwrap();
+			let sig = repo.signature().unwrap();
+			let parent =
+				repo.head().unwrap().peel_to_commit().unwrap();
+			let oid = repo
+				.commit(
+					Some("HEAD"),
+					&sig,
+					&sig,
+					msg,
+					&tree,
+					&[&parent],
+				)
+				.unwrap();
+			CommitId::new(oid)
+		};
+		let c1 = make_commit(&long_msg("first"));
+		let c2 = make_commit(&long_msg("second"));
+		let env = Environment::test_env();
+		*env.repo.borrow_mut() =
+			asyncgit::sync::RepoPath::Path(td.path().to_path_buf());
+		(td, env, c1, c2)
+	}
+
+	#[test]
+	fn t8n_same_commit_keeps_scroll() {
+		use ratatui::{backend::TestBackend, Terminal};
+
+		let (_td, env, c1, _c2) = make_repo_with_two_commits();
+		let mut details = DetailsComponent::new(&env, true);
+		details.set_commit(Some(c1), None);
+
+		let mut term =
+			Terminal::new(TestBackend::new(40, 14)).unwrap();
+		term.draw(|f| {
+			details.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert_eq!(details.scroll.get_top(), 3);
+
+		// Same commit again (e.g. refresh or tags arriving): user scroll wins.
+		details.set_commit(Some(c1), Some(vec![Tag::new("v1.0.0")]));
+		assert_eq!(details.scroll.get_top(), 3);
+	}
+
+	#[test]
+	fn t8n_new_commit_resets_scroll() {
+		use ratatui::{backend::TestBackend, Terminal};
+
+		let (_td, env, c1, c2) = make_repo_with_two_commits();
+		let mut details = DetailsComponent::new(&env, true);
+		details.set_commit(Some(c1), None);
+
+		let mut term =
+			Terminal::new(TestBackend::new(40, 14)).unwrap();
+		term.draw(|f| {
+			details.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert_eq!(details.scroll.get_top(), 2);
+
+		// Different commit resets scroll.
+		details.set_commit(Some(c2), None);
+		assert_eq!(details.scroll.get_top(), 0);
+
+		term.draw(|f| {
+			details.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+		assert!(details.move_scroll_top(ScrollType::Down));
+		assert_eq!(details.scroll.get_top(), 1);
+
+		// None resets scroll.
+		details.set_commit(None, None);
+		assert_eq!(details.scroll.get_top(), 0);
 	}
 }

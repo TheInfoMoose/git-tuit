@@ -98,28 +98,15 @@ impl<'a> StatefulParagraph<'a> {
 		self.wrap = Some(wrap);
 		self
 	}
-}
 
-impl StatefulWidget for StatefulParagraph<'_> {
-	type State = ParagraphState;
-
-	fn render(
-		mut self,
-		area: Rect,
+	fn render_pass(
+		&self,
+		text_area: Rect,
 		buf: &mut Buffer,
-		state: &mut Self::State,
-	) {
-		buf.set_style(area, self.style);
-		let text_area = self.block.take().map_or(area, |b| {
-			let inner_area = b.inner(area);
-			b.render(area, buf);
-			inner_area
-		});
-
-		if text_area.height < 1 {
-			return;
-		}
-
+		scroll_x: u16,
+		scroll_y: u16,
+		stop_after_view: bool,
+	) -> usize {
 		let style = self.style;
 		let mut styled = self.text.lines.iter().flat_map(|line| {
 			line.spans
@@ -146,17 +133,22 @@ impl StatefulWidget for StatefulParagraph<'_> {
 					text_area.width,
 				));
 				if self.alignment == Alignment::Left {
-					line_composer
-						.set_horizontal_offset(state.scroll.x);
+					line_composer.set_horizontal_offset(scroll_x);
 				}
 				line_composer
 			};
-		let mut y = 0;
-		let mut end_reached = false;
+
+		let scroll_y_usize = usize::from(scroll_y);
+		let end_y = scroll_y_usize
+			.saturating_add(usize::from(text_area.height));
+		let mut y: usize = 0;
+
 		while let Some((current_line, current_line_width)) =
 			line_composer.next_line()
 		{
-			if !end_reached && y >= state.scroll.y {
+			if y >= scroll_y_usize && y < end_y {
+				let row_offset =
+					u16::try_from(y - scroll_y_usize).unwrap_or(0);
 				let mut x = get_line_offset(
 					current_line_width,
 					text_area.width,
@@ -164,8 +156,8 @@ impl StatefulWidget for StatefulParagraph<'_> {
 				);
 				for StyledGrapheme { symbol, style } in current_line {
 					buf.cell_mut(Position::new(
-						text_area.left() + x,
-						text_area.top() + y - state.scroll.y,
+						text_area.left().saturating_add(x),
+						text_area.top().saturating_add(row_offset),
 					))
 					.map(|cell| {
 						cell.set_symbol(if symbol.is_empty() {
@@ -177,16 +169,77 @@ impl StatefulWidget for StatefulParagraph<'_> {
 						})
 						.set_style(*style)
 					});
-					x += Cast::<u16>::cast(symbol.width());
+					x = x.saturating_add(Cast::<u16>::cast(
+						symbol.width(),
+					));
 				}
 			}
-			y += 1;
-			if y >= text_area.height + state.scroll.y {
-				end_reached = true;
+			y = y.saturating_add(1);
+			if stop_after_view && y >= end_y {
+				break;
 			}
 		}
 
-		state.lines = y;
+		y
+	}
+}
+
+impl StatefulWidget for StatefulParagraph<'_> {
+	type State = ParagraphState;
+
+	fn render(
+		mut self,
+		area: Rect,
+		buf: &mut Buffer,
+		state: &mut Self::State,
+	) {
+		buf.set_style(area, self.style);
+		let text_area = self.block.take().map_or(area, |b| {
+			let inner_area = b.inner(area);
+			b.render(area, buf);
+			inner_area
+		});
+
+		if text_area.height < 1 || text_area.width < 1 {
+			state.lines = 0;
+			state.height = area.height;
+			state.scroll.y = 0;
+			return;
+		}
+
+		let total_lines = self.render_pass(
+			text_area,
+			buf,
+			state.scroll.x,
+			state.scroll.y,
+			false,
+		);
+		let total_lines_u16 =
+			u16::try_from(total_lines).unwrap_or(u16::MAX);
+		let max_scroll =
+			total_lines_u16.saturating_sub(text_area.height);
+
+		if state.scroll.y > max_scroll {
+			state.scroll.y = max_scroll;
+			for row in text_area.top()..text_area.bottom() {
+				for col in text_area.left()..text_area.right() {
+					if let Some(cell) =
+						buf.cell_mut(Position::new(col, row))
+					{
+						cell.set_symbol(" ").set_style(self.style);
+					}
+				}
+			}
+			self.render_pass(
+				text_area,
+				buf,
+				state.scroll.x,
+				state.scroll.y,
+				true,
+			);
+		}
+
+		state.lines = total_lines_u16;
 		state.height = area.height;
 	}
 }

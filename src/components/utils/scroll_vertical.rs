@@ -35,12 +35,16 @@ impl VerticalScroll {
 		let new_scroll_top = match move_type {
 			ScrollType::Down => old.saturating_add(1),
 			ScrollType::Up => old.saturating_sub(1),
-			ScrollType::PageDown => old
-				.saturating_sub(1)
-				.saturating_add(self.visual_height.get()),
-			ScrollType::PageUp => old
-				.saturating_add(1)
-				.saturating_sub(self.visual_height.get()),
+			ScrollType::PageDown => match self.visual_height.get() {
+				0 => old,
+				1 => old.saturating_add(1),
+				h => old.saturating_sub(1).saturating_add(h),
+			},
+			ScrollType::PageUp => match self.visual_height.get() {
+				0 => old,
+				1 => old.saturating_sub(1),
+				h => old.saturating_add(1).saturating_sub(h),
+			},
 			ScrollType::Home => 0,
 			ScrollType::End => max,
 		};
@@ -63,11 +67,11 @@ impl VerticalScroll {
 		end: usize,
 	) {
 		let top = self.top.get();
-		let bottom = top + height;
+		let bottom = top.saturating_add(height);
 		let max_top = self.max_top.get();
 		// the top of some content is hidden
 		if start < top {
-			self.top.set(start);
+			self.top.set(std::cmp::min(max_top, start));
 			return;
 		}
 		// the bottom of some content is hidden and there is visible space available
@@ -141,12 +145,20 @@ const fn calc_scroll_top(
 		return 0;
 	}
 
-	if current_top + height_in_lines <= selection {
-		selection.saturating_sub(height_in_lines) + 1
-	} else if current_top > selection {
-		selection
+	let max_top = selection_max.saturating_sub(height_in_lines);
+	let new_top =
+		if current_top.saturating_add(height_in_lines) <= selection {
+			selection.saturating_sub(height_in_lines) + 1
+		} else if current_top > selection {
+			selection
+		} else {
+			current_top
+		};
+
+	if new_top > max_top {
+		max_top
 	} else {
-		current_top
+		new_top
 	}
 }
 
@@ -222,5 +234,103 @@ mod tests {
 
 		assert!(!scroll.move_top(ScrollType::PageUp));
 		assert_eq!(scroll.get_top(), 0);
+	}
+
+	#[test]
+	fn t8n_vertical_clamps() {
+		let scroll = VerticalScroll::new();
+		scroll.update_no_selection(20, 5);
+		scroll.move_top(ScrollType::End);
+		assert_eq!(scroll.get_top(), 15);
+
+		// Terminal grows: max_top drops from 15 to 10
+		assert_eq!(scroll.update_no_selection(20, 10), 10);
+		assert_eq!(scroll.get_top(), 10);
+
+		// Content shrinks: max_top drops from 10 to 2
+		assert_eq!(scroll.update_no_selection(12, 10), 2);
+		assert_eq!(scroll.get_top(), 2);
+
+		// With selection: terminal grows, top clamps and selected row stays visible
+		scroll.update(18, 20, 5);
+		assert_eq!(scroll.get_top(), 14);
+		let top = scroll.update(18, 20, 10);
+		assert_eq!(top, 10);
+		assert!(top <= 18 && 18 < top + 10);
+
+		// With selection: content shrinks, top clamps and selected row stays visible
+		let top = scroll.update(12, 15, 5);
+		assert_eq!(top, 10);
+		assert!(top <= 12 && 12 < top + 5);
+	}
+
+	#[test]
+	fn t8n_empty_is_zero() {
+		use crate::{
+			components::utils::scroll_horizontal::HorizontalScroll,
+			ui::{ParagraphState, ScrollPos, StatefulParagraph},
+		};
+		use ratatui::{
+			buffer::Buffer, layout::Rect, widgets::StatefulWidget,
+		};
+
+		let vscroll = VerticalScroll::new();
+		vscroll.update_no_selection(20, 5);
+		vscroll.move_top(ScrollType::End);
+		assert_eq!(vscroll.update_no_selection(20, 0), 0);
+		assert_eq!(vscroll.get_top(), 0);
+		assert_eq!(vscroll.update(0, 0, 10), 0);
+		assert_eq!(vscroll.get_top(), 0);
+
+		let hscroll = HorizontalScroll::new();
+		hscroll.update_no_selection(20, 5);
+		assert_eq!(hscroll.update_no_selection(20, 0), 0);
+		assert_eq!(hscroll.get_right(), 0);
+		assert_eq!(hscroll.update(0, 0, 10), 0);
+		assert_eq!(hscroll.get_right(), 0);
+
+		let mut state = ParagraphState::default();
+		state.set_scroll(ScrollPos { x: 0, y: 5 });
+		let mut buf = Buffer::empty(Rect::new(0, 0, 0, 0));
+		StatefulParagraph::new("hello").render(
+			Rect::new(0, 0, 0, 0),
+			&mut buf,
+			&mut state,
+		);
+		assert_eq!(state.scroll().y, 0);
+
+		state.set_scroll(ScrollPos { x: 0, y: 5 });
+		let mut buf = Buffer::empty(Rect::new(0, 0, 10, 5));
+		StatefulParagraph::new("").render(
+			Rect::new(0, 0, 10, 5),
+			&mut buf,
+			&mut state,
+		);
+		assert_eq!(state.scroll().y, 0);
+	}
+
+	#[test]
+	fn t8n_page_zero_height() {
+		let scroll = VerticalScroll::new();
+		scroll.max_top.set(10);
+		scroll.top.set(5);
+		// visual_height is 0 (not drawn yet or zero height)
+		assert!(!scroll.move_top(ScrollType::PageDown));
+		assert_eq!(scroll.get_top(), 5);
+		assert!(!scroll.move_top(ScrollType::PageUp));
+		assert_eq!(scroll.get_top(), 5);
+	}
+
+	#[test]
+	fn t8n_page_one_row() {
+		let scroll = VerticalScroll::new();
+		scroll.update_no_selection(10, 1);
+		scroll.top.set(3);
+
+		assert!(scroll.move_top(ScrollType::PageDown));
+		assert_eq!(scroll.get_top(), 4);
+
+		assert!(scroll.move_top(ScrollType::PageUp));
+		assert_eq!(scroll.get_top(), 3);
 	}
 }

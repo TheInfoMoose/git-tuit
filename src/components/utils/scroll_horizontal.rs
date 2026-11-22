@@ -107,12 +107,21 @@ const fn calc_scroll_right(
 		return 0;
 	}
 
-	if current_right + width_in_lines <= selection {
+	let max_right = selection_max.saturating_sub(width_in_lines);
+	let new_right = if current_right.saturating_add(width_in_lines)
+		<= selection
+	{
 		selection.saturating_sub(width_in_lines) + 1
 	} else if current_right > selection {
 		selection
 	} else {
 		current_right
+	};
+
+	if new_right > max_right {
+		max_right
+	} else {
+		new_right
 	}
 }
 
@@ -129,5 +138,27 @@ mod tests {
 	#[test]
 	fn test_scroll_zero_width() {
 		assert_eq!(calc_scroll_right(4, 0, 4, 3), 0);
+	}
+
+	#[test]
+	fn t8n_horizontal_clamps() {
+		let scroll = HorizontalScroll::new();
+		scroll.update_no_selection(20, 5);
+		scroll.right.set(15);
+
+		// Terminal grows: max_right drops from 15 to 10
+		assert_eq!(scroll.update_no_selection(20, 10), 10);
+		assert_eq!(scroll.get_right(), 10);
+
+		// Content shrinks: max_right drops from 10 to 2
+		assert_eq!(scroll.update_no_selection(12, 10), 2);
+		assert_eq!(scroll.get_right(), 2);
+
+		// With selection: terminal grows, right clamps and selected column stays visible
+		scroll.update(18, 20, 5);
+		assert_eq!(scroll.get_right(), 14);
+		let right = scroll.update(18, 20, 10);
+		assert_eq!(right, 10);
+		assert!(right <= 18 && 18 < right + 10);
 	}
 }

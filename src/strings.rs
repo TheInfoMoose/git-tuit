@@ -635,14 +635,20 @@ pub fn copy_success(s: &str) -> String {
 pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 	if s.width() <= width {
 		Cow::Borrowed(s)
+	} else if width == 0 {
+		Cow::Borrowed("")
+	} else if width < 3 {
+		Cow::Owned(format!(
+			"{}{}",
+			symbol::ELLIPSIS,
+			s.unicode_truncate_start(width - 1).0
+		))
 	} else {
 		Cow::Owned(format!(
 			"[{}]{}",
 			symbol::ELLIPSIS,
-			s.unicode_truncate_start(
-				width.saturating_sub(3 /* front indicator */)
-			)
-			.0
+			s.unicode_truncate_start(width - 3 /* front indicator */)
+				.0
 		))
 	}
 }
@@ -2326,5 +2332,28 @@ mod tests {
 			cmd.name,
 			down_hint
 		);
+	}
+
+	#[test]
+	fn t8n_ellipsis_tiny_width() {
+		for width in [0, 1, 2] {
+			for input in ["hello world", "日本語テスト", "ab", "日"]
+			{
+				let out = ellipsis_trim_start(input, width);
+				assert!(
+					out.width() <= width,
+					"width={width}, input={input:?}, out={out:?} (out.width()={})",
+					out.width()
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn t8n_ellipsis_normal_width() {
+		assert_eq!(ellipsis_trim_start("abcdef", 3), "[\u{2026}]");
+		assert_eq!(ellipsis_trim_start("abcdef", 5), "[\u{2026}]ef");
+		assert_eq!(ellipsis_trim_start("abc", 3), "abc");
+		assert_eq!(ellipsis_trim_start("日本語", 5), "[\u{2026}]語");
 	}
 }

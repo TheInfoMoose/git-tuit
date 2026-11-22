@@ -219,8 +219,6 @@ impl DrawableComponent for SyntaxTextComponent {
 
 		self.paragraph_state.set(state);
 
-		self.set_scroll(state.scroll().y);
-
 		if self.focused() {
 			ui::draw_scrollbar(
 				f,
@@ -282,5 +280,100 @@ impl Component for SyntaxTextComponent {
 	/// focus/unfocus this component depending on param
 	fn focus(&mut self, focus: bool) {
 		self.focused = focus;
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use ratatui::{backend::TestBackend, Terminal};
+
+	fn buffer_text(terminal: &Terminal<TestBackend>) -> String {
+		let buf = terminal.backend().buffer();
+		let mut out = String::new();
+		for y in 0..buf.area.height {
+			for x in 0..buf.area.width {
+				out.push_str(buf[(x, y)].symbol());
+			}
+			out.push('\n');
+		}
+		out
+	}
+
+	#[test]
+	fn t8n_file_view_clamps_first_frame() {
+		let env = Environment::test_env();
+		let mut comp = SyntaxTextComponent::new(&env);
+		let twenty_lines = (0..20)
+			.map(|i| format!("line-{i:02}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		comp.current_file = Some((
+			String::from("sample.txt"),
+			Either::Right(twenty_lines),
+		));
+
+		// Draw at height 7 (inner height 5) and scroll to bottom (y = 15)
+		let mut term =
+			Terminal::new(TestBackend::new(20, 7)).unwrap();
+		term.draw(|f| {
+			comp.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+		assert!(comp.scroll(MoveSelection::End));
+		assert_eq!(comp.paragraph_state.get().scroll().y, 15);
+
+		// Resize taller to height 12 (inner height 10): max_scroll = 10.
+		// Must clamp in the SAME frame with no blank frame.
+		let mut term =
+			Terminal::new(TestBackend::new(20, 12)).unwrap();
+		term.draw(|f| {
+			comp.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+		assert_eq!(comp.paragraph_state.get().scroll().y, 10);
+		let rendered = buffer_text(&term);
+		assert!(
+			rendered.contains("line-10")
+				&& rendered.contains("line-19"),
+			"expected clamped lines 10..=19 on first frame, got:\n{rendered}"
+		);
+
+		// Shrink content to 5 lines while scroll.y = 10: must clamp to 0
+		// in the SAME frame with no blank frame.
+		let five_lines = (0..5)
+			.map(|i| format!("short-{i:02}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		comp.current_file = Some((
+			String::from("sample.txt"),
+			Either::Right(five_lines),
+		));
+		let mut term =
+			Terminal::new(TestBackend::new(20, 7)).unwrap();
+		term.draw(|f| {
+			comp.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+		assert_eq!(comp.paragraph_state.get().scroll().y, 0);
+		let rendered = buffer_text(&term);
+		assert!(
+			rendered.contains("short-00")
+				&& rendered.contains("short-04"),
+			"expected short-00..=short-04 on first frame, got:\n{rendered}"
+		);
+
+		// u16::MAX scroll offset must not overflow u16 and must render content.
+		let mut state = comp.paragraph_state.get();
+		state.set_scroll(ScrollPos { x: 0, y: u16::MAX });
+		comp.paragraph_state.set(state);
+		let mut term =
+			Terminal::new(TestBackend::new(20, 7)).unwrap();
+		term.draw(|f| {
+			comp.draw(f, f.area()).unwrap();
+		})
+		.unwrap();
+		assert_eq!(comp.paragraph_state.get().scroll().y, 0);
+		assert!(buffer_text(&term).contains("short-00"));
 	}
 }
