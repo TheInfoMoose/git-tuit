@@ -417,6 +417,246 @@ pub fn checkout_remote_branch(
 	Ok(())
 }
 
+fn local_name_for_remote(
+	repo: &Repository,
+	branch: &BranchInfo,
+) -> String {
+	if let Ok(remote_buf) = repo.branch_remote_name(&branch.reference)
+	{
+		if let Ok(remote_name) = bytes2string(remote_buf.as_ref()) {
+			let prefix = format!("{remote_name}/");
+			if let Some(rest) = branch.name.strip_prefix(&prefix) {
+				return rest.to_string();
+			}
+		}
+	}
+
+	branch.name.split_once('/').map_or_else(
+		|| branch.name.clone(),
+		|(_, rest)| rest.to_string(),
+	)
+}
+
+fn untracked_path_collides_with_tree(
+	target_tree: &git2::Tree<'_>,
+	rel_path: &std::path::Path,
+) -> bool {
+	if target_tree.get_path(rel_path).is_ok() {
+		return true;
+	}
+
+	let mut cur = rel_path.parent();
+	while let Some(parent) = cur {
+		if parent.as_os_str().is_empty() {
+			break;
+		}
+		if let Ok(entry) = target_tree.get_path(parent) {
+			if entry.kind() != Some(git2::ObjectType::Tree) {
+				return true;
+			}
+		}
+		cur = parent.parent();
+	}
+
+	false
+}
+
+fn find_untracked_collisions(
+	repo: &Repository,
+	head_tree: &git2::Tree<'_>,
+	target_tree: &git2::Tree<'_>,
+) -> Result<Vec<String>> {
+	let mut opts = git2::StatusOptions::new();
+	opts.include_untracked(true)
+		.recurse_untracked_dirs(true)
+		.include_ignored(false);
+
+	let statuses = repo.statuses(Some(&mut opts))?;
+	let mut collisions = Vec::new();
+
+	for entry in statuses.iter() {
+		let status = entry.status();
+		if !status.is_wt_new() || status.is_index_deleted() {
+			continue;
+		}
+
+		let path = bytes2string(entry.path_bytes())?;
+		let rel_path = std::path::Path::new(&path);
+
+		if head_tree.get_path(rel_path).is_ok() {
+			continue;
+		}
+
+		if untracked_path_collides_with_tree(target_tree, rel_path) {
+			collisions.push(path);
+		}
+	}
+
+	collisions.sort();
+	Ok(collisions)
+}
+
+enum DiscardTarget<'repo> {
+	Local {
+		ref_name: String,
+		tree: git2::Tree<'repo>,
+	},
+	Remote {
+		local_name: String,
+		upstream_name: String,
+		commit: git2::Commit<'repo>,
+		tree: git2::Tree<'repo>,
+	},
+}
+
+impl<'repo> DiscardTarget<'repo> {
+	const fn tree(&self) -> &git2::Tree<'repo> {
+		match self {
+			Self::Local { tree, .. } | Self::Remote { tree, .. } => {
+				tree
+			}
+		}
+	}
+}
+
+fn resolve_discard_target<'repo>(
+	repo: &'repo Repository,
+	branch: &BranchInfo,
+) -> Result<DiscardTarget<'repo>> {
+	if branch.is_local() {
+		let target_branch =
+			repo.find_branch(&branch.name, BranchType::Local)?;
+		let target_ref = target_branch.into_reference();
+		let ref_name = bytes2string(target_ref.name_bytes())?;
+		let tree = target_ref.peel_to_tree()?;
+		return Ok(DiscardTarget::Local { ref_name, tree });
+	}
+
+	let remote_branch =
+		repo.find_branch(&branch.name, BranchType::Remote)?;
+	let commit = remote_branch.into_reference().peel_to_commit()?;
+	let tree = commit.tree()?;
+	let local_name = local_name_for_remote(repo, branch);
+
+	if !Branch::name_is_valid(&local_name)? {
+		return Err(Error::Generic(format!(
+			"invalid branch name: {local_name}"
+		)));
+	}
+
+	let target_ref = format!("refs/heads/{local_name}");
+	for existing in repo.branches(Some(BranchType::Local))? {
+		let (existing_branch, _) = existing?;
+		if let Ok(existing_ref) =
+			bytes2string(existing_branch.get().name_bytes())
+		{
+			if existing_ref == target_ref
+				|| existing_ref
+					.strip_prefix(&target_ref)
+					.is_some_and(|rest| rest.starts_with('/'))
+				|| target_ref
+					.strip_prefix(existing_ref.as_str())
+					.is_some_and(|rest| rest.starts_with('/'))
+			{
+				return Err(Error::Generic(format!(
+					"branch '{local_name}' already exists"
+				)));
+			}
+		}
+	}
+
+	Ok(DiscardTarget::Remote {
+		local_name,
+		upstream_name: branch.name.clone(),
+		commit,
+		tree,
+	})
+}
+
+fn apply_discard_target_head(
+	repo: &Repository,
+	target: DiscardTarget<'_>,
+) -> Result<()> {
+	match target {
+		DiscardTarget::Local { ref_name, .. } => {
+			repo.set_head(&ref_name)?;
+		}
+		DiscardTarget::Remote {
+			local_name,
+			upstream_name,
+			commit,
+			..
+		} => {
+			let mut new_branch =
+				repo.branch(&local_name, &commit, false)?;
+			if let Err(e) =
+				new_branch.set_upstream(Some(&upstream_name))
+			{
+				let _ = new_branch.delete();
+				return Err(e.into());
+			}
+			let ref_name =
+				match bytes2string(new_branch.get().name_bytes()) {
+					Ok(name) => name,
+					Err(e) => {
+						let _ = new_branch.delete();
+						return Err(e);
+					}
+				};
+			if let Err(e) = repo.set_head(&ref_name) {
+				let _ = new_branch.delete();
+				return Err(e.into());
+			}
+		}
+	}
+
+	Ok(())
+}
+
+/// Discard all staged and unstaged tracked changes and switch to `branch`.
+///
+/// Validates HEAD, the target branch (and local branch name availability for
+/// remote branches), and checks for untracked (non-ignored) files that would
+/// be overwritten by the target tree before mutating the worktree, index,
+/// branches, or HEAD.
+pub fn checkout_branch_discard(
+	repo_path: &RepoPath,
+	branch: &BranchInfo,
+) -> Result<()> {
+	scope_time!("checkout_branch_discard");
+
+	let repo = repo(repo_path)?;
+
+	let head = repo.head().map_err(|e| {
+		if e.code() == git2::ErrorCode::UnbornBranch {
+			Error::NoHead
+		} else {
+			e.into()
+		}
+	})?;
+	let head_tree = head.peel_to_tree()?;
+
+	let target = resolve_discard_target(&repo, branch)?;
+
+	let collisions =
+		find_untracked_collisions(&repo, &head_tree, target.tree())?;
+	if !collisions.is_empty() {
+		return Err(Error::Generic(format!(
+			"untracked working tree file would be overwritten by checkout: {}",
+			collisions.join(", ")
+		)));
+	}
+
+	let mut checkout_opts = git2::build::CheckoutBuilder::new();
+	checkout_opts.force().overwrite_ignored(true);
+	repo.checkout_tree(
+		target.tree().as_object(),
+		Some(&mut checkout_opts),
+	)?;
+
+	apply_discard_target_head(&repo, target)
+}
+
 /// The user must not be on the branch for the branch to be deleted
 pub fn delete_branch(
 	repo_path: &RepoPath,
