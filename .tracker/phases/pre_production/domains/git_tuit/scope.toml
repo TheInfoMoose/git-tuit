@@ -1105,7 +1105,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0099"
 title = "Remote Input Is Validated"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
