@@ -591,6 +591,12 @@ pub fn create_remote_popup_msg_url(
 pub const fn remote_name_invalid() -> &'static str {
 	"[invalid name]"
 }
+pub const fn remote_name_exists() -> &'static str {
+	"[remote already exists]"
+}
+pub const fn remote_url_invalid() -> &'static str {
+	"[empty url]"
+}
 pub fn username_popup_title(_key_config: &SharedKeyConfig) -> String {
 	"Username".to_string()
 }

@@ -48,7 +48,7 @@ impl Component for RenameRemotePopup {
 				strings::commands::remote_confirm_name_msg(
 					&self.key_config,
 				),
-				true,
+				self.is_valid_remote_name(),
 				true,
 			));
 		}
@@ -115,6 +115,10 @@ impl RenameRemotePopup {
 		Ok(())
 	}
 
+	fn is_valid_remote_name(&self) -> bool {
+		sync::validate_remote_name(self.input.get_text())
+	}
+
 	fn draw_warnings(&self, f: &mut Frame) {
 		let current_text = self.input.get_text();
 
@@ -122,7 +126,7 @@ impl RenameRemotePopup {
 			let valid = sync::validate_remote_name(current_text);
 
 			if !valid {
-				let msg = strings::branch_name_invalid();
+				let msg = strings::remote_name_invalid();
 				let msg_length: u16 = msg.len().cast();
 				let w = Paragraph::new(msg)
 					.style(self.theme.text_danger());
@@ -147,30 +151,129 @@ impl RenameRemotePopup {
 
 	///
 	pub fn rename_remote(&mut self) {
+		if !self.is_valid_remote_name() {
+			return;
+		}
+
+		if self.initial_name.as_deref() == Some(self.input.get_text())
+		{
+			self.input.clear();
+			self.initial_name = None;
+			self.hide();
+			return;
+		}
+
 		if let Some(init_name) = &self.initial_name {
-			if init_name != self.input.get_text() {
-				let res = sync::rename_remote(
-					&self.repo.borrow(),
-					init_name,
-					self.input.get_text(),
-				);
-				match res {
-					Ok(()) => {
-						self.queue.push(InternalEvent::Update(
-							NeedsUpdate::ALL | NeedsUpdate::REMOTES,
-						));
-					}
-					Err(e) => {
-						log::error!("rename remote: {e}");
-						self.queue.push(InternalEvent::ShowErrorMsg(
-							format!("rename remote error:\n{e}"),
-						));
-					}
+			let res = sync::rename_remote(
+				&self.repo.borrow(),
+				init_name,
+				self.input.get_text(),
+			);
+			match res {
+				Ok(()) => {
+					self.input.clear();
+					self.initial_name = None;
+					self.hide();
+					self.queue.push(InternalEvent::Update(
+						NeedsUpdate::ALL | NeedsUpdate::REMOTES,
+					));
+				}
+				Err(e) => {
+					log::error!("rename remote: {e}");
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!("rename remote error:\n{e}"),
+					));
 				}
 			}
 		}
-		self.input.clear();
-		self.initial_name = None;
-		self.hide();
+	}
+
+	#[cfg(test)]
+	pub(super) fn set_input_text(&mut self, text: String) {
+		self.input.set_text(text);
+	}
+
+	#[cfg(test)]
+	pub(super) fn input_text(&self) -> &str {
+		self.input.get_text()
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::popups::UpdateRemoteUrlPopup;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+	use std::cell::RefCell;
+
+	fn env_for_repo(path: &std::path::Path) -> Environment {
+		let mut env = Environment::test_env();
+		env.repo =
+			RefCell::new(sync::RepoPath::Path(path.to_path_buf()));
+		env
+	}
+
+	fn enter_event() -> Event {
+		Event::Key(KeyEvent::new(KeyCode::Enter, KeyModifiers::NONE))
+	}
+
+	#[test]
+	fn t8h_unchanged_closes() {
+		let (_td, repo) = git2_testing::repo_init();
+		let root = repo.path().parent().unwrap();
+		let env = env_for_repo(root);
+
+		// Use non-existent remote so any git call would fail with ShowErrorMsg.
+		let mut rename = RenameRemotePopup::new(&env);
+		rename.open("missing".to_string()).unwrap();
+		rename.event(&enter_event()).unwrap();
+		assert!(
+			!rename.is_visible(),
+			"unchanged rename should close popup"
+		);
+		assert!(
+			env.queue.pop().is_none(),
+			"unchanged rename should make no git call"
+		);
+
+		let mut update = UpdateRemoteUrlPopup::new(&env);
+		update
+			.open(
+				"missing".to_string(),
+				"https://example.com/repo.git".to_string(),
+			)
+			.unwrap();
+		update.event(&enter_event()).unwrap();
+		assert!(
+			!update.is_visible(),
+			"unchanged url should close popup"
+		);
+		assert!(
+			env.queue.pop().is_none(),
+			"unchanged url should make no git call"
+		);
+	}
+
+	#[test]
+	fn t8h_rename_failure_keeps_input() {
+		let (_td, repo) = git2_testing::repo_init();
+		let root = repo.path().parent().unwrap();
+		let env = env_for_repo(root);
+
+		let mut popup = RenameRemotePopup::new(&env);
+		popup.open("missing".to_string()).unwrap();
+		popup.input.set_text("upstream".to_string());
+		popup.event(&enter_event()).unwrap();
+
+		assert!(
+			popup.is_visible(),
+			"rename popup should stay open on git error"
+		);
+		assert_eq!(popup.input.get_text(), "upstream");
+		assert_eq!(popup.initial_name.as_deref(), Some("missing"));
+		assert!(matches!(
+			env.queue.pop(),
+			Some(InternalEvent::ShowErrorMsg(_))
+		));
 	}
 }

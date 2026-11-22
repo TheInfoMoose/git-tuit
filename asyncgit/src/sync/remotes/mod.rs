@@ -63,6 +63,7 @@ pub fn update_remote_url(
 	new_url: &str,
 ) -> Result<()> {
 	let repo = repo(repo_path)?;
+	repo.find_remote(name)?;
 	repo.remote_set_url(name, new_url)?;
 	Ok(())
 }
@@ -79,6 +80,10 @@ pub fn delete_remote(
 
 ///
 pub fn validate_remote_name(name: &str) -> bool {
+	if name.is_empty() || name.contains('\0') {
+		return false;
+	}
+
 	Remote::is_valid_name(name)
 }
 
