@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0105"
 type = "task"
 title = "Scrolling Survives Resize"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T05:34:48Z"
+updated_at = "2026-11-22T15:04:39Z"
 source_ref = "STEP 8N"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 7
 iteration_count = 1
+last_timer_session = "TASK-0105@2026-11-22T14:57:33Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "82134ef0"
+summary = "STEP 8N: Scrolling Survives Resize (phased check PASS)"
