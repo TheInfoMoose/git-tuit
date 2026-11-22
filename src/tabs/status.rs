@@ -401,6 +401,7 @@ impl Status {
 			self.git_state = sync::repo_state(&self.repo.borrow())
 				.unwrap_or(RepoState::Clean);
 
+			self.check_remotes();
 			self.branch_compare();
 		}
 
@@ -521,6 +522,14 @@ impl Status {
 			self.diff.clear(false);
 		}
 
+		if self.focus == Focus::Diff && self.diff.is_empty() {
+			let target_focus = match self.diff_target {
+				DiffTarget::Stage => Focus::Stage,
+				DiffTarget::WorkingDir => Focus::WorkDir,
+			};
+			self.switch_focus(target_focus)?;
+		}
+
 		Ok(())
 	}
 
@@ -614,11 +623,19 @@ impl Status {
 			.git_branch_state
 			.as_ref()
 			.is_none_or(|state| state.ahead > 0);
+		let has_branch = self
+			.git_branch_name
+			.last()
+			.is_some_and(|branch| branch != "HEAD");
 
-		is_ahead && self.remotes.has_remote_for_push
+		is_ahead && has_branch && self.remotes.has_remote_for_push
 	}
 
 	const fn can_fetch(&self) -> bool {
+		self.remotes.has_remote_for_fetch
+	}
+
+	const fn can_pull(&self) -> bool {
 		self.remotes.has_remote_for_fetch
 			&& self.git_branch_state.is_some()
 	}
@@ -764,7 +781,7 @@ impl Component for Status {
 			));
 			out.push(CommandInfo::new(
 				strings::commands::status_pull(&self.key_config),
-				self.can_fetch(),
+				self.can_pull(),
 				!focus_on_diff,
 			));
 
@@ -892,7 +909,7 @@ impl Component for Status {
 					Ok(EventState::Consumed)
 				} else if key_match(k, self.key_config.keys.pull)
 					&& !self.is_focus_on_diff()
-					&& self.can_fetch()
+					&& self.can_pull()
 				{
 					self.pull();
 					Ok(EventState::Consumed)
@@ -972,9 +989,180 @@ impl Component for Status {
 		self.index.show()?;
 		self.index_wd.show()?;
 
-		self.check_remotes();
 		self.update()?;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use asyncgit::StatusItemType;
+	use crossbeam_channel::{unbounded, Receiver};
+	use crossterm::event::{Event, KeyEvent};
+	use std::{cell::RefCell, time::Duration};
+
+	fn env_for_repo(
+		path: &std::path::Path,
+	) -> (Environment, Receiver<AsyncGitNotification>) {
+		let mut env = Environment::test_env();
+		let (tx, rx) = unbounded();
+		env.sender_git = tx;
+		env.repo = RefCell::new(RepoPath::Path(path.to_path_buf()));
+		(env, rx)
+	}
+
+	fn drain_pending(
+		status: &Status,
+		rx: &Receiver<AsyncGitNotification>,
+	) {
+		while status.anything_pending() {
+			if rx.recv_timeout(Duration::from_secs(2)).is_err() {
+				break;
+			}
+		}
+	}
+
+	#[test]
+	fn t7j_focus_leaves_only_loaded_empty_diff() {
+		let (td, _repo) = git2_testing::repo_init();
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+
+		let item = StatusItem {
+			path: String::from("staged.txt"),
+			status: StatusItemType::Modified,
+		};
+		status.index.set_items(&[item]).unwrap();
+		status.switch_focus(Focus::Stage).unwrap();
+
+		// Enter diff while it is still loading (pending = true, diff = None).
+		status.switch_focus(Focus::Diff).unwrap();
+		let focused_while_loading = status.is_focus_on_diff();
+
+		// Once the file list is empty, update_diff clears the diff with pending = false.
+		// Focus must return to Focus::Stage (the list it came from).
+		status.index.set_items(&[]).unwrap();
+		status.update_diff().unwrap();
+		let focused_after_empty_stage = status.is_focus_on_diff();
+		let focus_after_empty_stage = status.focus == Focus::Stage;
+		let index_focused = status.index.focused();
+
+		// Same check when coming from WorkDir.
+		let wd_item = StatusItem {
+			path: String::from("workdir.txt"),
+			status: StatusItemType::Modified,
+		};
+		status.index_wd.set_items(&[wd_item]).unwrap();
+		status.switch_focus(Focus::WorkDir).unwrap();
+		status.switch_focus(Focus::Diff).unwrap();
+		let focused_while_loading_wd = status.is_focus_on_diff();
+
+		status.index_wd.set_items(&[]).unwrap();
+		status.update_diff().unwrap();
+		let focused_after_empty_wd = status.is_focus_on_diff();
+		let focus_after_empty_wd = status.focus == Focus::WorkDir;
+		let index_wd_focused = status.index_wd.focused();
+
+		drain_pending(&status, &rx);
+
+		assert!(focused_while_loading);
+		assert!(!focused_after_empty_stage);
+		assert!(focus_after_empty_stage);
+		assert!(index_focused);
+		assert!(focused_while_loading_wd);
+		assert!(!focused_after_empty_wd);
+		assert!(focus_after_empty_wd);
+		assert!(index_wd_focused);
+	}
+
+	#[test]
+	fn t7j_fetch_without_upstream() {
+		let (td, repo) = git2_testing::repo_init();
+		repo.remote("origin", "https://example.com/repo.git")
+			.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+
+		assert!(status.can_fetch());
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let fetch_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_fetch(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		let pull_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_pull(&env.key_config)
+			})
+			.unwrap();
+		assert!(fetch_cmd.enabled);
+		assert!(!pull_cmd.enabled);
+
+		let fetch_key = env.key_config.keys.fetch;
+		let fetch_ev = Event::Key(KeyEvent::new(
+			fetch_key.code,
+			fetch_key.modifiers,
+		));
+		assert!(status.event(&fetch_ev).unwrap().is_consumed());
+		assert!(matches!(
+			env.queue.pop(),
+			Some(InternalEvent::FetchRemotes)
+		));
+
+		let pull_key = env.key_config.keys.pull;
+		let pull_ev = Event::Key(KeyEvent::new(
+			pull_key.code,
+			pull_key.modifiers,
+		));
+		assert!(!status.event(&pull_ev).unwrap().is_consumed());
+		assert!(env.queue.pop().is_none());
+	}
+
+	#[test]
+	fn t7j_no_push_when_detached() {
+		let (td, repo) = git2_testing::repo_init();
+		repo.remote("origin", "https://example.com/repo.git")
+			.unwrap();
+		let head_id = repo.head().unwrap().target().unwrap();
+		repo.set_head_detached(head_id).unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+
+		assert!(!status.can_push());
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let push_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_push(&env.key_config)
+			})
+			.unwrap();
+		assert!(!push_cmd.enabled);
+
+		let push_key = env.key_config.keys.push;
+		let push_ev = Event::Key(KeyEvent::new(
+			push_key.code,
+			push_key.modifiers,
+		));
+		status.event(&push_ev).unwrap();
+		assert!(env.queue.pop().is_none());
 	}
 }

@@ -81,9 +81,10 @@ impl Selection {
 				Self::Multiple(start, old_end.saturating_sub(1))
 			}
 
-			Direction::Down => {
-				Self::Multiple(start, cmp::min(old_end + 1, max))
-			}
+			Direction::Down => Self::Multiple(
+				start,
+				cmp::min(old_end.saturating_add(1), max),
+			),
 		};
 	}
 
@@ -262,6 +263,10 @@ impl DiffComponent {
 		}
 	}
 
+	pub const fn is_empty(&self) -> bool {
+		!self.pending && self.diff.is_none()
+	}
+
 	fn lines_count(&self) -> usize {
 		self.diff.as_ref().map_or(0, |diff| diff.lines)
 	}
@@ -273,7 +278,8 @@ impl DiffComponent {
 
 	fn modify_selection(&mut self, direction: Direction) {
 		if self.diff.is_some() {
-			self.selection.modify(direction, self.lines_count());
+			let max = self.lines_count().saturating_sub(1);
+			self.selection.modify(direction, max);
 		}
 	}
 
@@ -560,12 +566,12 @@ impl DiffComponent {
 	}
 
 	fn reset_lines(&self) {
-		self.queue.push(InternalEvent::ConfirmAction(
-			Action::ResetLines(
-				self.current.path.clone(),
-				self.selected_lines(),
-			),
-		));
+		let lines = self.selected_lines();
+		if !lines.is_empty() {
+			self.queue.push(InternalEvent::ConfirmAction(
+				Action::ResetLines(self.current.path.clone(), lines),
+			));
+		}
 	}
 
 	fn stage_lines(&self) {
@@ -1057,6 +1063,95 @@ mod tests {
 			event,
 			Some(InternalEvent::OpenExternalEditor(Some(path)))
 				if path == "src/main.rs"
+		));
+	}
+
+	fn sample_diff() -> FileDiff {
+		let lines = vec![
+			DiffLine {
+				content: "@@ -1,2 +1,2 @@".into(),
+				line_type: DiffLineType::Header,
+				position: DiffLinePosition::default(),
+			},
+			DiffLine {
+				content: "context".into(),
+				line_type: DiffLineType::None,
+				position: DiffLinePosition {
+					old_lineno: Some(1),
+					new_lineno: Some(1),
+				},
+			},
+			DiffLine {
+				content: "added".into(),
+				line_type: DiffLineType::Add,
+				position: DiffLinePosition {
+					old_lineno: None,
+					new_lineno: Some(2),
+				},
+			},
+		];
+		FileDiff {
+			lines: lines.len(),
+			hunks: vec![asyncgit::sync::diff::Hunk {
+				header_hash: 1,
+				lines,
+			}],
+			untracked: false,
+			sizes: (0, 0),
+			size_delta: 0,
+		}
+	}
+
+	#[test]
+	fn t7j_selection_stops_at_last_line() {
+		let env = Environment::test_env();
+		let mut diff = DiffComponent::new(&env, false);
+		diff.focus(true);
+		diff.update(String::from("sample.txt"), false, sample_diff());
+
+		let key = env.key_config.keys.shift_down;
+		let ev = Event::Key(KeyEvent::new(key.code, key.modifiers));
+
+		for _ in 0..5 {
+			assert!(matches!(
+				diff.event(&ev).unwrap(),
+				EventState::Consumed
+			));
+		}
+
+		assert_eq!(diff.selection.get_end(), 2);
+		assert_eq!(diff.selection.get_bottom(), 2);
+	}
+
+	#[test]
+	fn t7j_empty_discard_no_prompt() {
+		let env = Environment::test_env();
+		let mut diff = DiffComponent::new(&env, false);
+		diff.focus(true);
+		diff.update(String::from("sample.txt"), false, sample_diff());
+
+		let key = env.key_config.keys.diff_reset_lines;
+		let ev = Event::Key(KeyEvent::new(key.code, key.modifiers));
+
+		// Line 0 is a Header line (neither Add nor Delete).
+		assert!(matches!(
+			diff.event(&ev).unwrap(),
+			EventState::Consumed
+		));
+		assert!(env.queue.pop().is_none());
+
+		// Moving to line 2 (an Add line) should open the confirm prompt.
+		diff.update_selection(2);
+		assert!(matches!(
+			diff.event(&ev).unwrap(),
+			EventState::Consumed
+		));
+		assert!(matches!(
+			env.queue.pop(),
+			Some(InternalEvent::ConfirmAction(Action::ResetLines(
+				ref path,
+				ref lines
+			))) if path == "sample.txt" && lines.len() == 1
 		));
 	}
 }
