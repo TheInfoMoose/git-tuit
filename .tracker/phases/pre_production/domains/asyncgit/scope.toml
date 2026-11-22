@@ -135,6 +135,34 @@ status = "pending"
 severity = "high"
 created_at = "2026-11-22T05:32:55Z"
 
+[[items.bugs]]
+id = "BUG-0077"
+title = "Keep untracked files with a staged deletion on discard-and-switch"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0078"
+title = "Clear staged changes and merge state on discard-and-switch"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0082"
+title = "Read core.commentChar=auto as git does"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0086"
+title = "Clear the log and its marks when HEAD becomes unborn"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T17:27:22Z"
+
 [[items.features]]
 id = "FEAT-0001"
 title = "Add trusted global-only git config reader"
@@ -242,8 +270,8 @@ created_at = "2026-11-21T14:57:39Z"
 
 [[items.tasks]]
 id = "TASK-0092"
-title = "Abort Keeps What the Merge Didn't Touch"
-status = "pending"
+title = "Deferred twice; re-split as STEP 9A (BUG-0070)"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
@@ -253,3 +281,17 @@ title = "A Failed Switch Discards Nothing"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0108"
+title = "Abort Undoes Only the Merge (re-split 8A)"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T21:59:21Z"
+
+[[items.tasks]]
+id = "TASK-0109"
+title = "Discard-and-Switch Checks First, Leaves a Clean Target"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T21:59:21Z"

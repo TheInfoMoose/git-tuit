@@ -549,6 +549,48 @@ status = "pending"
 severity = "medium"
 created_at = "2026-11-22T05:55:58Z"
 
+[[items.bugs]]
+id = "BUG-0079"
+title = "Take push credentials from the remote being pushed to"
+status = "pending"
+severity = "critical"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0080"
+title = "Refuse force-push when the branch moved during confirmation"
+status = "pending"
+severity = "high"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0081"
+title = "Consume the commit key while commit is blocked"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0083"
+title = "Fix the hard-reset confirmation failure path and subject"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0084"
+title = "Reject tag names starting with a dash and HEAD inline"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T17:27:22Z"
+
+[[items.bugs]]
+id = "BUG-0085"
+title = "Show Left as close only where it closes"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T17:27:22Z"
+
 [[items.features]]
 id = "FEAT-0002"
 title = "Ship amber-on-black CRT default theme"
@@ -1111,8 +1153,8 @@ created_at = "2026-11-22T05:34:48Z"
 
 [[items.tasks]]
 id = "TASK-0100"
-title = "Stash Message, Go to Line and Submodule Status"
-status = "pending"
+title = "Deferred; stays pending as TASK-0100"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
@@ -1164,3 +1206,17 @@ title = "Files View Follows Its Revision"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0110"
+title = "Push Credentials Come From the Target Remote"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T21:59:21Z"
+
+[[items.tasks]]
+id = "TASK-0111"
+title = "Force-Push Refuses a Moved Branch"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T21:59:21Z"

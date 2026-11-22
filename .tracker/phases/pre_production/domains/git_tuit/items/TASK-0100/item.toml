@@ -3,12 +3,12 @@ schema_version = 2
 [item]
 id = "TASK-0100"
 type = "task"
-title = "Stash Message, Go to Line and Submodule Status"
-status = "pending"
+title = "Deferred; stays pending as TASK-0100"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T14:20:33Z"
+updated_at = "2026-11-22T21:59:21Z"
 source_ref = "STEP 8I"
 
 [effort]
@@ -18,4 +18,8 @@ last_timer_session = "TASK-0100@2026-11-22T07:22:17Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "05d6ba9"
+summary = "Completed per plan roadmap"

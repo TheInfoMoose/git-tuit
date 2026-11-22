@@ -1,0 +1,17 @@
+[item]
+id = "BUG-0082"
+type = "bug"
+title = "Read core.commentChar=auto as git does"
+status = "pending"
+severity = "medium"
+scope_ref = "asyncgit"
+created_at = "2026-11-22T17:27:22Z"
+updated_at = "2026-11-22T17:27:22Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []

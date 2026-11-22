@@ -1,67 +1,19 @@
 # Written by phased-step.sh new-phase from the plan's Up Next table.
 # Regenerated every phase; edits here are lost.
-phase = "8"
+phase = "9"
 
 [[queue]]
-step = "8A"
-item = "TASK-0092"
+step = "9A"
+item = "TASK-0108"
 
 [[queue]]
-step = "8B"
-item = "TASK-0093"
+step = "9B"
+item = "TASK-0109"
 
 [[queue]]
-step = "8C"
-item = "TASK-0094"
+step = "9C"
+item = "TASK-0110"
 
 [[queue]]
-step = "8D"
-item = "TASK-0095"
-
-[[queue]]
-step = "8E"
-item = "TASK-0096"
-
-[[queue]]
-step = "8F"
-item = "TASK-0097"
-
-[[queue]]
-step = "8G"
-item = "TASK-0098"
-
-[[queue]]
-step = "8H"
-item = "TASK-0099"
-
-[[queue]]
-step = "8I"
-item = "TASK-0100"
-
-[[queue]]
-step = "8J"
-item = "TASK-0101"
-
-[[queue]]
-step = "8K"
-item = "TASK-0102"
-
-[[queue]]
-step = "8L"
-item = "TASK-0103"
-
-[[queue]]
-step = "8M"
-item = "TASK-0104"
-
-[[queue]]
-step = "8N"
-item = "TASK-0105"
-
-[[queue]]
-step = "8O"
-item = "TASK-0106"
-
-[[queue]]
-step = "8P"
-item = "TASK-0107"
+step = "9D"
+item = "TASK-0111"

@@ -37,14 +37,19 @@
 **How to read this:** work goes strictly top to bottom through **Up Next**, one step at a time. The **#** column is the only order. Step IDs are kept because commits and notes cite them. A step whose "Waits on" names an Open Question or a **[USER]** action doesn't start until that's resolved.
 
 **Who runs what (phased workflow, through Orrery `gemini-phased`):**
-- **Claude** writes the phase (full step blocks) and reviews it once at the end. It never builds or tests code here.
+- **Claude** writes the phase as contract steps (behavior, interfaces and test outcomes, not code) in a planning session, and reviews it in a separate fresh review session at the end. Stopped phases are fixed in their own issue session. It never builds or tests code here.
 - **Gemini Hydrogen** (`agy-hydrogen-orch`, stage 0) routes the step; **Gemini Neon** (`agy-neon-impl`, stage 1) executes it; **Hydrogen** (`agy-hydrogen-val`, stage 2) reads the diff. Orrery's `phased:step_start` hook runs PRE_GATE, `neb start` and the snapshot; the `phased:step_check` gate runs `scripts/phased-step.sh check`; `phased:step_commit` commits on pass; `phased:step_defer` saves the attempt and restores the tree on deferral. Nothing failing is committed.
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 8):** no abort, switch or single keypress loses work or rewrites history unasked; input popups validate and keep what you typed; hints match keys; details, lists and the file view stay correct on small terminals and across revisions.
+**Phase goal (Phase 9):** aborting a merge or revert and discarding to switch branches never lose untracked files or unrelated edits and leave no stale merge state; a push only ever offers the credentials of the remote it goes to; a force-push refuses when the branch moved under its prompt.
 
-**Phase 8 format:** outcome steps v2, planned with the TASK-0091 trial rule (writers and states). The review counts spec gaps.
+**Phase 9 format:** outcome steps v2 with the TASK-0091 rule (writers and states), plus a Tests list per step. Re-splits the Phase 8 review findings BUG-0070, BUG-0071, BUG-0077, BUG-0078, BUG-0079, BUG-0080. STEP 8A (deferred) is re-split as 9A; STEP 8I (deferred) stays pending as TASK-0100. The amber theme moves to Phase 10.
+
+**Phase 9 decision (user, 2026-11-22):**
+- **D15 Discard-and-switch in progress:** a pending merge, revert or cherry-pick is cleared as part of the discard. A rebase or `git am` in progress refuses, changing nothing.
+
+_Phase 8 goal (ran 2026-11-22; 8A and 8I deferred):_ no abort, switch or single keypress loses work or rewrites history unasked; input popups validate and keep what you typed; hints match keys; details, lists and the file view stay correct on small terminals and across revisions.
 
 **Phase 8 decisions (user, 2026-11-21):**
 - **D1 Abort:** merge and revert aborts match `git reset --merge`: untracked files and unrelated unstaged edits survive; refuse, changing nothing, if an edit can't be kept.
@@ -84,22 +89,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 8A** | `/boost` | Abort Keeps What the Merge Didn't Touch | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/reset.rs`, `src/strings.rs` | — |
-| 2 | **STEP 8B** | `/boost` | A Failed Switch Discards Nothing | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/status.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
-| 3 | **STEP 8C** | `/boost` | Confirm Revert and Detached Checkout | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs` +5 | — |
-| 4 | **STEP 8D** | `/boost` | Confirm Merge, Rebase and Submodule Update | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/branchlist.rs` +3 | STEP 8C |
-| 5 | **STEP 8E** | `/boost` | Confirm Hard Reset, Discard and Undo | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/reset.rs` +4 | STEP 8B, STEP 8C |
-| 6 | **STEP 8F** | `/boost` | Pushes and Prompts Name Their Targets | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/push.rs` +6 | STEP 8C |
-| 7 | **STEP 8G** | `/boost` | Branch and Tag Input Is Validated | `src/popups/create_branch.rs`, `src/popups/rename_branch.rs`, `src/popups/tag_commit.rs`, `src/components/textinput.rs`, `src/strings.rs` +2 | — |
-| 8 | **STEP 8H** | `/boost` | Remote Input Is Validated | `src/popups/create_remote.rs`, `src/popups/rename_remote.rs`, `src/popups/update_remote_url.rs`, `src/strings.rs`, `asyncgit/src/sync/remotes/mod.rs` | — |
-| 9 | **STEP 8I** | `/goal` | Stash Message, Go to Line and Submodule Status | `src/app.rs`, `src/popups/stashmsg.rs`, `src/popups/goto_line.rs`, `src/popups/submodules.rs`, `src/strings.rs` | — |
-| 10 | **STEP 8J** | `/boost` | Commit Popup Follows git | `src/app.rs`, `src/popups/commit.rs`, `src/strings.rs` | — |
-| 11 | **STEP 8K** | `/boost` | Popup Hints Match Their Keys | `src/app.rs`, `src/gitui.rs`, `src/strings.rs`, `src/components/mod.rs`, `src/popups/*` | — |
-| 12 | **STEP 8L** | `/boost` | List and Diff Hints Match Their Keys | `src/strings.rs`, `src/components/diff.rs`, `src/popups/branchlist.rs`, `src/popups/remotelist.rs`, `src/popups/inspect_commit.rs` +4 | — |
-| 13 | **STEP 8M** | `/boost` | Commit Details Fit Small Terminals | `src/components/commit_details/*` | — |
-| 14 | **STEP 8N** | `/goal` | Scrolling Survives Resize | `src/components/utils/scroll_vertical.rs`, `src/components/utils/scroll_horizontal.rs`, `src/components/syntax_text.rs`, `src/components/commit_details/details.rs`, `src/ui/stateful_paragraph.rs` +1 | — |
-| 15 | **STEP 8O** | `/boost` | Marks and Column Widths | `src/components/commitlist.rs`, `src/components/utils/mod.rs`, `src/tabs/revlog.rs`, `src/tabs/stashlist.rs` | — |
-| 16 | **STEP 8P** | `/boost` | Files View Follows Its Revision | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/popup_stack.rs`, `src/strings.rs` +5 | — |
+| 1 | **STEP 9A** | `/boost` | Abort Undoes Only the Merge (re-split 8A) | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/mod.rs`, `src/strings.rs` | — |
+| 2 | **STEP 9B** | `/boost` | Discard-and-Switch Checks First, Leaves a Clean Target | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
+| 3 | **STEP 9C** | `/boost` | Push Credentials Come From the Target Remote | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/push.rs`, `src/popups/push_tags.rs`, `src/app.rs` | — |
+| 4 | **STEP 9D** | `/goal` | Force-Push Refuses a Moved Branch | `src/popups/confirm.rs`, `src/app.rs` | — |
 
 ### Completed
 
@@ -177,6 +170,22 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 7L | ✅ 188e3826 | `/goal` | Failures and Confirmations Tell the Truth | `src/components/revision_files.rs`, `src/popups/*`, `src/strings.rs` |
 | STEP 7M | ✅ d5fd91ec | `/goal` | Selections Survive a Refresh | `src/components/utils/*`, `src/components/commitlist.rs` |
 | STEP 7N | ✅ 961636ad | `/boost` | Phase 7 Review Fixes | `src/components/*`, `src/tabs/*`, `src/popups/taglist.rs`, `src/strings.rs` |
+| STEP 8A | ↪ withdrawn | `/boost` | Deferred twice; re-split as STEP 9A (BUG-0070) | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/reset.rs`, `src/strings.rs` |
+| **STEP 8B** | ✅ 72eea2cc | `/boost` | A Failed Switch Discards Nothing (follow-ups in 9B) | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/status.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 8C** | ✅ | `/boost` | Confirm Revert and Detached Checkout | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs` +5 |
+| **STEP 8D** | ✅ | `/boost` | Confirm Merge, Rebase and Submodule Update | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/branchlist.rs` +3 |
+| **STEP 8E** | ✅ | `/boost` | Confirm Hard Reset, Discard and Undo | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/reset.rs` +4 |
+| **STEP 8F** | ✅ 0d5c04ae | `/boost` | Pushes and Prompts Name Their Targets (follow-ups in 9C, 9D) | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/push.rs` +6 |
+| **STEP 8G** | ✅ | `/boost` | Branch and Tag Input Is Validated | `src/popups/create_branch.rs`, `src/popups/rename_branch.rs`, `src/popups/tag_commit.rs`, `src/components/textinput.rs`, `src/strings.rs` +2 |
+| **STEP 8H** | ✅ | `/boost` | Remote Input Is Validated | `src/popups/create_remote.rs`, `src/popups/rename_remote.rs`, `src/popups/update_remote_url.rs`, `src/strings.rs`, `asyncgit/src/sync/remotes/mod.rs` |
+| STEP 8I | ↪ withdrawn | `/goal` | Deferred; stays pending as TASK-0100 | `src/app.rs`, `src/popups/stashmsg.rs`, `src/popups/goto_line.rs`, `src/popups/submodules.rs`, `src/strings.rs` |
+| **STEP 8J** | ✅ | `/boost` | Commit Popup Follows git | `src/app.rs`, `src/popups/commit.rs`, `src/strings.rs` |
+| **STEP 8K** | ✅ | `/boost` | Popup Hints Match Their Keys | `src/app.rs`, `src/gitui.rs`, `src/strings.rs`, `src/components/mod.rs`, `src/popups/*` |
+| **STEP 8L** | ✅ | `/boost` | List and Diff Hints Match Their Keys | `src/strings.rs`, `src/components/diff.rs`, `src/popups/branchlist.rs`, `src/popups/remotelist.rs`, `src/popups/inspect_commit.rs` +4 |
+| **STEP 8M** | ✅ | `/boost` | Commit Details Fit Small Terminals | `src/components/commit_details/*` |
+| **STEP 8N** | ✅ | `/goal` | Scrolling Survives Resize | `src/components/utils/scroll_vertical.rs`, `src/components/utils/scroll_horizontal.rs`, `src/components/syntax_text.rs`, `src/components/commit_details/details.rs`, `src/ui/stateful_paragraph.rs` +1 |
+| **STEP 8O** | ✅ c12a21bb | `/boost` | Marks and Column Widths | `src/components/commitlist.rs`, `src/components/utils/mod.rs`, `src/tabs/revlog.rs`, `src/tabs/stashlist.rs` |
+| **STEP 8P** | ✅ 25cc85c7 | `/boost` | Files View Follows Its Revision | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/popup_stack.rs`, `src/strings.rs` +5 |
 
 ### User Step: IMAGE
 
@@ -210,7 +219,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 9 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
+- **Phase 10 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
   - Shared plain-border block helpers (P3-03)
@@ -4844,6 +4853,327 @@ Must still work:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8p_ 2>&1 | grep -cE 't8p_.* ok$')" -ge 18
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+## Phase 9: Data-Loss and Push Fixes
+
+### STEP 9A: Abort Undoes Only the Merge
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 9A: aborting a merge or revert works like `git reset --merge`: untracked files and unrelated unstaged edits survive, and an edit that can't be kept refuses the abort.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/merge.rs
+  - asyncgit/src/sync/mod.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/merge.rs:35-50 (abort_pending_state)
+  - asyncgit/src/sync/reset.rs:6-39 (reset_stage, reset_workdir)
+  - src/tabs/status.rs:711-729 (can_abort_merge, revert_pending_state)
+  - src/popups/confirm.rs:521-532 (abort prompts)
+  - neb: BUG-0070 (incl. the Phase 8 review note on the deferred 8A attempt). Decision D1
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. `reset_workdir` and `reset_stage` keep their behavior (file discard in Status uses them). Abort rebase does not change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: after Abort merge or Abort revert, untracked files and unrelated unstaged edits are still there, the merge's changes are gone, and an edit that can't be kept refuses the abort with nothing changed.
+
+Contract & Behavior:
+Writers of the state this changes: the merge or revert (index entries, conflict stages, worktree files, MERGE_HEAD/REVERT_HEAD/MERGE_MSG), the user's edits before the abort, untracked and ignored files. `abort_pending_state(repo_path: &RepoPath) -> Result<()>` keeps its name and signature; both merge and revert abort call it.
+
+1. Refusal checks come before any write. If one fails, nothing changes (index, worktree, MERGE_HEAD) and the error names the paths.
+   Edge cases:
+   a. A path whose index entry differs from HEAD (not a conflict) and whose worktree copy differs from that index entry: refuse. Error text: `cannot abort: local changes to {paths} would be lost`.
+      Proof: test `t9a_edited_merge_file_refuses`.
+   b. A type change between index and worktree on such a path (file vs directory, either way) is judged by content, not by "lstat found something": a path the merge turned into a directory, or a directory into a file, with no further user edit, is NOT an edit and does not refuse.
+      Proof: tests `t9a_file_became_dir`, `t9a_dir_became_file`.
+2. After the checks pass, every path whose index differs from HEAD goes back to HEAD, in index and worktree.
+   Edge cases:
+   a. A file the merge added, changed or deleted cleanly: removed, restored, or recreated to HEAD content.
+      Proof: test `t9a_merge_changes_undone`.
+   b. A conflicted path (stages 1-3): back to HEAD whatever the worktree holds (conflict markers or a partial resolution), as git does. Add/add conflict (no HEAD entry): file removed.
+      Proof: test `t9a_conflict_restored`.
+   c. File→directory and directory→file changes from the merge: the HEAD shape comes back, no leftover directory or file.
+      Proof: tests `t9a_file_became_dir`, `t9a_dir_became_file`.
+3. Everything else in the worktree is left alone.
+   Edge cases:
+   a. An untracked file (not in index, not in HEAD): survives with its content.
+      Proof: test `t9a_untracked_survives`.
+   b. An unstaged edit to a path whose index entry equals HEAD: survives.
+      Proof: test `t9a_unrelated_edit_survives`.
+   c. Ignored files: untouched.
+      Proof: validator's trace.
+4. Write order: worktree first, then the index, then the repo state is cleaned (MERGE_HEAD etc.). A failure while writing returns the error and leaves MERGE_HEAD in place so the Status tab still shows the merge. A second abort after such a failure may refuse on paths already restored; that is accepted (git behaves the same).
+   Proof: validator's trace.
+5. Revert abort behaves the same as merge abort.
+   Proof: test `t9a_revert_abort_keeps_untracked` (revert that conflicts, untracked file present, abort → file kept, REVERT_HEAD gone).
+6. The abort prompt tells the truth. `confirm_msg_revertchanges()` returns exactly: `Files it changed go back to HEAD. Untracked files and unrelated edits are kept. Are you sure?`
+   Proof: POST_GATE grep.
+
+Must still work:
+- Abort is offered only in Merge and Revert state (`can_abort_merge`, `pending_revert`).
+- `reset_workdir` / `reset_stage` callers in `src/tabs/status.rs` and `src/components/changes.rs`, and the existing `reset.rs` tests.
+- `test_smoke` in merge.rs; abort rebase (`abort_pending_rebase`) and its prompt text.
+
+Drops: none
+
+Tests:
+  In asyncgit/src/sync/merge.rs `mod tests`, real repos via `repo_init` / `write_commit_file`, entry point `abort_pending_state`.
+  - `t9a_untracked_survives`: conflicting merge + untracked `notes.txt` -> after abort `notes.txt` exists with its content; MERGE_HEAD gone.
+  - `t9a_unrelated_edit_survives`: unstaged edit to `other.txt` (not touched by the merge) + conflicting merge -> edit kept after abort.
+  - `t9a_conflict_restored`: conflicted `test.txt` -> HEAD content, no conflict entries, index equals HEAD tree.
+  - `t9a_merge_changes_undone`: merge (with one conflict, so it stops) that also adds `new.txt`, changes `b.txt`, deletes `c.txt` -> `new.txt` gone, `b.txt` and `c.txt` at HEAD content.
+  - `t9a_edited_merge_file_refuses`: after the merge stops, edit the cleanly merged `b.txt` in the worktree -> Err naming `b.txt`; index, worktree and MERGE_HEAD unchanged.
+  - `t9a_file_became_dir`: HEAD has file `a`, merged side has `a/x.txt` -> abort succeeds, `a` is the HEAD file.
+  - `t9a_dir_became_file`: HEAD has `d/x.txt`, merged side has file `d` -> abort succeeds, `d/x.txt` back.
+  - `t9a_revert_abort_keeps_untracked`: see item 5.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t9a_ 2>&1 | grep -cE 't9a_.* ok$')" -ge 8 && grep -qF 'Untracked files and unrelated edits are kept.' src/strings.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 9B: Discard-and-Switch Checks First, Leaves a Clean Target
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 9B: discard-and-switch refuses before touching anything when it can't finish, never deletes an un-indexed file, and leaves the index equal to the target with no pending merge state.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+  - asyncgit/src/sync/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:440-658 (untracked_path_collides_with_tree, find_untracked_collisions, DiscardTarget, resolve_discard_target, apply_discard_target_head, checkout_branch_discard)
+  - src/popups/checkout_option.rs:103-166 (handle_event, confirm_discard, open_discard_confirm), 464-700 (t8b tests)
+  - neb: BUG-0071, BUG-0077, BUG-0078. Decisions D3, D15
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. "Keep local changes" checkout (`checkout_branch`, `checkout_remote_branch`) does not change. The confirmation and its stale guard (8E) do not change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a discard-and-switch either completes (target checked out, index equal to the target, no pending merge) or refuses with everything as it was; it never deletes or overwrites a file that isn't in the index.
+
+Contract & Behavior:
+Writers of the state this changes: worktree files, index, HEAD, the new local branch and its upstream config (remote targets), repo state files (MERGE_HEAD, REVERT_HEAD, CHERRY_PICK_HEAD, MERGE_MSG, rebase dirs). `checkout_branch_discard(repo_path: &RepoPath, branch: &BranchInfo) -> Result<()>` keeps its name and signature.
+
+1. Every check that can refuse runs before the worktree or index is touched. On refusal: worktree, index, HEAD, branches, config and repo state are unchanged.
+   Edge cases:
+   a. A rebase or `git am` is in progress (any `Rebase*` or `ApplyMailbox*` repo state): refuse with `a rebase is in progress: abort it first`.
+      Proof: test `t9b_rebase_refuses`.
+   b. The target local branch is checked out in a linked worktree: refuse with `branch '{name}' is checked out at {worktree path}`.
+      Proof: test `t9b_linked_worktree_refuses`.
+   c. Remote target whose upstream can't be set (no fetch refspec of the remote maps that remote branch): refuse with the git error; no local branch is left behind.
+      Proof: test `t9b_upstream_failure_refuses`.
+   d. Remote target: the new local branch and its upstream are created as part of the checks, before the discard. If any later step fails, that branch is deleted again.
+      Proof: validator's trace.
+   e. Existing refusals stay: unborn HEAD, missing target, local name taken, untracked collision (8B).
+      Proof: existing t8b tests.
+2. A worktree file that is not in the index is never overwritten or deleted. It counts as a collision (refuse, message `untracked working tree file would be overwritten by checkout: {paths}`, as today) when the target tree has that path or a file at one of its parent dirs, OR when HEAD has the path (the forced checkout would rewrite or remove it). This includes files staged as deleted (`git rm --cached`).
+   Edge cases:
+   a. Staged-deleted file, edited, target also has the path: refuse.
+      Proof: test `t9b_index_deleted_overwrite_refuses`.
+   b. Staged-deleted file, edited, target lacks the path: refuse.
+      Proof: test `t9b_index_deleted_remove_refuses`.
+   c. Plain untracked file in neither HEAD nor target: survives the switch.
+      Proof: existing `t8b_untracked_bystander_survives`.
+   d. Ignored files: overwritten as today (`overwrite_ignored`), same as `git checkout -f`.
+      Proof: validator's trace.
+3. After a successful switch the index equals the target tree exactly.
+   Edge cases:
+   a. A staged edit whose worktree copy equals HEAD: not staged on the target.
+      Proof: test `t9b_index_matches_target`.
+   b. A staged new file deleted from disk: gone from the index.
+      Proof: test `t9b_index_matches_target`.
+4. Pending merge, revert or cherry-pick state is cleared after a successful switch (D15). The next commit on the target is a normal commit.
+   Edge cases:
+   a. Conflicting merge in progress, discard-and-switch: MERGE_HEAD and MERGE_MSG gone, repo state Clean, index has no conflict entries.
+      Proof: test `t9b_merge_state_cleared`.
+   b. A bisect in progress: the switch proceeds and the bisect state is kept (git checkout during bisect is normal).
+      Proof: validator's trace.
+
+Must still work:
+- All five `t8b_` tests in src/popups/checkout_option.rs, unchanged.
+- Both callers in checkout_option.rs (`handle_event`, `confirm_discard`) show the error and keep the popup state they have today on Err.
+- The 8E confirmation and its stale guard; the branch list refresh after a switch.
+
+Drops: none
+
+Tests:
+  In src/popups/checkout_option.rs `mod tests`, real repos, entry point `checkout_branch_discard` as the t8b tests call it.
+  - `t9b_rebase_refuses`: a rebase stopped on a conflict + a tracked edit -> Err containing `a rebase is in progress`; edit, HEAD and rebase state unchanged.
+  - `t9b_linked_worktree_refuses`: branch `feature` checked out in a linked worktree, tracked edit in the main tree -> Err naming `feature`; edit kept, HEAD unchanged.
+  - `t9b_upstream_failure_refuses`: `refs/remotes/origin/topic` exists, `remote.origin.fetch` only maps `main`, tracked edit present -> Err; edit kept, no local `topic` branch, HEAD unchanged.
+  - `t9b_index_deleted_overwrite_refuses`: `git rm --cached notes.txt`, edit it, target tracks `notes.txt` -> Err naming `notes.txt`; file content unchanged.
+  - `t9b_index_deleted_remove_refuses`: same, target lacks `notes.txt` -> Err naming `notes.txt`; file still on disk.
+  - `t9b_index_matches_target`: staged edit reverted on disk + staged new file deleted from disk -> after switch, status on the target is empty.
+  - `t9b_merge_state_cleared`: conflicting merge in progress -> after switch, repo state Clean and no MERGE_HEAD.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t9b_ 2>&1 | grep -cE 't9b_.* ok$')" -ge 7 && test "$(cargo test --workspace --locked t8b_ 2>&1 | grep -cE 't8b_.* ok$')" -ge 5
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 9C: Push Credentials Come From the Target Remote
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 9C: every push (branch, remote-branch delete, remote-tag delete, push tags) decides whether it needs credentials, and which, from the push URL of the remote it actually goes to.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/cred.rs
+  - asyncgit/src/sync/mod.rs
+  - src/popups/push.rs
+  - src/popups/push_tags.rs
+  - src/app.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/cred.rs:70-231 (need_username_password*, extract_username_password*, ensure_no_control_chars)
+  - src/popups/push.rs:92-240 (resolve_branch_remote, push, push_with_remote, delete_remote_*, start_push, push_to_remote)
+  - src/popups/push_tags.rs:66-129 (push_tags, push_to_remote)
+  - src/components/cred.rs:53-60 (set_cred, get_cred)
+  - neb: BUG-0079
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Which remote a push goes to does not change (override, then branch remote, then default push remote). Fetch, pull and the tag list's remote-tag lookup keep their credential sources. src/app.rs: tests only.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a push never offers one remote's stored or URL credentials to another remote's host.
+
+Contract & Behavior:
+Writers of the push remote: `push_with_remote` / `delete_remote_branch` / `delete_remote_tag` (override), the branch's upstream remote, `remote.pushDefault`, the default remote, and `push_tags(remote)`. The credentials depend on all of them and must follow.
+
+1. asyncgit/src/sync/cred.rs adds, re-exported from `sync`:
+   - `pub fn need_username_password_for_push_remote(repo_path: &RepoPath, remote: &str) -> Result<bool>`
+   - `pub fn extract_username_password_for_push_remote(repo_path: &RepoPath, remote: &str) -> Result<BasicAuthCredential>`
+   Both use that remote's pushurl, falling back to its url. The URL control-character check (4A) applies. Unknown remote: Err. The existing functions keep their behavior.
+   Edge cases:
+   a. Named remote differs from the default and pushDefault: its own credentials.
+      Proof: test `t9c_cred_from_named_remote`.
+   b. Named remote has a pushurl: pushurl wins for both functions.
+      Proof: test `t9c_cred_prefers_pushurl`.
+   c. Named remote ssh while origin is https: no credentials needed.
+      Proof: test `t9c_need_cred_named_remote`.
+   d. Unknown remote name: Err.
+      Proof: test `t9c_unknown_remote_errs`.
+2. PushPopup resolves the target remote once, in `start_push`, before the credential check, and uses that same remote for the credential check, the credential lookup, the pre-push hook and the push, including after the credential prompt is submitted. A resolution failure shows the error, closes the popup and pushes nothing.
+   Edge cases:
+   a. Remote-tag delete to `fork` while the default remote is `origin`: fork's credentials.
+      Proof: test `t9c_tag_delete_fork_creds`.
+   b. Branch push whose upstream remote is `fork` while pushDefault is `origin`: fork's credentials.
+      Proof: test `t9c_branch_push_upstream_creds`.
+   c. Config changes between start and credential submit: the push still goes to the remote resolved at start.
+      Proof: validator's trace.
+3. PushTagsPopup takes credentials from the remote it pushes to (the `push_tags` argument; default remote only when none was given).
+   Proof: test `t9c_push_tags_named_remote`.
+
+Must still work:
+- Cancelling the credential prompt cancels the push (5H); complete credentials push without a prompt.
+- Delete the right remote branch (5B); all `t8f_` tests; the existing cred.rs tests.
+- Fetch and pull use their current credential functions.
+
+Drops: none
+
+Tests:
+  cred.rs tests are `#[serial]`, like the existing ones. Popup tests use a real repo with `origin` = a local bare-repo path and `fork` = `https://forkuser@fork.example.org/r.git`, and observe the credential prompt opening with username `forkuser`; no network is reached because the credential is incomplete.
+  - `t9c_cred_from_named_remote`: origin `https://originuser:originpass@git.example.com/r.git`, fork `https://forkuser:forkpass@fork.example.org/r.git`, pushDefault origin -> extract for `fork` = forkuser/forkpass.
+  - `t9c_cred_prefers_pushurl`: fork url `git@fork.example.org:r.git`, pushurl `https://pushuser@fork.example.org/r.git` -> need = true, extract username = pushuser.
+  - `t9c_need_cred_named_remote`: origin https, fork `git@fork.example.org:r.git` -> need for fork = false, for origin = true.
+  - `t9c_unknown_remote_errs`: `nosuch` -> both functions Err.
+  - `t9c_tag_delete_fork_creds`: `delete_remote_tag("fork", "v1")` -> credential prompt visible with username forkuser.
+  - `t9c_branch_push_upstream_creds`: `branch.master.remote = fork`, `remote.pushDefault = origin`, push master -> credential prompt visible with username forkuser.
+  - `t9c_push_tags_named_remote`: `push_tags("fork")` -> credential prompt visible with username forkuser.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t9c_ 2>&1 | grep -cE 't9c_.* ok$')" -ge 7 && grep -qE 'pub fn need_username_password_for_push_remote' asyncgit/src/sync/cred.rs && grep -qE 'pub fn extract_username_password_for_push_remote' asyncgit/src/sync/cred.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 9D: Force-Push Refuses a Moved Branch
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 9D: the force-push confirmation pins the branch tip when it opens and refuses on Enter if the branch moved or vanished.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/confirm.rs
+  - src/app.rs
+READ_ONLY_REFS:
+  - src/popups/confirm.rs:68-90 (PushRemoteKind, ConfirmGuard), 217-302 (open, confirm), 376-410 (verify_push_remote)
+  - src/app.rs:2896-2959 (t8f_changed_remote_refuses: harness pattern)
+  - neb: BUG-0080. Decision D2
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The remote check (8F) stays. Other guards (Repo, Branch, Submodule, push tags, remote-tag delete) do not change. src/app.rs: tests only.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a force-push confirmed after the branch moved pushes nothing and says the repo changed.
+
+Contract & Behavior:
+Writers of the branch tip while the prompt is open: other processes (commit, reset, branch -f, branch delete). Nothing inside gitui runs while the modal prompt is open.
+
+1. Opening the `ForcePush` confirmation records the local branch's tip commit alongside the remote. If the tip can't be read, the prompt doesn't open and the error is shown, like other guard failures today.
+   Proof: validator's trace.
+2. On Enter, the tip is read again. Different commit or branch gone: refuse with `confirm_err_repo_changed()`; nothing is pushed. Same commit and same remote: the push runs as today.
+   Edge cases:
+   a. A new commit lands on the branch while the prompt is open: refuse; the remote branch keeps its old tip.
+      Proof: test `t9d_moved_branch_refuses`.
+   b. Nothing changed: the force-push runs and the remote gets the local tip.
+      Proof: guard test `t9d_same_tip_pushes`.
+   c. The remote changed (8F): still refuses.
+      Proof: existing `t8f_changed_remote_refuses`.
+
+Must still work:
+- All `t8f_` tests and the force-push availability tests in src/tabs/status.rs.
+- The prompt text (8F) is unchanged.
+
+Drops: none
+
+Tests:
+  In src/app.rs tests, `make_test_app_with_rx` with `origin` = a local bare repo, master pushed with upstream, then one more local commit so force-push is offered.
+  - `t9d_moved_branch_refuses`: open force-push, commit again via git2, Enter -> confirm and push popups hidden, error popup visible, origin master unchanged after draining work.
+  - `t9d_same_tip_pushes`: open force-push, Enter -> after draining work, origin master equals the local tip.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t9d_ 2>&1 | grep -cE 't9d_.* ok$')" -ge 2
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
