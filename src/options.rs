@@ -59,7 +59,12 @@ impl Options {
 	}
 
 	pub const fn current_tab(&self) -> usize {
-		self.data.tab
+		// tabs 0..=4 exist; an older or hand-edited options file may hold more
+		if self.data.tab <= 4 {
+			self.data.tab
+		} else {
+			0
+		}
 	}
 
 	pub const fn diff_options(&self) -> DiffOptions {
@@ -167,5 +172,19 @@ impl Options {
 		let dir = repo_dir(&repo.borrow())?;
 		let dir = dir.join("gitui");
 		Ok(dir)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	#[test]
+	fn test_current_tab_out_of_range() {
+		let mut options = Options::test_env();
+		options.data.tab = 7;
+		assert_eq!(options.current_tab(), 0);
+		options.data.tab = 3;
+		assert_eq!(options.current_tab(), 3);
 	}
 }

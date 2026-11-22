@@ -144,7 +144,7 @@ impl StatusTreeComponent {
 			StatusItemType::New => '+',
 			StatusItemType::Deleted => '-',
 			StatusItemType::Renamed => 'R',
-			StatusItemType::Typechange => ' ',
+			StatusItemType::Typechange => 'T',
 			StatusItemType::Conflicted => '!',
 		}
 	}

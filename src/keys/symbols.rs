@@ -54,8 +54,11 @@ impl Default for KeySymbols {
 impl KeySymbols {
 	pub fn init(file: PathBuf) -> Self {
 		if file.exists() {
-			let file =
-				KeySymbolsFile::read_file(file).unwrap_or_default();
+			let file = KeySymbolsFile::read_file(file)
+				.unwrap_or_else(|e| {
+					log::error!("KeySymbols parse error: {e}");
+					KeySymbolsFile::default()
+				});
 			file.get_symbols()
 		} else {
 			Self::default()
