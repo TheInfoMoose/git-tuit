@@ -197,13 +197,19 @@ impl StatusTree {
 			return None;
 		}
 
-		let res = self.tree.items().binary_search_by(|e| {
-			e.info.full_path.as_str().cmp(last_selection)
-		});
-		match res {
-			Ok(i) => Some(i),
-			Err(i) => Some(cmp::min(i, self.tree.len() - 1)),
+		let items = self.tree.items();
+		if let Some(i) = items
+			.iter()
+			.position(|e| e.info.full_path == last_selection)
+		{
+			return Some(i);
 		}
+
+		let idx = items
+			.iter()
+			.position(|e| e.info.full_path.as_str() >= last_selection)
+			.unwrap_or_else(|| items.len().saturating_sub(1));
+		Some(idx)
 	}
 
 	fn selection_updown(
@@ -976,5 +982,38 @@ mod tests {
 
 		let down = res.selection_updown(1, false);
 		assert_eq!(down.new_index, 1);
+	}
+
+	#[test]
+	fn t7m_refresh_keeps_dash_path() {
+		let items = string_vec_to_status(&["a-b", "a/c"]);
+		let mut tree = StatusTree::default();
+		tree.update(&items).unwrap();
+		tree.selection = Some(0);
+		assert_eq!(
+			tree.selected_item().unwrap().info.full_path,
+			"a-b"
+		);
+
+		tree.update(&items).unwrap();
+		assert_eq!(
+			tree.selected_item().unwrap().info.full_path,
+			"a-b"
+		);
+
+		let reversed = string_vec_to_status(&["a/c", "a-b"]);
+		let mut tree_rev = StatusTree::default();
+		tree_rev.update(&reversed).unwrap();
+		tree_rev.selection = Some(2);
+		assert_eq!(
+			tree_rev.selected_item().unwrap().info.full_path,
+			"a-b"
+		);
+
+		tree_rev.update(&reversed).unwrap();
+		assert_eq!(
+			tree_rev.selected_item().unwrap().info.full_path,
+			"a-b"
+		);
 	}
 }

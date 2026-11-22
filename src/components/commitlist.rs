@@ -93,6 +93,8 @@ impl CommitList {
 	pub fn clear(&mut self) {
 		self.items.clear();
 		self.commits.clear();
+		self.clamp_selection();
+		self.set_highlighted_selection_index();
 	}
 
 	///
@@ -207,9 +209,13 @@ impl CommitList {
 
 	///
 	pub fn set_commits(&mut self, commits: IndexSet<CommitId>) {
-		if commits != self.commits {
+		if commits == self.commits {
+			self.clamp_selection();
+		} else {
 			self.items.clear();
 			self.commits = commits;
+			self.clamp_selection();
+			self.set_highlighted_selection_index();
 			self.fetch_commits(false);
 		}
 	}
@@ -218,6 +224,7 @@ impl CommitList {
 	pub fn refresh_extend_data(&mut self, commits: Vec<CommitId>) {
 		let new_commits = !commits.is_empty();
 		self.commits.extend(commits);
+		self.clamp_selection();
 
 		let selection = self.selection();
 		let selection_max = self.selection_max();
@@ -291,6 +298,10 @@ impl CommitList {
 
 	fn selection_max(&self) -> usize {
 		self.commits.len().saturating_sub(1)
+	}
+
+	fn clamp_selection(&mut self) {
+		self.selection = self.selection.min(self.selection_max());
 	}
 
 	fn selected_entry_marked(&self) -> bool {
@@ -728,10 +739,9 @@ impl CommitList {
 		self.items
 			.index_offset_raw()
 			.and_then(|index| {
-				self.items
-					.iter()
-					.next()
-					.map(|item| item.id == self.commits[index])
+				self.items.iter().next().map(|item| {
+					self.commits.get_index(index) == Some(&item.id)
+				})
 			})
 			.unwrap_or_default()
 	}
@@ -1083,5 +1093,37 @@ mod tests {
 				"0000000000000000000000000000000000000005"
 			)))
 		);
+	}
+
+	#[test]
+	fn t7m_commit_selection_clamps() {
+		let ids: Vec<CommitId> = (0..5)
+			.map(|idx| {
+				CommitId::from_str_unchecked(&format!("{idx:040}"))
+					.unwrap()
+			})
+			.collect();
+
+		let mut cl = CommitList::default();
+		cl.set_commits(ids.iter().copied().collect());
+		cl.select_commit(ids[4]).unwrap();
+		assert_eq!(cl.selection(), 4);
+
+		// Shrinking clamps selection to the last commit (index 1).
+		cl.set_commits(ids[..2].iter().copied().collect());
+		assert_eq!(cl.selection(), 1);
+
+		// Shrinking to empty list clamps safely to 0.
+		cl.set_commits(IndexSet::new());
+		assert_eq!(cl.selection(), 0);
+		assert!(cl.selected_entry().is_none());
+
+		// Clearing from a non-zero selection also resets safely.
+		cl.set_commits(ids[..3].iter().copied().collect());
+		cl.select_commit(ids[2]).unwrap();
+		assert_eq!(cl.selection(), 2);
+		cl.clear();
+		assert_eq!(cl.selection(), 0);
+		assert!(cl.selected_entry().is_none());
 	}
 }
