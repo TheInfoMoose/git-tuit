@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0096"
 type = "task"
 title = "Confirm Hard Reset, Discard and Undo"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T05:34:48Z"
+updated_at = "2026-11-22T06:45:23Z"
 source_ref = "STEP 8E"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 11
 iteration_count = 1
+last_timer_session = "TASK-0096@2026-11-22T06:33:24Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "0aa3b194"
+summary = "STEP 8E: Confirm Hard Reset, Discard and Undo (phased check PASS)"

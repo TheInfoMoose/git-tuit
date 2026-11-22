@@ -1084,7 +1084,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0096"
 title = "Confirm Hard Reset, Discard and Undo"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
