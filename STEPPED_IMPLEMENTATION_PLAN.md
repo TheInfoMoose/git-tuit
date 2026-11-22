@@ -46,6 +46,8 @@
 
 **Phase 7 pilot (7J–7M, approved 2026-11-21):** outcome steps. Each MUTATION_SPEC item is a required behavior and the coder chooses the implementation. The "Outcome steps" section of `.orrery/skills/repo-rules.md` overrides the exact-wording rules for these steps. 7B–7I are withdrawn.
 
+**Phase 7 pilot v2 (7N, approved 2026-11-21):** outcome steps also list edge cases and "Must still work". The validator traces the callers of changed functions.
+
 _Phase 6 goal (done, reviewed 2026-11-21):_ popups get keys in draw order and don't leak them; panes, searches, highlighting, blame and fetch never stay blank, stuck or silent; file tree and stash list keep working selections and toggles.
 
 _Phase 5 goal (done, reviewed 2026-11-21):_ no handler error exits the TUI, the audited panics are gone, and destructive actions hit the right target, start on the safe option and say what they delete.
@@ -62,6 +64,7 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
+| 1 | **STEP 7N** | `/boost` | Phase 7 review fixes: log selection, zero-line diff focus, quiet tag lookup | `src/components/*`, `src/tabs/*`, `src/popups/taglist.rs`, `src/strings.rs` | — |
 
 ### Completed
 
@@ -3586,6 +3589,74 @@ Outcome step: each item is a required behavior. The implementation is the coder'
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7m_ 2>&1 | grep -cE 't7m_.* ok$')" -ge 2
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 7N: Phase 7 Review Fixes
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 7N: the log selection survives a history reload, a loaded empty diff releases focus, and a failed remote-tag lookup doesn't interrupt the tag list.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/*
+  - src/tabs/*
+  - src/popups/taglist.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0064, BUG-0065, BUG-0066
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The log revert confirmation (TASK-0087) is not part of this step.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+1. When history reloads, the Log tab keeps the same commit selected, by ID.
+   Edge cases:
+   a. The newest commit was selected: select the new newest commit.
+      Proof: guard test `t7n_reload_newest_stays_newest`.
+   b. An older commit was selected, and commits were added above it or it arrives in a later batch: select that commit.
+      Proof: test `t7n_reload_follows_commit`.
+   c. The selected commit is gone (amend, reword, reset): when loading ends, select the old position, clamped to the list. An empty history is safe.
+      Proof: test `t7n_reload_missing_commit_clamps`.
+   d. Until the selection is restored, no action may receive a different commit: there is no selected commit.
+      Proof: test `t7n_reload_no_wrong_commit_while_loading`.
+   e. The user moves the selection, or a jump-to-commit runs, during loading: that choice wins over the restore.
+      Proof: guard test `t7n_reload_user_choice_wins`.
+2. Focus leaves the Status diff whenever it has finished loading with zero lines.
+   Edge cases:
+   a. Loaded with zero lines (empty file, mode-only change), or no file selected: focus returns to its file list.
+      Proof: test `t7n_zero_line_diff_returns_focus`.
+   b. Still loading, including a reload after a diff option change: focus stays.
+      Proof: existing `t7j_focus_leaves_only_loaded_empty_diff`, plus the validator's trace.
+3. A failed background remote-tag lookup never opens a popup.
+   Edge cases:
+   a. Offline, no credentials, or several remotes without origin: log the error and show in the tag list that remote status is unknown.
+      Proof: test `t7n_remote_tags_failure_is_inline`.
+   b. Failure after an earlier success: the old missing-on-remote markers are cleared. A later success clears the unknown notice.
+      Proof: test `t7n_remote_tags_state_resets`.
+   c. No remotes: no lookup and no notice.
+      Proof: validator's trace.
+
+Must still work:
+- The stash list clamps its selection when it shrinks (set_commits).
+- Marked commits, search highlighting and jump-to-commit in the Log tab.
+- Staging one of several hunks keeps focus in the diff.
+- Pushing and deleting tags still report their own errors.
+- The app snapshot tests, unchanged.
+
+Allowed test change: in `t7m_commit_selection_clamps`, only the final clear() block may be removed (it asserts the BUG-0064 regression).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7n_ 2>&1 | grep -cE 't7n_.* ok$')" -ge 8
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
