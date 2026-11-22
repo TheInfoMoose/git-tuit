@@ -205,10 +205,8 @@ pub fn confirm_msg_abortrebase() -> String {
 pub fn confirm_msg_reset(path: &str) -> String {
 	format!("discard changes to '{path}'?\nuntracked files are deleted permanently and can't be recovered.")
 }
-pub fn confirm_msg_reset_lines(lines: usize) -> String {
-	format!(
-		"are you sure you want to discard {lines} selected lines?"
-	)
+pub fn confirm_msg_reset_lines(path: &str, lines: usize) -> String {
+	format!("Discard {lines} selected lines in '{path}'?")
 }
 pub fn confirm_msg_undo_commit(
 	short_id: &str,
@@ -280,14 +278,27 @@ pub fn confirm_msg_stashdrop(
 			.join(", ")
 	)
 }
-pub fn confirm_msg_stashpop(_key_config: &SharedKeyConfig) -> String {
-	"The stash will be applied and removed from the stash list. Confirm stash pop?"
-        .to_string()
+pub fn confirm_msg_stashpop(
+	_key_config: &SharedKeyConfig,
+	short_id: &str,
+	message: &str,
+	max_name_width: usize,
+) -> String {
+	let target = if message.is_empty() {
+		short_id.to_string()
+	} else {
+		let message = ellipsis_trim_middle(message, max_name_width);
+		format!("{short_id} ({message})")
+	};
+	format!(
+		"Pop stash {target}?\nThe stash will be applied and removed from the stash list."
+	)
 }
 pub fn confirm_msg_resethunk(
 	_key_config: &SharedKeyConfig,
+	path: &str,
 ) -> String {
-	"confirm reset hunk?".to_string()
+	format!("Confirm discarding hunk in '{path}'?")
 }
 pub fn confirm_title_delete_branch(
 	_key_config: &SharedKeyConfig,
@@ -336,8 +347,19 @@ pub fn confirm_msg_delete_tag(
 pub fn confirm_title_delete_tag_remote() -> String {
 	"Delete Tag (remote)".to_string()
 }
-pub fn confirm_msg_delete_tag_remote(remote_name: &str) -> String {
-	format!("Confirm deleting tag on remote '{remote_name}'?")
+pub fn confirm_msg_delete_tag_remote(
+	tag_name: &str,
+	remote_name: &str,
+) -> String {
+	format!(
+		"Confirm deleting tag '{tag_name}' on remote '{remote_name}'?"
+	)
+}
+pub fn confirm_title_push_tags() -> String {
+	"Push Tags".to_string()
+}
+pub fn confirm_msg_push_tags(remote_name: &str) -> String {
+	format!("Confirm pushing tags to remote '{remote_name}'?")
 }
 pub fn confirm_title_force_push(
 	_key_config: &SharedKeyConfig,
@@ -347,10 +369,11 @@ pub fn confirm_title_force_push(
 pub fn confirm_msg_force_push(
 	_key_config: &SharedKeyConfig,
 	branch_ref: &str,
+	remote_name: &str,
 ) -> String {
 	format!(
-        "Confirm force push to branch '{branch_ref}' ?  This may rewrite history."
-    )
+		"Confirm force push branch '{branch_ref}' to remote '{remote_name}'? This may rewrite history."
+	)
 }
 pub fn confirm_title_revert_commit() -> String {
 	"Revert Commit".to_string()

@@ -65,6 +65,11 @@ fn wrapped_line_count(msg: &str, inner_width: usize) -> usize {
 	total.max(1)
 }
 
+enum PushRemoteKind {
+	DefaultRemote,
+	Branch(String),
+}
+
 enum ConfirmGuard {
 	Repo(RepoSnapshot),
 	Branch {
@@ -76,6 +81,10 @@ enum ConfirmGuard {
 	Submodule {
 		name: String,
 		snapshot: SubmoduleSnapshot,
+	},
+	PushRemote {
+		kind: PushRemoteKind,
+		remote: String,
 	},
 }
 
@@ -250,6 +259,19 @@ impl ConfirmPopup {
 					snapshot,
 				})
 			}
+			Action::PushTags(remote)
+			| Action::DeleteRemoteTag(_, remote) => {
+				Some(ConfirmGuard::PushRemote {
+					kind: PushRemoteKind::DefaultRemote,
+					remote: remote.clone(),
+				})
+			}
+			Action::ForcePush(branch, remote, _) => {
+				Some(ConfirmGuard::PushRemote {
+					kind: PushRemoteKind::Branch(branch.clone()),
+					remote: remote.clone(),
+				})
+			}
 			_ => None,
 		};
 		self.guard = guard;
@@ -339,7 +361,63 @@ impl ConfirmPopup {
 					false
 				}
 			},
+			ConfirmGuard::PushRemote {
+				kind,
+				remote: expected,
+			} => self.verify_push_remote(kind, expected),
 		}
+	}
+
+	fn verify_push_remote(
+		&self,
+		kind: &PushRemoteKind,
+		expected: &str,
+	) -> bool {
+		let repo = self.repo.borrow();
+		let resolved = match kind {
+			PushRemoteKind::DefaultRemote => {
+				sync::get_default_remote(&repo)
+			}
+			PushRemoteKind::Branch(branch) => {
+				crate::popups::PushPopup::resolve_branch_remote(
+					&repo, branch,
+				)
+			}
+		};
+		let still_matches = match resolved {
+			Ok(ref current) if current == expected => {
+				match sync::get_remotes(&repo) {
+					Ok(remotes) => {
+						remotes.iter().any(|r| r == expected)
+					}
+					Err(e) => {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!(
+								"failed to verify repository state:\n{e}"
+							),
+						));
+						return false;
+					}
+				}
+			}
+			Ok(_) | Err(asyncgit::Error::NoDefaultRemoteFound) => {
+				false
+			}
+			Err(e) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!(
+						"failed to verify repository state:\n{e}"
+					),
+				));
+				return false;
+			}
+		};
+		if !still_matches {
+			self.queue.push(InternalEvent::ShowErrorMsg(
+				strings::confirm_err_repo_changed(),
+			));
+		}
+		still_matches
 	}
 
 	fn verify_repo_snapshot(&self, expected: &RepoSnapshot) -> bool {
@@ -388,17 +466,25 @@ impl ConfirmPopup {
 				strings::confirm_title_stashdrop(kc, ids.len() > 1),
 				strings::confirm_msg_stashdrop(kc, ids),
 			),
-			Action::StashPop(_) => (
+			Action::StashPop { id, message } => (
 				strings::confirm_title_stashpop(kc),
-				strings::confirm_msg_stashpop(kc),
+				strings::confirm_msg_stashpop(
+					kc,
+					&id.get_short_string(),
+					message,
+					max_name_width,
+				),
 			),
-			Action::ResetHunk(_, _) => (
+			Action::ResetHunk(path, _) => (
 				strings::confirm_title_reset(),
-				strings::confirm_msg_resethunk(kc),
+				strings::confirm_msg_resethunk(kc, &trim(path)),
 			),
-			Action::ResetLines(_, lines) => (
+			Action::ResetLines(path, lines) => (
 				strings::confirm_title_reset(),
-				strings::confirm_msg_reset_lines(lines.len()),
+				strings::confirm_msg_reset_lines(
+					&trim(path),
+					lines.len(),
+				),
 			),
 			Action::DeleteLocalBranch(_)
 			| Action::DeleteRemoteBranch(_)
@@ -407,7 +493,7 @@ impl ConfirmPopup {
 			| Action::DeleteRemoteTag(_, _) => {
 				self.delete_confirm_text(a, max_name_width)
 			}
-			Action::ForcePush(branch, _force) => (
+			Action::ForcePush(branch, remote, _force) => (
 				strings::confirm_title_force_push(kc),
 				strings::confirm_msg_force_push(
 					kc,
@@ -416,7 +502,12 @@ impl ConfirmPopup {
 							.strip_prefix("refs/heads/")
 							.unwrap_or(branch),
 					),
+					&trim(remote),
 				),
+			),
+			Action::PushTags(remote) => (
+				strings::confirm_title_push_tags(),
+				strings::confirm_msg_push_tags(&trim(remote)),
 			),
 			Action::PullMerge { incoming, rebase } => (
 				strings::confirm_title_merge(kc, *rebase),
@@ -568,9 +659,12 @@ impl ConfirmPopup {
 				strings::confirm_title_delete_tag(kc),
 				strings::confirm_msg_delete_tag(kc, &trim(tag_name)),
 			),
-			Action::DeleteRemoteTag(_tag_name, remote) => (
+			Action::DeleteRemoteTag(tag_name, remote) => (
 				strings::confirm_title_delete_tag_remote(),
-				strings::confirm_msg_delete_tag_remote(&trim(remote)),
+				strings::confirm_msg_delete_tag_remote(
+					&trim(tag_name),
+					&trim(remote),
+				),
 			),
 			_ => (String::new(), String::new()),
 		}
@@ -709,6 +803,7 @@ mod tests {
 
 		let (_, msg_with_prefix) = popup_with(Action::ForcePush(
 			"refs/heads/feat/login".to_string(),
+			"origin".to_string(),
 			true,
 		))
 		.get_text();
@@ -717,12 +812,14 @@ mod tests {
 			strings::confirm_msg_force_push(
 				&key_config,
 				"feat/login",
+				"origin",
 			)
 		);
 		assert!(!msg_with_prefix.contains("refs/heads/"));
 
 		let (_, msg_without_prefix) = popup_with(Action::ForcePush(
 			"feat/login".to_string(),
+			"origin".to_string(),
 			true,
 		))
 		.get_text();
@@ -731,17 +828,23 @@ mod tests {
 			strings::confirm_msg_force_push(
 				&key_config,
 				"feat/login",
+				"origin",
 			)
 		);
 
 		let (_, msg_simple) = popup_with(Action::ForcePush(
 			"refs/heads/main".to_string(),
+			"origin".to_string(),
 			true,
 		))
 		.get_text();
 		assert_eq!(
 			msg_simple,
-			strings::confirm_msg_force_push(&key_config, "main")
+			strings::confirm_msg_force_push(
+				&key_config,
+				"main",
+				"origin",
+			)
 		);
 	}
 }

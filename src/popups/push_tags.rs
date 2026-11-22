@@ -36,6 +36,7 @@ pub struct PushTagsPopup {
 	git_push: AsyncPushTags,
 	progress: Option<PushTagsProgress>,
 	pending: bool,
+	remote: Option<String>,
 	queue: Queue,
 	theme: SharedTheme,
 	key_config: SharedKeyConfig,
@@ -50,6 +51,7 @@ impl PushTagsPopup {
 			queue: env.queue.clone(),
 			pending: false,
 			visible: false,
+			remote: None,
 			git_push: AsyncPushTags::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
@@ -62,43 +64,58 @@ impl PushTagsPopup {
 	}
 
 	///
-	pub fn push_tags(&mut self) -> Result<()> {
+	pub fn push_tags(&mut self, remote: String) -> Result<()> {
+		self.remote = Some(remote);
 		self.show()?;
-		if need_username_password(&self.repo.borrow())? {
-			let cred = extract_username_password(&self.repo.borrow())
-				.unwrap_or_else(|_| {
-					BasicAuthCredential::new(None, None)
-				});
-			if cred.is_complete() {
-				self.push_to_remote(Some(cred))
-			} else {
-				self.input_cred.set_cred(cred);
-				self.input_cred.show()
+		let need_cred = need_username_password(&self.repo.borrow());
+		let res = match need_cred {
+			Ok(true) => {
+				let cred =
+					extract_username_password(&self.repo.borrow())
+						.unwrap_or_else(|_| {
+							BasicAuthCredential::new(None, None)
+						});
+				if cred.is_complete() {
+					self.push_to_remote(Some(cred))
+				} else {
+					self.input_cred.set_cred(cred);
+					self.input_cred.show()
+				}
 			}
-		} else {
-			self.push_to_remote(None)
+			Ok(false) => self.push_to_remote(None),
+			Err(e) => Err(e.into()),
+		};
+		if res.is_err() {
+			self.hide();
 		}
+		res
 	}
 
 	fn push_to_remote(
 		&mut self,
 		cred: Option<BasicAuthCredential>,
 	) -> Result<()> {
-		let remote = get_default_remote(&self.repo.borrow())?;
+		let remote = match self.remote.take() {
+			Some(remote) => remote,
+			None => get_default_remote(&self.repo.borrow())?,
+		};
 
-		let repo = self.repo.borrow();
-		if let HookResult::NotOk(e) = hooks_pre_push(
-			&repo,
-			&remote,
-			&asyncgit::sync::PrePushTarget::Tags,
-			cred.clone(),
-		)? {
+		let hook_res = {
+			let repo = self.repo.borrow();
+			hooks_pre_push(
+				&repo,
+				&remote,
+				&asyncgit::sync::PrePushTarget::Tags,
+				cred.clone(),
+			)?
+		};
+		if let HookResult::NotOk(e) = hook_res {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"pre-push hook failed:\n{e}"
 			)));
 			self.pending = false;
-			self.visible = false;
+			self.hide();
 			return Ok(());
 		}
 
@@ -265,6 +282,7 @@ impl Component for PushTagsPopup {
 
 	fn hide(&mut self) {
 		self.visible = false;
+		self.remote = None;
 	}
 
 	fn show(&mut self) -> Result<()> {

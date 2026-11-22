@@ -886,8 +886,20 @@ impl App {
 				flags.insert(NeedsUpdate::ALL);
 			}
 			InternalEvent::PushTags => {
-				self.push_tags_popup.push_tags()?;
-				flags.insert(NeedsUpdate::ALL);
+				match sync::get_default_remote(&self.repo.borrow()) {
+					Ok(remote) => {
+						self.queue.push(
+							InternalEvent::ConfirmAction(
+								Action::PushTags(remote),
+							),
+						);
+					}
+					Err(err) => {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!("push tags failed:\n{err}"),
+						));
+					}
+				}
 			}
 			InternalEvent::StatusLastFileMoved => {
 				self.status_tab.last_file_moved()?;
@@ -1001,7 +1013,7 @@ impl App {
 			Action::Reset(r) => {
 				self.status_tab.reset(&r);
 			}
-			Action::StashDrop(_) | Action::StashPop(_) => {
+			Action::StashDrop(_) | Action::StashPop { .. } => {
 				if let Err(e) = self
 					.stashlist_tab
 					.action_confirmed(&self.repo.borrow(), &action)
@@ -1047,21 +1059,21 @@ impl App {
 			Action::DeleteTag(tag_name) => {
 				self.delete_tag(tag_name)?;
 			}
-			Action::DeleteRemoteTag(tag_name, _remote) => {
-				self.queue.push(InternalEvent::Push(
-					tag_name,
-					PushType::Tag,
-					false,
-					true,
-				));
+			Action::DeleteRemoteTag(tag_name, remote) => {
+				self.push_popup
+					.delete_remote_tag(remote, tag_name)?;
 			}
-			Action::ForcePush(branch, force) => {
-				self.queue.push(InternalEvent::Push(
+			Action::ForcePush(branch, remote, force) => {
+				self.push_popup.push_with_remote(
+					remote,
 					branch,
 					PushType::Branch,
 					force,
 					false,
-				));
+				)?;
+			}
+			Action::PushTags(remote) => {
+				self.push_tags_popup.push_tags(remote)?;
 			}
 			Action::PullMerge { rebase, .. } => {
 				self.pull_popup.try_conflict_free_merge(rebase);
@@ -2517,5 +2529,518 @@ mod tests {
 				"undo on unborn HEAD must show error"
 			);
 		}
+	}
+
+	fn make_test_app_with_rx(
+		repo_path: &Path,
+	) -> (
+		App,
+		KeyConfig,
+		crossbeam_channel::Receiver<AsyncGitNotification>,
+	) {
+		let (tx_git, rx_git) = crossbeam_channel::unbounded();
+		let (tx_app, _rx_app) = crossbeam_channel::unbounded();
+		let key_config = KeyConfig::default();
+		let app = App::new(
+			CliArgs {
+				theme: PathBuf::default(),
+				select_file: None,
+				repo_path: RepoPath::Path(repo_path.to_path_buf()),
+				notify_watcher: false,
+				key_bindings_path: None,
+				key_symbols_path: None,
+			},
+			tx_git,
+			tx_app,
+			Input::new(),
+			Theme::default(),
+			key_config.clone(),
+		)
+		.unwrap();
+		(app, key_config, rx_git)
+	}
+
+	fn drain_app_work(
+		app: &mut App,
+		rx_git: &crossbeam_channel::Receiver<AsyncGitNotification>,
+	) {
+		let deadline = std::time::Instant::now()
+			+ std::time::Duration::from_secs(5);
+		while app.any_work_pending()
+			&& std::time::Instant::now() < deadline
+		{
+			if let Ok(ev) = rx_git
+				.recv_timeout(std::time::Duration::from_millis(50))
+			{
+				let _ = app.update_async(AsyncNotification::Git(ev));
+			}
+		}
+	}
+
+	#[test]
+	fn t8f_push_tags_asks_first() {
+		let (bare_td, bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		let head_obj = repo.find_object(head_oid, None).unwrap();
+		repo.tag_lightweight("v1.0", &head_obj, false).unwrap();
+		repo.remote("origin", bare_td.path().to_str().unwrap())
+			.unwrap();
+		repo.reference(
+			"refs/remotes/origin/main",
+			head_oid,
+			true,
+			"test",
+		)
+		.unwrap();
+
+		let (mut app, kc, rx_git) = make_test_app_with_rx(td.path());
+
+		// 1. From Log tab: pressing push opens confirm naming the remote; Esc pushes nothing.
+		app.set_tab(1).unwrap();
+		send_key!(&mut app, kc.keys.push);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"push tags from Log must open confirm popup"
+		);
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("origin"),
+			"push tags confirm must name remote: {msg}"
+		);
+		assert!(
+			bare_repo.tag_names(None).unwrap().is_empty(),
+			"nothing may be pushed before confirmation"
+		);
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.push_tags_popup.is_visible());
+		assert!(
+			bare_repo.tag_names(None).unwrap().is_empty(),
+			"Esc must not push tags"
+		);
+
+		// 2. From TagList popup: pressing push opens confirm naming the remote; Esc pushes nothing.
+		app.tags_popup.open().unwrap();
+		send_key!(&mut app, kc.keys.push);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"push tags from tag list must open confirm popup"
+		);
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("origin"),
+			"push tags confirm from tag list must name remote: {msg}"
+		);
+		assert!(bare_repo.tag_names(None).unwrap().is_empty());
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(app.tags_popup.is_visible());
+		assert!(!app.push_tags_popup.is_visible());
+		assert!(bare_repo.tag_names(None).unwrap().is_empty());
+		drain_app_work(&mut app, &rx_git);
+	}
+
+	#[test]
+	fn t8f_push_tags_without_remote() {
+		// 1. No remotes at all.
+		{
+			let (td, _repo) = git2_testing::repo_init();
+			let (mut app, kc, rx_git) =
+				make_test_app_with_rx(td.path());
+			app.set_tab(1).unwrap();
+
+			send_key!(&mut app, kc.keys.push);
+			assert!(
+				!app.confirm_popup.is_visible(),
+				"no remote must not open confirm popup"
+			);
+			assert!(
+				!app.push_tags_popup.is_visible(),
+				"no remote must not open push tags popup"
+			);
+			assert!(
+				app.msg_popup.is_visible(),
+				"no remote must show error"
+			);
+			drain_app_work(&mut app, &rx_git);
+		}
+
+		// 2. Multiple remotes without a default (no origin).
+		{
+			let (td, repo) = git2_testing::repo_init();
+			repo.remote("upstream", "https://example.com/up.git")
+				.unwrap();
+			repo.remote("fork", "https://example.com/fork.git")
+				.unwrap();
+			let (mut app, kc, rx_git) =
+				make_test_app_with_rx(td.path());
+			app.set_tab(1).unwrap();
+
+			send_key!(&mut app, kc.keys.push);
+			assert!(
+				!app.confirm_popup.is_visible(),
+				"ambiguous remotes must not open confirm popup"
+			);
+			assert!(
+				!app.push_tags_popup.is_visible(),
+				"ambiguous remotes must not open push tags popup"
+			);
+			assert!(
+				app.msg_popup.is_visible(),
+				"ambiguous remotes must show error"
+			);
+			drain_app_work(&mut app, &rx_git);
+		}
+	}
+
+	fn bare_has_tag(path: &Path, tag: &str) -> bool {
+		sync::get_tags(&RepoPath::Path(path.to_path_buf()))
+			.unwrap()
+			.values()
+			.flatten()
+			.any(|t| t.name == tag)
+	}
+
+	fn init_three_remote_repo() -> (
+		tempfile::TempDir,
+		tempfile::TempDir,
+		tempfile::TempDir,
+		tempfile::TempDir,
+	) {
+		let (origin_td, _origin_bare) =
+			git2_testing::repo_init_bare();
+		let (pushdef_td, _pushdef_bare) =
+			git2_testing::repo_init_bare();
+		let (up_td, _up_bare) = git2_testing::repo_init_bare();
+
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		let head_obj = repo.find_object(head_oid, None).unwrap();
+		repo.tag_lightweight("v2.0", &head_obj, false).unwrap();
+
+		repo.remote("origin", origin_td.path().to_str().unwrap())
+			.unwrap();
+		repo.remote("pushdef", pushdef_td.path().to_str().unwrap())
+			.unwrap();
+		repo.remote("up", up_td.path().to_str().unwrap()).unwrap();
+
+		for name in ["origin", "pushdef"] {
+			let mut rem = repo.find_remote(name).unwrap();
+			rem.push(&["refs/tags/v2.0:refs/tags/v2.0"], None)
+				.unwrap();
+		}
+
+		{
+			let mut cfg = repo.config().unwrap();
+			cfg.set_str("remote.pushDefault", "pushdef").unwrap();
+			cfg.set_str(
+				&format!("branch.{orig_branch}.remote"),
+				"up",
+			)
+			.unwrap();
+			cfg.set_str(
+				&format!("branch.{orig_branch}.merge"),
+				&format!("refs/heads/{orig_branch}"),
+			)
+			.unwrap();
+		}
+		let up_ref = format!("refs/remotes/up/{orig_branch}");
+		repo.reference(&up_ref, head_oid, true, "test").unwrap();
+		commit_file(td.path(), "a.txt", "ahead", "ahead");
+
+		(origin_td, pushdef_td, up_td, td)
+	}
+
+	#[test]
+	fn t8f_prompt_names_push_remote() {
+		let (origin_td, pushdef_td, _up_td, td) =
+			init_three_remote_repo();
+		assert!(bare_has_tag(origin_td.path(), "v2.0"));
+		assert!(bare_has_tag(pushdef_td.path(), "v2.0"));
+
+		let (mut app, kc, rx_git) = make_test_app_with_rx(td.path());
+
+		// 1. Force-push on branch with upstream -> names upstream remote ("up").
+		app.set_tab(0).unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("up") && !msg.contains("pushdef"),
+			"force-push with upstream must name 'up', got: {msg}"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 2. Force-push on branch without upstream -> names remote.pushDefault ("pushdef").
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		sync::create_branch(&rp, "topic").unwrap();
+		app.update().unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("pushdef") && !msg.contains("origin"),
+			"force-push without upstream must name 'pushdef', got: {msg}"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 3. Push tags -> names default remote ("origin").
+		app.set_tab(1).unwrap();
+		send_key!(&mut app, kc.keys.push);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("origin") && !msg.contains("pushdef"),
+			"push tags must name default remote 'origin', got: {msg}"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 4. Remote-tag delete -> names 'origin' AND actually deletes from 'origin', not 'pushdef'.
+		app.tags_popup.open().unwrap();
+		send_key!(&mut app, kc.keys.delete_tag);
+		assert!(app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("origin") && !msg.contains("pushdef"),
+			"remote tag delete must name 'origin', got: {msg}"
+		);
+		send_key!(&mut app, kc.keys.enter);
+		drain_app_work(&mut app, &rx_git);
+		assert!(
+			!bare_has_tag(origin_td.path(), "v2.0"),
+			"tag v2.0 must be deleted on origin"
+		);
+		assert!(
+			bare_has_tag(pushdef_td.path(), "v2.0"),
+			"tag v2.0 must remain on pushdef"
+		);
+	}
+
+	#[test]
+	fn t8f_changed_remote_refuses() {
+		let (origin_td, origin_bare) = git2_testing::repo_init_bare();
+		let (other_td, _other_bare) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		let head_obj = repo.find_object(head_oid, None).unwrap();
+		repo.tag_lightweight("v1", &head_obj, false).unwrap();
+		repo.remote("origin", origin_td.path().to_str().unwrap())
+			.unwrap();
+		repo.remote("other", other_td.path().to_str().unwrap())
+			.unwrap();
+		repo.config()
+			.unwrap()
+			.set_str("remote.pushDefault", "origin")
+			.unwrap();
+
+		let (mut app, kc, rx_git) = make_test_app_with_rx(td.path());
+
+		// 1. Force-push: pushDefault changes while prompt is open -> refuse with repo-changed error.
+		app.set_tab(0).unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+		repo.config()
+			.unwrap()
+			.set_str("remote.pushDefault", "other")
+			.unwrap();
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.push_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"changed pushDefault must show repo-changed error"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 2. Force-push: remote deleted while pushDefault still names it -> refuse.
+		app.update().unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+		repo.remote_delete("other").unwrap();
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.push_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"deleted remote must show repo-changed error"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 3. Push tags: default remote removed while prompt is open -> refuse, nothing pushed.
+		app.set_tab(1).unwrap();
+		send_key!(&mut app, kc.keys.push);
+		assert!(app.confirm_popup.is_visible());
+		repo.remote_delete("origin").unwrap();
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.push_tags_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"deleted default remote must refuse push tags"
+		);
+		assert!(origin_bare.tag_names(None).unwrap().is_empty());
+		drain_app_work(&mut app, &rx_git);
+	}
+
+	#[test]
+	fn t8f_stash_pop_names_stash() {
+		let (td, mut repo) = git2_testing::repo_init();
+		commit_file(td.path(), "f.txt", "v1", "init f");
+		std::fs::write(td.path().join("f.txt"), "v2").unwrap();
+		let sig = repo.signature().unwrap();
+		let stash_oid =
+			repo.stash_save(&sig, "wip login fix", None).unwrap();
+		let short_id = CommitId::new(stash_oid).get_short_string();
+
+		let (mut app, kc) = make_test_app(td.path());
+		app.set_tab(4).unwrap();
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains(&short_id),
+			"stash pop prompt must include short id {short_id}, got: {msg}"
+		);
+		assert!(
+			msg.contains("wip login fix"),
+			"stash pop prompt must include stash message, got: {msg}"
+		);
+	}
+
+	#[test]
+	fn t8f_tag_delete_names_tag() {
+		let (bare_td, _bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		let head_obj = repo.find_object(head_oid, None).unwrap();
+		repo.tag_lightweight("v1.2.3", &head_obj, false).unwrap();
+		repo.remote("origin", bare_td.path().to_str().unwrap())
+			.unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		app.tags_popup.open().unwrap();
+		send_key!(&mut app, kc.keys.delete_tag);
+		assert!(app.confirm_popup.is_visible());
+		// Confirm local delete -> opens remote tag delete prompt.
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("v1.2.3"),
+			"remote tag delete prompt must name tag, got: {msg}"
+		);
+		assert!(
+			msg.contains("origin"),
+			"remote tag delete prompt must name remote, got: {msg}"
+		);
+	}
+
+	#[test]
+	fn t8f_discard_names_path() {
+		let (td, _repo) = git2_testing::repo_init();
+		std::fs::create_dir_all(td.path().join("src")).unwrap();
+		commit_file(td.path(), "src/notes.txt", "a\n", "add notes");
+		std::fs::write(td.path().join("src/notes.txt"), "a\nb\nc\n")
+			.unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		let diff = sync::diff::get_diff(
+			&RepoPath::Path(td.path().to_path_buf()),
+			"src/notes.txt",
+			false,
+			None,
+		)
+		.unwrap();
+		// Drive DiffComponent through App's queue & confirm_popup.
+		let mut diff_comp = crate::components::DiffComponent::new(
+			&Environment {
+				queue: app.queue.clone(),
+				theme: app.theme.clone(),
+				key_config: app.key_config.clone(),
+				repo: app.repo.clone(),
+				options: app.options.clone(),
+				sender_git: crossbeam_channel::unbounded().0,
+				sender_app: crossbeam_channel::unbounded().0,
+			},
+			false,
+		);
+		diff_comp.focus(true);
+		diff_comp.update("src/notes.txt".to_string(), false, diff);
+
+		// 1. Hunk discard: names the file path.
+		let reset_hunk_ev = Event::Key(KeyEvent::new(
+			kc.keys.status_reset_item.code,
+			kc.keys.status_reset_item.modifiers,
+		));
+		diff_comp.event(&reset_hunk_ev).unwrap();
+		app.process_queue(NeedsUpdate::empty()).unwrap();
+		assert!(app.confirm_popup.is_visible());
+		let (_, hunk_msg) = app.confirm_popup.get_text();
+		assert!(
+			hunk_msg.contains("src/notes.txt"),
+			"hunk discard prompt must name file path, got: {hunk_msg}"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 2. Line discard (2 added lines): names the file path and line count.
+		let down_ev = Event::Key(KeyEvent::new(
+			kc.keys.move_down.code,
+			kc.keys.move_down.modifiers,
+		));
+		let shift_down_ev = Event::Key(KeyEvent::new(
+			kc.keys.shift_down.code,
+			kc.keys.shift_down.modifiers,
+		));
+		// Move from header (0) -> context 'a' (1) -> added 'b' (2), then extend to 'c' (3).
+		diff_comp.event(&down_ev).unwrap();
+		diff_comp.event(&down_ev).unwrap();
+		diff_comp.event(&shift_down_ev).unwrap();
+		let reset_lines_ev = Event::Key(KeyEvent::new(
+			kc.keys.diff_reset_lines.code,
+			kc.keys.diff_reset_lines.modifiers,
+		));
+		diff_comp.event(&reset_lines_ev).unwrap();
+		app.process_queue(NeedsUpdate::empty()).unwrap();
+		assert!(app.confirm_popup.is_visible());
+		let (_, lines_msg) = app.confirm_popup.get_text();
+		assert!(
+			lines_msg.contains("src/notes.txt"),
+			"line discard prompt must name file path, got: {lines_msg}"
+		);
+		assert!(
+			lines_msg.contains('2'),
+			"line discard prompt must name line count, got: {lines_msg}"
+		);
+	}
+
+	#[test]
+	fn t8f_force_push_names_remote() {
+		let (bare_td, _bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		sync::create_branch(&rp, "feat/login").unwrap();
+		repo.remote("upstream", bare_td.path().to_str().unwrap())
+			.unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		app.set_tab(0).unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+		let (_, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("feat/login"),
+			"force-push prompt must name full branch, got: {msg}"
+		);
+		assert!(
+			msg.contains("upstream"),
+			"force-push prompt must name remote, got: {msg}"
+		);
 	}
 }

@@ -18,7 +18,7 @@ use asyncgit::{
 		},
 		get_branch_remote, hooks_pre_push,
 		remotes::get_default_remote_for_push,
-		HookResult, RepoPathRef,
+		HookResult, RepoPath, RepoPathRef,
 	},
 	AsyncGitNotification, AsyncPush, PushRequest, PushType,
 	RemoteProgress, RemoteProgressState,
@@ -89,6 +89,20 @@ impl PushPopup {
 		}
 	}
 
+	/// resolve the remote a branch push will target
+	pub(crate) fn resolve_branch_remote(
+		repo: &RepoPath,
+		branch: &str,
+	) -> asyncgit::Result<String> {
+		let short =
+			branch.strip_prefix("refs/heads/").unwrap_or(branch);
+		if let Ok(Some(remote)) = get_branch_remote(repo, short) {
+			Ok(remote)
+		} else {
+			get_default_remote_for_push(repo)
+		}
+	}
+
 	///
 	pub fn push(
 		&mut self,
@@ -101,14 +115,41 @@ impl PushPopup {
 		self.start_push(branch, push_type, force, delete)
 	}
 
+	/// push to an explicit `remote` (cleared when the push finishes or closes)
+	pub fn push_with_remote(
+		&mut self,
+		remote: String,
+		branch: String,
+		push_type: PushType,
+		force: bool,
+		delete: bool,
+	) -> Result<()> {
+		self.remote_override = Some(remote);
+		self.start_push(branch, push_type, force, delete)
+	}
+
 	/// delete `branch` on the given `remote` (not the upstream/default remote)
 	pub fn delete_remote_branch(
 		&mut self,
 		remote: String,
 		branch: String,
 	) -> Result<()> {
-		self.remote_override = Some(remote);
-		self.start_push(branch, PushType::Branch, false, true)
+		self.push_with_remote(
+			remote,
+			branch,
+			PushType::Branch,
+			false,
+			true,
+		)
+	}
+
+	/// delete `tag` on the given `remote`
+	pub fn delete_remote_tag(
+		&mut self,
+		remote: String,
+		tag: String,
+	) -> Result<()> {
+		self.push_with_remote(remote, tag, PushType::Tag, false, true)
 	}
 
 	fn start_push(
@@ -129,20 +170,30 @@ impl PushPopup {
 
 		self.show()?;
 
-		if need_username_password_for_push(&self.repo.borrow())? {
-			let cred = extract_username_password_for_push(
-				&self.repo.borrow(),
-			)
-			.unwrap_or_else(|_| BasicAuthCredential::new(None, None));
-			if cred.is_complete() {
-				self.push_to_remote(Some(cred), force)
-			} else {
-				self.input_cred.set_cred(cred);
-				self.input_cred.show()
+		let need_cred =
+			need_username_password_for_push(&self.repo.borrow());
+		let res = match need_cred {
+			Ok(true) => {
+				let cred = extract_username_password_for_push(
+					&self.repo.borrow(),
+				)
+				.unwrap_or_else(|_| {
+					BasicAuthCredential::new(None, None)
+				});
+				if cred.is_complete() {
+					self.push_to_remote(Some(cred), force)
+				} else {
+					self.input_cred.set_cred(cred);
+					self.input_cred.show()
+				}
 			}
-		} else {
-			self.push_to_remote(None, force)
+			Ok(false) => self.push_to_remote(None, force),
+			Err(e) => Err(e.into()),
+		};
+		if res.is_err() {
+			self.hide();
 		}
+		res
 	}
 
 	fn push_to_remote(
@@ -150,8 +201,7 @@ impl PushPopup {
 		cred: Option<BasicAuthCredential>,
 		force: bool,
 	) -> Result<()> {
-		let remote = if let Some(remote) =
-			self.remote_override.clone()
+		let remote = if let Some(remote) = self.remote_override.take()
 		{
 			log::info!(
 				"push: branch '{}' to explicit remote '{}'",
@@ -159,15 +209,11 @@ impl PushPopup {
 				remote
 			);
 			remote
-		} else if let Ok(Some(remote)) =
-			get_branch_remote(&self.repo.borrow(), &self.branch)
-		{
-			log::info!("push: branch '{}' has upstream for remote '{}' - using that",self.branch,remote);
-			remote
 		} else {
-			log::info!("push: branch '{}' has no upstream - looking up default remote",self.branch);
-			let remote =
-				get_default_remote_for_push(&self.repo.borrow())?;
+			let remote = Self::resolve_branch_remote(
+				&self.repo.borrow(),
+				&self.branch,
+			)?;
 			log::info!(
 				"push: branch '{}' to remote '{}'",
 				self.branch,
@@ -177,22 +223,25 @@ impl PushPopup {
 		};
 
 		// run pre push hook - can reject push
-		let repo = self.repo.borrow();
-		if let HookResult::NotOk(e) = hooks_pre_push(
-			&repo,
-			&remote,
-			&asyncgit::sync::PrePushTarget::Branch {
-				branch: &self.branch,
-				delete: self.modifier.delete(),
-			},
-			cred.clone(),
-		)? {
+		let hook_res = {
+			let repo = self.repo.borrow();
+			hooks_pre_push(
+				&repo,
+				&remote,
+				&asyncgit::sync::PrePushTarget::Branch {
+					branch: &self.branch,
+					delete: self.modifier.delete(),
+				},
+				cred.clone(),
+			)?
+		};
+		if let HookResult::NotOk(e) = hook_res {
 			log::error!("pre-push hook failed: {e}");
 			self.queue.push(InternalEvent::ShowErrorMsg(format!(
 				"pre-push hook failed:\n{e}"
 			)));
 			self.pending = false;
-			self.visible = false;
+			self.hide();
 			return Ok(());
 		}
 
@@ -376,6 +425,7 @@ impl Component for PushPopup {
 
 	fn hide(&mut self) {
 		self.visible = false;
+		self.remote_override = None;
 	}
 
 	fn show(&mut self) -> Result<()> {

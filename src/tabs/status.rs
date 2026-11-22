@@ -572,12 +572,35 @@ impl Status {
 	}
 
 	fn push(&self, force: bool) {
-		if self.can_push() {
+		let allowed = if force {
+			self.can_force_push()
+		} else {
+			self.can_push()
+		};
+		if allowed {
 			if let Some(branch) = self.git_branch_name.last() {
 				if force {
-					self.queue.push(InternalEvent::ConfirmAction(
-						Action::ForcePush(branch, force),
-					));
+					match crate::popups::PushPopup::resolve_branch_remote(
+						&self.repo.borrow(),
+						&branch,
+					) {
+						Ok(remote) => {
+							self.queue.push(
+								InternalEvent::ConfirmAction(
+									Action::ForcePush(
+										branch, remote, force,
+									),
+								),
+							);
+						}
+						Err(err) => {
+							self.queue.push(
+								InternalEvent::ShowErrorMsg(format!(
+									"push failed:\n{err}"
+								)),
+							);
+						}
+					}
 				} else {
 					self.queue.push(InternalEvent::Push(
 						branch,
@@ -635,17 +658,31 @@ impl Status {
 			});
 	}
 
-	fn can_push(&self) -> bool {
-		let is_ahead = self
-			.git_branch_state
-			.as_ref()
-			.is_none_or(|state| state.ahead > 0);
+	fn has_pushable_branch(&self) -> bool {
 		let has_branch = self
 			.git_branch_name
 			.last()
 			.is_some_and(|branch| branch != "HEAD");
 
-		is_ahead && has_branch && self.remotes.has_remote_for_push
+		has_branch && self.remotes.has_remote_for_push
+	}
+
+	fn can_push(&self) -> bool {
+		let is_ahead = self
+			.git_branch_state
+			.as_ref()
+			.is_none_or(|state| state.ahead > 0);
+
+		is_ahead && self.has_pushable_branch()
+	}
+
+	fn can_force_push(&self) -> bool {
+		let differs_from_upstream = self
+			.git_branch_state
+			.as_ref()
+			.is_none_or(|state| state.ahead > 0 || state.behind > 0);
+
+		differs_from_upstream && self.has_pushable_branch()
 	}
 
 	const fn can_fetch(&self) -> bool {
@@ -788,7 +825,7 @@ impl Component for Status {
 					&self.key_config,
 				),
 				true,
-				self.can_push() && !focus_on_diff,
+				self.can_force_push() && !focus_on_diff,
 			));
 
 			out.push(CommandInfo::new(
@@ -909,7 +946,7 @@ impl Component for Status {
 					k,
 					self.key_config.keys.force_push,
 				) && !self.is_focus_on_diff()
-					&& self.can_push()
+					&& self.can_force_push()
 				{
 					self.push(true);
 					Ok(EventState::Consumed)
@@ -1218,5 +1255,212 @@ mod tests {
 		assert!(!status.is_focus_on_diff());
 		assert!(status.focus == Focus::Stage);
 		assert!(status.index.focused());
+	}
+
+	fn init_branch_with_upstream(
+		ahead: usize,
+		behind: usize,
+	) -> (tempfile::TempDir, tempfile::TempDir) {
+		let (bare_td, _bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let branch_name =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let base_oid = repo.head().unwrap().target().unwrap();
+		repo.remote("origin", bare_td.path().to_str().unwrap())
+			.unwrap();
+
+		let remote_ref = format!("refs/remotes/origin/{branch_name}");
+		let sig = repo.signature().unwrap();
+		let mut remote_oid = base_oid;
+		for i in 0..behind {
+			let parent = repo.find_commit(remote_oid).unwrap();
+			let tree = parent.tree().unwrap();
+			remote_oid = repo
+				.commit(
+					None,
+					&sig,
+					&sig,
+					&format!("remote {i}"),
+					&tree,
+					&[&parent],
+				)
+				.unwrap();
+		}
+		repo.reference(&remote_ref, remote_oid, true, "test")
+			.unwrap();
+		{
+			let mut cfg = repo.config().unwrap();
+			cfg.set_str(
+				&format!("branch.{branch_name}.remote"),
+				"origin",
+			)
+			.unwrap();
+			cfg.set_str(
+				&format!("branch.{branch_name}.merge"),
+				&format!("refs/heads/{branch_name}"),
+			)
+			.unwrap();
+		}
+
+		let mut local_oid = base_oid;
+		for i in 0..ahead {
+			let parent = repo.find_commit(local_oid).unwrap();
+			let tree = parent.tree().unwrap();
+			local_oid = repo
+				.commit(
+					Some("HEAD"),
+					&sig,
+					&sig,
+					&format!("local {i}"),
+					&tree,
+					&[&parent],
+				)
+				.unwrap();
+		}
+
+		(bare_td, td)
+	}
+
+	#[test]
+	fn t8f_force_push_when_behind() {
+		let (_bare_td, td) = init_branch_with_upstream(0, 1);
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let fp_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_force_push(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			fp_cmd.enabled && fp_cmd.show_in_quickbar(),
+			"force-push hint must be offered when behind upstream"
+		);
+
+		let key = env.key_config.keys.force_push;
+		let ev = Event::Key(KeyEvent::new(key.code, key.modifiers));
+		assert!(status.event(&ev).unwrap().is_consumed());
+		assert!(
+			matches!(
+				env.queue.pop(),
+				Some(InternalEvent::ConfirmAction(
+					Action::ForcePush(..)
+				))
+			),
+			"force-push key when behind must open confirmation"
+		);
+	}
+
+	#[test]
+	fn t8f_force_push_when_ahead() {
+		for (ahead, behind, label) in
+			[(1, 0, "ahead"), (1, 1, "diverged")]
+		{
+			let (_bare_td, td) =
+				init_branch_with_upstream(ahead, behind);
+			let (env, rx) = env_for_repo(td.path());
+			let mut status = Status::new(&env);
+			status.show().unwrap();
+			drain_pending(&status, &rx);
+
+			let mut cmds = Vec::new();
+			status.commands(&mut cmds, false);
+			let fp_cmd = cmds
+				.iter()
+				.find(|c| {
+					c.text
+						== strings::commands::status_force_push(
+							&env.key_config,
+						)
+				})
+				.unwrap();
+			assert!(
+				fp_cmd.enabled && fp_cmd.show_in_quickbar(),
+				"force-push hint must be offered when {label}"
+			);
+
+			let key = env.key_config.keys.force_push;
+			let ev =
+				Event::Key(KeyEvent::new(key.code, key.modifiers));
+			assert!(status.event(&ev).unwrap().is_consumed());
+			assert!(
+				matches!(
+					env.queue.pop(),
+					Some(InternalEvent::ConfirmAction(
+						Action::ForcePush(..)
+					))
+				),
+				"force-push key when {label} must open confirmation"
+			);
+		}
+	}
+
+	#[test]
+	fn t8f_no_force_push_when_equal() {
+		let (_bare_td, td) = init_branch_with_upstream(0, 0);
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let fp_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_force_push(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			!fp_cmd.show_in_quickbar(),
+			"force-push hint must not be offered when equal to upstream"
+		);
+
+		let key = env.key_config.keys.force_push;
+		let ev = Event::Key(KeyEvent::new(key.code, key.modifiers));
+		assert!(!status.event(&ev).unwrap().is_consumed());
+		assert!(env.queue.pop().is_none());
+	}
+
+	#[test]
+	fn t8f_no_normal_push_when_behind() {
+		let (_bare_td, td) = init_branch_with_upstream(0, 1);
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let push_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::status_push(&env.key_config)
+			})
+			.unwrap();
+		assert!(
+			!push_cmd.enabled,
+			"normal push must not be offered when only behind upstream"
+		);
+
+		let key = env.key_config.keys.push;
+		let ev = Event::Key(KeyEvent::new(key.code, key.modifiers));
+		status.event(&ev).unwrap();
+		assert!(
+			env.queue.pop().is_none(),
+			"normal push key must do nothing when only behind upstream"
+		);
 	}
 }

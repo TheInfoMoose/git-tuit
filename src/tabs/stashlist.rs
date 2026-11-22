@@ -77,7 +77,10 @@ impl StashList {
 	fn pop_stash(&self) {
 		if let Some(e) = self.list.selected_entry() {
 			self.queue.push(InternalEvent::ConfirmAction(
-				Action::StashPop(e.id),
+				Action::StashPop {
+					id: e.id,
+					message: e.msg.to_string(),
+				},
 			));
 		}
 	}
@@ -100,7 +103,7 @@ impl StashList {
 	) -> Result<()> {
 		match action {
 			Action::StashDrop(ids) => self.drop(repo, ids)?,
-			Action::StashPop(id) => self.pop(repo, *id)?,
+			Action::StashPop { id, .. } => self.pop(repo, *id)?,
 			_ => (),
 		}
 
