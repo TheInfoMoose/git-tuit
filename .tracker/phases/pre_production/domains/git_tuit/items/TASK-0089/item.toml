@@ -1,0 +1,23 @@
+schema_version = 2
+
+[item]
+id = "TASK-0089"
+type = "task"
+title = "Require per-edge-case evidence in validator reports"
+status = "closed"
+severity = "medium"
+scope_ref = "git_tuit"
+created_at = "2026-11-22T02:44:18Z"
+updated_at = "2026-11-22T05:34:38Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "uncommitted"
+summary = "won't fix: the replay found no gain from validator evidence rows; the planning-side rule is TASK-0091"

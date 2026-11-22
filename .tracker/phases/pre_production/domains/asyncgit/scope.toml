@@ -121,6 +121,20 @@ status = "closed"
 severity = "critical"
 created_at = "2026-11-21T05:36:39Z"
 
+[[items.bugs]]
+id = "BUG-0070"
+title = "Keep untracked files when aborting a merge or revert"
+status = "open"
+severity = "critical"
+created_at = "2026-11-22T05:16:48Z"
+
+[[items.bugs]]
+id = "BUG-0075"
+title = "Report a failed history load instead of panicking"
+status = "pending"
+severity = "high"
+created_at = "2026-11-22T05:32:55Z"
+
 [[items.features]]
 id = "FEAT-0001"
 title = "Add trusted global-only git config reader"
@@ -225,3 +239,17 @@ title = "Relax STEP 4E POST_GATE grep for clippy::option_if_let_else and rustfmt
 status = "closed"
 severity = "high"
 created_at = "2026-11-21T14:57:39Z"
+
+[[items.tasks]]
+id = "TASK-0092"
+title = "Abort Keeps What the Merge Didn't Touch"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0093"
+title = "A Failed Switch Discards Nothing"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"

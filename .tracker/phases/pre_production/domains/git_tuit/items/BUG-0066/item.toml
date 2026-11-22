@@ -2,11 +2,11 @@
 id = "BUG-0066"
 type = "bug"
 title = "Stop error popup on every tag list open"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T01:47:33Z"
-updated_at = "2026-11-22T02:29:05Z"
+updated_at = "2026-11-22T05:34:38Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "961636ad"
+summary = "STEP 7N: a failed background remote-tag lookup is shown inline instead of as an error popup"

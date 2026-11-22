@@ -42,7 +42,27 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase 7 goal:** nothing in the UI stays stuck or shows the wrong state: tab index, loading lists, diff focus and selection, fetch/push availability, hints, error popups for tag/remote-URL failures, single-line inputs, and a fuzzy finder that Esc can cancel.
+**Phase goal (Phase 8):** no abort, switch or single keypress loses work or rewrites history unasked; input popups validate and keep what you typed; hints match keys; details, lists and the file view stay correct on small terminals and across revisions.
+
+**Phase 8 format:** outcome steps v2, planned with the TASK-0091 trial rule (writers and states). The review counts spec gaps.
+
+**Phase 8 decisions (user, 2026-11-21):**
+- **D1 Abort:** merge and revert aborts match `git reset --merge`: untracked files and unrelated unstaged edits survive; refuse, changing nothing, if an edit can't be kept.
+- **D2 Stale confirmation:** if HEAD, the repo state or the named target changed while the prompt was open, refuse. Nothing runs.
+- **D3 Destructive picks:** hard reset and discard-all get a confirmation whose Esc returns to the picker; pickers don't wrap; discard-and-switch never deletes an untracked file, it refuses.
+- **D4 Availability:** revert, merge, rebase, log checkout and undo are off unless the repo state is clean. The Stashes tab has no checkout.
+- **D5 Push:** push tags confirms and names the remote. Force-push is allowed when only behind, and stays off when equal to upstream.
+- **D6 Drafts:** a failed submit keeps popup and text. Esc discards: every open starts clean (create) or with the current value (edit). The commit draft is the exception and persists.
+- **D7 No-op input:** a whitespace-only stash message means no message. An unchanged rename or URL just closes.
+- **D8 Go to line:** invalid input stays open in red, with no error popup.
+- **D9 Hints:** keys win and hints change. Key fixes are limited to rename on the Remote tab, annotate overwriting the tag name, and the `.` pass-through. Delete remote stays `r`.
+- **D10 Commit hooks:** a failing prepare-commit-msg doesn't open the popup and keeps the draft. No-verify lasts through failures and resets on success or close.
+- **D11 Small panes:** info clips first; message and files keep one row each, whatever is focused.
+- **D12 Marks:** follow commits by ID and are dropped once loading finishes without them.
+- **D13 Files reload:** follow the selected path, showing the new content from the top; a selection made during loading wins.
+- **D14 Edit from a revision:** close the popup stack, switch to Status, edit. A missing file is an error and the popup stays.
+
+_Phase 7 goal (7N landed, reviewed 2026-11-21; log-selection follow-ups parked as BUG-0067 and BUG-0069):_ nothing in the UI stays stuck or shows the wrong state: tab index, loading lists, diff focus and selection, fetch/push availability, hints, error popups for tag/remote-URL failures, single-line inputs, and a fuzzy finder that Esc can cancel.
 
 **Phase 7 pilot (7J–7M, approved 2026-11-21):** outcome steps. Each MUTATION_SPEC item is a required behavior and the coder chooses the implementation. The "Outcome steps" section of `.orrery/skills/repo-rules.md` overrides the exact-wording rules for these steps. 7B–7I are withdrawn.
 
@@ -64,7 +84,22 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 7N** | `/boost` | Phase 7 review fixes: log selection, zero-line diff focus, quiet tag lookup | `src/components/*`, `src/tabs/*`, `src/popups/taglist.rs`, `src/strings.rs` | — |
+| 1 | **STEP 8A** | `/boost` | Abort Keeps What the Merge Didn't Touch | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/reset.rs`, `src/strings.rs` | — |
+| 2 | **STEP 8B** | `/boost` | A Failed Switch Discards Nothing | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/status.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
+| 3 | **STEP 8C** | `/boost` | Confirm Revert and Detached Checkout | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs` +5 | — |
+| 4 | **STEP 8D** | `/boost` | Confirm Merge, Rebase and Submodule Update | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/branchlist.rs` +3 | STEP 8C |
+| 5 | **STEP 8E** | `/boost` | Confirm Hard Reset, Discard and Undo | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/reset.rs` +4 | STEP 8B, STEP 8C |
+| 6 | **STEP 8F** | `/boost` | Pushes and Prompts Name Their Targets | `src/app.rs`, `src/queue.rs`, `src/strings.rs`, `src/popups/confirm.rs`, `src/popups/push.rs` +6 | STEP 8C |
+| 7 | **STEP 8G** | `/boost` | Branch and Tag Input Is Validated | `src/popups/create_branch.rs`, `src/popups/rename_branch.rs`, `src/popups/tag_commit.rs`, `src/components/textinput.rs`, `src/strings.rs` +2 | — |
+| 8 | **STEP 8H** | `/boost` | Remote Input Is Validated | `src/popups/create_remote.rs`, `src/popups/rename_remote.rs`, `src/popups/update_remote_url.rs`, `src/strings.rs`, `asyncgit/src/sync/remotes/mod.rs` | — |
+| 9 | **STEP 8I** | `/goal` | Stash Message, Go to Line and Submodule Status | `src/app.rs`, `src/popups/stashmsg.rs`, `src/popups/goto_line.rs`, `src/popups/submodules.rs`, `src/strings.rs` | — |
+| 10 | **STEP 8J** | `/boost` | Commit Popup Follows git | `src/app.rs`, `src/popups/commit.rs`, `src/strings.rs` | — |
+| 11 | **STEP 8K** | `/boost` | Popup Hints Match Their Keys | `src/app.rs`, `src/gitui.rs`, `src/strings.rs`, `src/components/mod.rs`, `src/popups/*` | — |
+| 12 | **STEP 8L** | `/boost` | List and Diff Hints Match Their Keys | `src/strings.rs`, `src/components/diff.rs`, `src/popups/branchlist.rs`, `src/popups/remotelist.rs`, `src/popups/inspect_commit.rs` +4 | — |
+| 13 | **STEP 8M** | `/boost` | Commit Details Fit Small Terminals | `src/components/commit_details/*` | — |
+| 14 | **STEP 8N** | `/goal` | Scrolling Survives Resize | `src/components/utils/scroll_vertical.rs`, `src/components/utils/scroll_horizontal.rs`, `src/components/syntax_text.rs`, `src/components/commit_details/details.rs`, `src/ui/stateful_paragraph.rs` +1 | — |
+| 15 | **STEP 8O** | `/boost` | Marks and Column Widths | `src/components/commitlist.rs`, `src/components/utils/mod.rs`, `src/tabs/revlog.rs`, `src/tabs/stashlist.rs` | — |
+| 16 | **STEP 8P** | `/boost` | Files View Follows Its Revision | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/popup_stack.rs`, `src/strings.rs` +5 | — |
 
 ### Completed
 
@@ -141,6 +176,7 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 7K | ✅ 0e69200b | `/goal` | Keys and Hints Do What They Say | `src/components/textinput.rs`, `src/popups/*`, `src/tabs/revlog.rs`, `src/strings.rs`, `vim_style_key_config.ron` |
 | STEP 7L | ✅ 188e3826 | `/goal` | Failures and Confirmations Tell the Truth | `src/components/revision_files.rs`, `src/popups/*`, `src/strings.rs` |
 | STEP 7M | ✅ d5fd91ec | `/goal` | Selections Survive a Refresh | `src/components/utils/*`, `src/components/commitlist.rs` |
+| STEP 7N | ✅ 961636ad | `/boost` | Phase 7 Review Fixes | `src/components/*`, `src/tabs/*`, `src/popups/taglist.rs`, `src/strings.rs` |
 
 ### User Step: IMAGE
 
@@ -174,7 +210,6 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 8 — Confirmations, hints, layout, input validation.** P2-08 (confirm dialogs for revert/merge/rebase/detached checkout/submodule update), P2-12 (key-hint mismatches), P2-16 (80x24 details layout, scroll clamping), P2-23 (pre-submit ref/input validation), the remaining P2-20 (commit-list marks across batches, display widths) and P2-22 (unborn-HEAD Files tab, RevisionFiles focus/`e` behind popup) parts.
 - **Phase 9 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
@@ -3657,6 +3692,1158 @@ Allowed test change: in `t7m_commit_selection_clamps`, only the final clear() bl
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t7n_ 2>&1 | grep -cE 't7n_.* ok$')" -ge 8
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+---
+
+## Phase 8: Data loss, confirmations, input, hints, layout
+
+Outcome steps (repo-rules, "Outcome steps"), planned with the TASK-0091 trial rule: each step lists the writers of the state it changes, and its edge cases say what wins. The decisions D1-D12 in the Phase 8 header note are settled product calls. A case they don't cover that needs a product decision is `Blocked`, not a guess.
+
+### STEP 8A: Abort Keeps What the Merge Didn't Touch
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8A: aborting a merge or revert keeps untracked files and unrelated unstaged edits, as git does.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/merge.rs
+  - asyncgit/src/sync/reset.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0070. Decision D1
+  - git-reset(1) --merge, git-merge(1) --abort
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Discarding a file from the Status tab (reset_workdir on a path) and aborting a rebase don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the worktree, index and pending state: the merge or revert, the user's edits and staging since it started, conflict resolution, and the abort.
+
+1. A confirmed abort of a merge or revert resets only what is staged or conflicted, then clears the pending state.
+   Edge cases:
+   a. An untracked file or directory, anywhere in the repo: it survives, unchanged.
+      Proof: test `t8a_abort_keeps_untracked`.
+   b. An ignored file: it survives.
+      Proof: guard test `t8a_abort_keeps_ignored`.
+   c. An unstaged edit or deletion in a file whose index entry equals HEAD: the user's change wins and survives.
+      Proof: test `t8a_abort_keeps_unstaged`.
+   d. A file the merge or revert added that is still staged: it is removed. One the user has since unstaged is untracked, so case a wins.
+      Proof: guard test `t8a_abort_removes_added`.
+   e. A conflicted path, edited or not, including modify/delete: it returns to HEAD, or is removed when HEAD has no such path. The abort wins over the resolution.
+      Proof: guard test `t8a_abort_resets_conflicts`.
+   f. A staged change with no unstaged edit on top, whoever staged it: it returns to HEAD.
+      Proof: guard test `t8a_abort_resets_staged`.
+   g. A non-conflicted file with a staged change and a different unstaged edit on top: refuse before anything changes. The error names every such file, and the pending state stays.
+      Proof: test `t8a_abort_refuses_mixed_edit`.
+   h. Paths containing `*`, `?` or `[`: they are literal paths and never match another file.
+      Proof: test `t8a_abort_paths_are_literal`.
+   i. HEAD can't be read: return the error and change nothing.
+      Proof: validator's trace.
+   j. A merge and a revert both follow a-i.
+      Proof: test `t8a_abort_revert_keeps_untracked`.
+2. The abort-merge and abort-revert prompt says that staged changes and conflict resolutions are lost, and that untracked files and other unstaged edits are kept.
+   Proof: test `t8a_abort_prompt_is_accurate`.
+
+Must still work:
+- The existing reset_workdir tests, unchanged.
+- The abort-rebase prompt and behavior.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8a_ 2>&1 | grep -cE 't8a_.* ok$')" -ge 10
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8B: A Failed Switch Discards Nothing
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8B: "discard all local changes" loses nothing unless the branch switch can succeed.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+  - asyncgit/src/sync/status.rs
+  - asyncgit/src/sync/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - neb: BUG-0071. Decision D3
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The "keep local changes" option doesn't change. The confirmation for this option is STEP 8E.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of HEAD, the index, the worktree and local branches: the discard, the checkout, creating a tracking branch, and other processes.
+
+1. "Discard all local changes" checks everything that can refuse the switch before it discards or creates anything.
+   Edge cases:
+   a. The switch can succeed: staged and unstaged tracked changes are discarded and HEAD is on the target.
+      Proof: guard test `t8b_discard_switch_succeeds`.
+   b. An untracked file is in the target's way: refuse and name it. HEAD, index, worktree and branches are unchanged.
+      Proof: test `t8b_untracked_collision_changes_nothing`.
+   c. Untracked files that aren't in the way: they survive, and they don't block a switch to a local or a remote branch.
+      Proof: test `t8b_untracked_bystander_survives`.
+   d. An ignored file is in the way: the target wins, as in git.
+      Proof: validator's trace.
+   e. The target is a remote branch whose local name already exists: refuse and change nothing.
+      Proof: test `t8b_existing_local_name_changes_nothing`.
+   f. The target is gone: refuse and change nothing.
+      Proof: test `t8b_missing_target_changes_nothing`.
+   g. HEAD is unborn or unreadable: refuse and change nothing. A detached HEAD switches normally.
+      Proof: validator's trace.
+   h. Writing fails after the checks passed: show the error, leave HEAD where it was and leave no new branch behind.
+      Proof: validator's trace.
+
+Must still work:
+- test_discard_status and test_checkout_remote_branch, unchanged.
+- A failed switch leaves the picker open under the error.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8b_ 2>&1 | grep -cE 't8b_.* ok$')" -ge 5
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8C: Confirm Revert and Detached Checkout
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8C: revert and log checkout ask first, and refuse if the repo changed while asking.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/gitui.rs
+  - src/queue.rs
+  - src/strings.rs
+  - src/popups/confirm.rs
+  - src/components/commitlist.rs
+  - src/tabs/revlog.rs
+  - src/tabs/stashlist.rs
+  - asyncgit/src/sync/utils.rs
+  - asyncgit/src/sync/mod.rs
+READ_ONLY_REFS:
+  - neb: BUG-0042 (part), TASK-0087. Decisions D2, D4
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Log selection, restore and search precedence don't change (BUG-0067 and BUG-0069 are parked). Other actions get confirmations in 8D-8F.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the pending confirmation: open, Enter, Esc. Writers of what it depends on: list refresh, selection moves, and other processes changing HEAD, refs or repo state.
+
+1. Revert and checkout in the Log run only after a confirmation that names the action, the commit (short id and subject) and the current branch. Checkout also says that HEAD will be detached.
+   Edge cases:
+   a. The key is pressed: nothing in the repo changes yet.
+      Proof: tests `t8c_revert_asks_first` and `t8c_checkout_asks_first`.
+   b. Esc: nothing runs, then or later.
+      Proof: test `t8c_cancel_runs_nothing`.
+   c. Enter: the action runs once. Revert switches to Status only on success. An error is shown.
+      Proof: test `t8c_confirm_runs_once`.
+   d. The list refreshes or its selection moves while the prompt is open: the commit named in the prompt wins.
+      Proof: test `t8c_prompt_pins_commit`.
+   e. No commit is selected (empty list, or a restore is pending): no prompt.
+      Proof: guard test `t8c_no_selection_no_prompt`.
+   f. HEAD is detached: the prompt names its short id as the current position.
+      Proof: validator's trace.
+2. A repo change while the prompt is open wins over Enter: nothing runs and an error says the repo changed. Build this check so later confirmations can reuse it.
+   Edge cases:
+   a. HEAD's commit changed.
+      Proof: test `t8c_stale_confirm_refuses`.
+   b. HEAD points at another branch with the same commit, or became detached or attached.
+      Proof: test `t8c_stale_branch_refuses`.
+   c. The repo state changed (a merge, revert or rebase started or ended).
+      Proof: test `t8c_stale_state_refuses`.
+   d. HEAD or the state can't be read at either moment: refuse with that error.
+      Proof: validator's trace.
+   e. Only worktree files changed: not stale. The action's own clean-tree checks still apply.
+      Proof: validator's trace.
+3. Both keys and hints are disabled unless the repo state is clean.
+   Edge cases:
+   a. Merge, revert, rebase, or any other pending state: no prompt and no action.
+      Proof: test `t8c_pending_state_blocks`.
+   b. A clean state with a dirty worktree: the prompt opens.
+      Proof: validator's trace.
+4. The Stashes tab has no commit checkout: no action, prompt or hint, with or without marks.
+   Proof: test `t8c_stashlist_has_no_checkout`.
+5. A confirmation's whole message is readable at 80x24. A name too long to fit is shortened in the middle, and the action and commit id always stay visible.
+   Proof: test `t8c_confirm_fits_80x24`.
+
+Must still work:
+- Every existing confirmation.
+- Revert and other commit actions stay off while a search is running, as today.
+- The t7m and t7n tests, and the app snapshots.
+
+Allowed test change: the `popup_with` helper in confirm.rs and `impl Default for CommitList` in the tests may set new fields. No assertion changes.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8c_ 2>&1 | grep -cE 't8c_.* ok$')" -ge 12
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8D: Confirm Merge, Rebase and Submodule Update
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8D: merge, rebase and submodule update ask first, and refuse if their target changed.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/queue.rs
+  - src/strings.rs
+  - src/popups/confirm.rs
+  - src/popups/branchlist.rs
+  - src/popups/submodules.rs
+  - asyncgit/src/sync/submodules.rs
+  - asyncgit/src/sync/mod.rs
+READ_ONLY_REFS:
+  - neb: BUG-0042 (part). Decisions D2, D4. Reuses the stale check from 8C
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. How merge, rebase and update work once confirmed doesn't change.
+
+[PRE_GATE]
+grep -rqF 'fn t8c_stale_confirm_refuses' src
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the target: branch-list refresh and selection, submodule-list refresh and selection, and other processes changing refs, HEAD or submodules.
+
+1. Merge and rebase run only after a confirmation naming the operation, the selected branch (local or remote, with short id) and the current branch.
+   Edge cases:
+   a. The key is pressed, or Esc follows: nothing changes and the branch list stays open.
+      Proof: tests `t8d_merge_asks_first` and `t8d_rebase_asks_first`.
+   b. The list refreshes or reorders while the prompt is open: the branch named in the prompt wins.
+      Proof: test `t8d_prompt_pins_branch`.
+   c. That branch moved or was deleted, or HEAD or the repo state changed: refuse with the repo-changed error.
+      Proof: test `t8d_moved_branch_refuses`.
+   d. A local and a remote branch share a name: the one named in the prompt is used.
+      Proof: validator's trace.
+   e. The current branch, or an empty list: no prompt.
+      Proof: guard test `t8d_invalid_branch_no_prompt`.
+   f. Merge, revert, rebase or another pending state: key and hint are disabled.
+      Proof: test `t8d_pending_state_blocks`.
+   g. HEAD is unborn: show the error without a prompt.
+      Proof: validator's trace.
+   h. Success closes the list and switches tabs as today. Failure leaves the list open under the error.
+      Proof: validator's trace.
+2. Submodule update runs only after a confirmation naming the submodule and the commit it will check out.
+   Edge cases:
+   a. The key is pressed, or Esc follows: nothing changes.
+      Proof: test `t8d_submodule_asks_first`.
+   b. The list refreshes while the prompt is open: the submodule named in the prompt wins.
+      Proof: validator's trace.
+   c. Its recorded commit or checked-out commit changed, or it was removed: refuse with the repo-changed error.
+      Proof: test `t8d_moved_submodule_refuses`.
+   d. It isn't initialized: the prompt says it will be initialized, and a confirmed update does so.
+      Proof: validator's trace.
+   e. No submodule is selected: no prompt.
+      Proof: validator's trace.
+   f. The parent repo has a pending state: update is still offered (D4 doesn't cover it).
+      Proof: validator's trace.
+
+Must still work:
+- Branch checkout, delete, rename, reset and compare.
+- Opening a submodule and its parent.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8d_ 2>&1 | grep -cE 't8d_.* ok$')" -ge 8
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8E: Confirm Hard Reset, Discard and Undo
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8E: hard reset and discard-all ask twice, and undo can't run on a changed or busy repo.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/queue.rs
+  - src/strings.rs
+  - src/popups/confirm.rs
+  - src/popups/reset.rs
+  - src/popups/checkout_option.rs
+  - src/tabs/status.rs
+  - asyncgit/src/sync/utils.rs
+  - asyncgit/src/sync/mod.rs
+READ_ONLY_REFS:
+  - neb: BUG-0042 (part), BUG-0074 (part). Decisions D2, D3, D4. Reuses 8B and the stale check from 8C
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Soft and Mixed reset and "keep local changes" need no second confirmation.
+
+[PRE_GATE]
+grep -rqF 'fn t8b_untracked_collision_changes_nothing' src asyncgit/src && grep -rqF 'fn t8c_stale_confirm_refuses' src
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the pick: picker open (safe option), Up, Down. Writers of the target: picker open, and other processes changing refs, HEAD or repo state.
+
+1. Enter on Hard reset or "discard all local changes" opens a confirmation naming the target and saying uncommitted changes will be lost.
+   Edge cases:
+   a. Enter in the picker: nothing changes yet.
+      Proof: tests `t8e_hard_reset_asks_first` and `t8e_discard_asks_first`.
+   b. Esc on the confirmation: back to the picker with the same pick, and nothing runs.
+      Proof: test `t8e_cancel_returns_to_picker`.
+   c. HEAD, the repo state or the target branch changed since the confirmation opened: refuse, and leave the picker open. The next Enter confirms against the target as it is then.
+      Proof: test `t8e_stale_pick_refuses`.
+   d. Confirmed and successful: both popups close and the app refreshes.
+      Proof: validator's trace.
+   e. A confirmed discard fails: the picker stays open under the error, and 8B's guarantees hold.
+      Proof: validator's trace.
+2. Both pickers stop at their first and last option.
+   Proof: test `t8e_pickers_do_not_wrap`.
+3. A successful reset of any kind refreshes the app.
+   Proof: test `t8e_reset_requests_refresh`.
+4. Undo names the commit it undoes (short id and subject) and says the changes stay staged.
+   Edge cases:
+   a. Merge, revert, rebase or another pending state: key and hint are disabled.
+      Proof: test `t8e_undo_blocked_when_pending`.
+   b. HEAD or the state changed since the prompt opened: refuse with the repo-changed error.
+      Proof: test `t8e_stale_undo_refuses`.
+   c. HEAD has no parent or is unborn: show an error without a prompt.
+      Proof: test `t8e_undo_without_parent`.
+   d. Before Enter, nothing is changed and no refresh is requested.
+      Proof: validator's trace.
+
+Must still work:
+- Both pickers open on the safe option every time.
+- Aborting and continuing a rebase.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8e_ 2>&1 | grep -cE 't8e_.* ok$')" -ge 9
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8F: Pushes and Prompts Name Their Targets
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8F: push tags asks first, force-push works when behind, and prompts name what they act on.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/queue.rs
+  - src/strings.rs
+  - src/popups/confirm.rs
+  - src/popups/push.rs
+  - src/popups/push_tags.rs
+  - src/popups/taglist.rs
+  - src/tabs/revlog.rs
+  - src/tabs/status.rs
+  - src/tabs/stashlist.rs
+  - src/components/diff.rs
+READ_ONLY_REFS:
+  - neb: BUG-0042 (part), BUG-0074 (rest). Decisions D2, D5
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Normal push availability doesn't change. The pre-push hook's tag ref is BUG-0073 (parked).
+
+[PRE_GATE]
+grep -rqF 'fn t8c_stale_confirm_refuses' src
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the push remote: git config, adding/renaming/deleting remotes, and the push popup's explicit-remote override. Writers of force-push availability: branch lookup, upstream compare, remote lookup.
+
+1. Push tags, from the Log and from the tag list, asks first and names the remote.
+   Edge cases:
+   a. The key is pressed, or Esc follows: nothing is pushed.
+      Proof: test `t8f_push_tags_asks_first`.
+   b. No remote can be chosen (none, or several without a default): an error and no prompt.
+      Proof: test `t8f_push_tags_without_remote`.
+   c. Confirmed: hooks, credentials and progress work as today.
+      Proof: validator's trace.
+2. For push tags, force-push and remote-tag delete, the remote named in the prompt is the remote pushed to.
+   Edge cases:
+   a. The branch upstream, pushDefault and the default remote differ: the prompt names the one that operation will use.
+      Proof: test `t8f_prompt_names_push_remote`.
+   b. That choice changed while the prompt was open, or the remote is gone: refuse with the repo-changed error.
+      Proof: test `t8f_changed_remote_refuses`.
+   c. An earlier push left an explicit-remote override: it never leaks into a later push.
+      Proof: validator's trace.
+3. Force-push is offered, by key and hint, according to the branch state.
+   Edge cases:
+   a. Only behind upstream: offered, still behind its confirmation.
+      Proof: test `t8f_force_push_when_behind`.
+   b. Ahead, or diverged: offered.
+      Proof: guard test `t8f_force_push_when_ahead`.
+   c. Equal to upstream: not offered.
+      Proof: guard test `t8f_no_force_push_when_equal`.
+   d. No upstream, or the compare failed: offered as today.
+      Proof: validator's trace.
+   e. Branch name not loaded, detached HEAD, or no push remote: not offered.
+      Proof: validator's trace.
+   f. Normal push while only behind: still not offered.
+      Proof: guard test `t8f_no_normal_push_when_behind`.
+4. These prompts name their target.
+   Edge cases:
+   a. Stash pop: short id and message.
+      Proof: test `t8f_stash_pop_names_stash`.
+   b. Remote-tag delete: tag and remote.
+      Proof: test `t8f_tag_delete_names_tag`.
+   c. Hunk and line discard: the file path, plus the line count for lines.
+      Proof: test `t8f_discard_names_path`.
+   d. Force-push: the full branch name and the remote.
+      Proof: test `t8f_force_push_names_remote`.
+
+Must still work:
+- Deleting a local tag in a repo without remotes.
+- Deleting a remote branch on its own remote.
+- t7j_no_push_when_detached.
+
+Allowed test change: `t7l_force_push_full_branch` and `popup_with` may add the remote to the setup and to the expected message. The full-branch assertions stay. The ResetLines match in diff.rs's tests may add fields, with the same assertions.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8f_ 2>&1 | grep -cE 't8f_.* ok$')" -ge 12
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8G: Branch and Tag Input Is Validated
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8G: branch and tag popups block bad input and keep it when git fails.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/create_branch.rs
+  - src/popups/rename_branch.rs
+  - src/popups/tag_commit.rs
+  - src/components/textinput.rs
+  - src/strings.rs
+  - asyncgit/src/sync/tags.rs
+  - asyncgit/src/sync/mod.rs
+READ_ONLY_REFS:
+  - neb: BUG-0057 (part), BUG-0046 (part). Decisions D6, D7, D9
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Branch-name character normalization and the tag.gpgsign refusal don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the text, mode and target: open, typing, entering annotation mode, Esc, success, failure.
+
+1. Submit works, and its hint is enabled, only for valid input. Invalid input stays visible with the inline warning.
+   Edge cases:
+   a. Branch create or rename, with an empty or invalid name, or a name the validator errors on: blocked.
+      Proof: test `t8g_invalid_branch_blocked`.
+   b. Tag name that is empty, whitespace, has spaces or NUL, or is an invalid ref: blocked, for submit and for annotate, without a panic.
+      Proof: test `t8g_invalid_tag_blocked`.
+   c. Annotation that is empty or only whitespace: blocked.
+      Proof: test `t8g_empty_annotation_blocked`.
+   d. Annotate with a tag name that already exists: blocked before the mode changes.
+      Proof: test `t8g_existing_tag_not_annotated`.
+   e. Rename to the unchanged name: close, with no git call and no error.
+      Proof: test `t8g_unchanged_rename_closes`.
+2. A failed submit wins over clearing: the popup, text, mode, tag name and target all stay, with the error on top.
+   Edge cases:
+   a. Branch create fails.
+      Proof: test `t8g_create_failure_keeps_input`.
+   b. Branch rename fails.
+      Proof: test `t8g_rename_failure_keeps_input`.
+   c. Tagging fails in either mode, including the gpgsign refusal.
+      Proof: test `t8g_tag_failure_keeps_input`.
+3. Every open starts clean, whatever the last one left.
+   Edge cases:
+   a. After Esc, create branch and tag are empty, and tag is in name mode.
+      Proof: test `t8g_reopen_is_clean`.
+   b. Rename shows the current name of the branch it was opened for.
+      Proof: guard test `t8g_rename_opens_with_name`.
+4. The annotate key in annotation mode never replaces the tag name.
+   Proof: test `t8g_annotate_twice_keeps_name`.
+
+Must still work:
+- A successful rename returns to the branch list.
+- Multiline annotations.
+- The t7k text input tests.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8g_ 2>&1 | grep -cE 't8g_.* ok$')" -ge 11
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8H: Remote Input Is Validated
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8H: remote popups block bad input and keep it when git fails.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/create_remote.rs
+  - src/popups/rename_remote.rs
+  - src/popups/update_remote_url.rs
+  - src/strings.rs
+  - asyncgit/src/sync/remotes/mod.rs
+READ_ONLY_REFS:
+  - neb: BUG-0057 (part), BUG-0046 (part). Decisions D6, D7
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. URLs aren't rewritten or checked for a scheme: local paths are valid.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the text, stage and target remote: open, typing, moving from name to URL, Esc, success, failure.
+
+1. Submit works, and its hint is enabled, only for valid input.
+   Edge cases:
+   a. A name that is empty, invalid or contains NUL: blocked without a panic, with a remote-name warning (not the branch one).
+      Proof: test `t8h_invalid_name_blocked`.
+   b. A new remote's name already exists: blocked at the name stage.
+      Proof: test `t8h_existing_name_blocked`.
+   c. A URL that is empty or only whitespace: blocked, in create and in update.
+      Proof: test `t8h_empty_url_blocked`.
+   d. A local path, including one with spaces: accepted.
+      Proof: guard test `t8h_path_url_accepted`.
+   e. An unchanged name or URL: close, with no git call.
+      Proof: test `t8h_unchanged_closes`.
+2. A failed submit wins over clearing: the popup, text, stage and target stay, with the error on top.
+   Edge cases:
+   a. Create fails: the URL stage, name and URL stay.
+      Proof: test `t8h_create_failure_keeps_input`.
+   b. Rename fails.
+      Proof: test `t8h_rename_failure_keeps_input`.
+   c. URL update fails.
+      Proof: test `t8h_url_failure_keeps_input`.
+3. Every open starts clean: create at an empty name stage, rename and update with the current value of the remote they were opened for.
+   Proof: guard test `t8h_reopen_is_clean`.
+4. The create popup's confirm hint says name at the name stage and URL at the URL stage.
+   Proof: test `t8h_confirm_hint_follows_stage`.
+
+Must still work:
+- A successful change refreshes the remote list.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8h_ 2>&1 | grep -cE 't8h_.* ok$')" -ge 10
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8I: Stash Message, Go to Line and Submodule Status
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 8I: stash and go-to-line input is never stale, and statuses are readable.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/popups/stashmsg.rs
+  - src/popups/goto_line.rs
+  - src/popups/submodules.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0057 (part). Decisions D6, D7, D8
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. What gets stashed for each option doesn't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the stash message and options: open, typing, Esc, success, failure. Writers of the line input and its validity: open (new maximum), typing, Backspace, Esc, Enter.
+
+1. The stash message popup handles each input state.
+   Edge cases:
+   a. Empty or only whitespace: stash with no message.
+      Proof: test `t8i_blank_stash_message`.
+   b. Failure: the popup, text and options stay. The error has no Rust debug output.
+      Proof: test `t8i_stash_failure_keeps_input`.
+   c. Reopen after Esc: empty, with the options it was just opened with.
+      Proof: test `t8i_stash_reopen_is_clean`.
+2. Go to line judges only the current text against the current maximum.
+   Edge cases:
+   a. Empty, including after deleting invalid text: not invalid. Enter closes without jumping.
+      Proof: test `t8i_goto_empty_is_valid`.
+   b. Out of range, or a lone or misplaced `-`: shown in red. Enter keeps the popup and text and opens no error popup.
+      Proof: test `t8i_goto_invalid_stays_open`.
+   c. In range, positive or negative: jump and close. `-0` is line 0.
+      Proof: test `t8i_goto_negative_zero`.
+   d. Every open: empty and not invalid.
+      Proof: guard test `t8i_goto_reopen_is_clean`.
+3. Submodule status shows plain words instead of debug flags.
+   Edge cases:
+   a. Every combination of flags gets words, including no flags (status unknown).
+      Proof: test `t8i_submodule_status_words`.
+
+Must still work:
+- A successful stash switches to the Stashes tab.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8i_ 2>&1 | grep -cE 't8i_.* ok$')" -ge 8
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8J: Commit Popup Follows git
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8J: commit messages, hook rejection and no-verify behave as in git.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/popups/commit.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0057 (rest). Decision D10
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The commit draft survives Esc. post-commit hook failures are still reported after a successful commit.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of the draft and mode: open (template, reword, merge, revert), prepare-commit-msg, typing, amend, history, signoff, editor, success. Writers of no-verify: its key, open, success, Esc, failed attempts, editor round trip.
+
+1. Commit is enabled and runs only for a message with content.
+   Edge cases:
+   a. Empty or only whitespace: blocked in every mode.
+      Proof: test `t8j_whitespace_blocked`.
+   b. Only comment lines, using core.commentChar: blocked.
+      Proof: test `t8j_comments_only_blocked`.
+   c. The unchanged template: blocked as today.
+      Proof: guard test `t8j_template_blocked`.
+   d. Content plus comments: allowed.
+      Proof: guard test `t8j_content_allowed`.
+   e. commit-msg empties the message: no commit, an error, and the draft stays.
+      Proof: validator's trace.
+2. A failing prepare-commit-msg wins over open.
+   Edge cases:
+   a. It rejects, or can't run: the popup doesn't open, the error is shown, and the draft and mode are what they were before this open.
+      Proof: test `t8j_prepare_rejection_blocks_open`.
+   b. It succeeds: its edited message is used. No hook: the popup opens as today.
+      Proof: guard test `t8j_prepare_success_opens`.
+   c. No-verify never skips this hook.
+      Proof: validator's trace.
+3. No-verify lasts until the commit succeeds or the popup is closed.
+   Edge cases:
+   a. A failed or aborted attempt: it stays on.
+      Proof: test `t8j_no_verify_survives_failure`.
+   b. A successful commit, including one with a failing post-commit hook: it resets.
+      Proof: guard test `t8j_no_verify_resets_on_success`.
+   c. Esc, or a fresh open after the popup was left any other way: it resets.
+      Proof: test `t8j_no_verify_resets_on_close`.
+   d. A successful external-editor round trip: it stays.
+      Proof: guard test `t8j_no_verify_survives_editor`.
+4. Signoff without a usable user.name and user.email shows an error and leaves the text unchanged.
+   Proof: test `t8j_signoff_failure_is_shown`.
+
+Must still work:
+- Amend, reword, merge and revert commits.
+- Message history and templates.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8j_ 2>&1 | grep -cE 't8j_.* ok$')" -ge 11
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8K: Popup Hints Match Their Keys
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8K: simple popups advertise the keys they handle, and `.` expands the command bar over them.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/gitui.rs
+  - src/strings.rs
+  - src/components/mod.rs
+  - src/popups/*
+READ_ONLY_REFS:
+  - neb: BUG-0046 (part). Decision D9: the keys are right and the hints change
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No binding changes except the `.` pass-through. Command bar layout is BUG-0058 (Phase 9).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of what a key does: the top popup's state (pending, credential prompt, text focus, mode) and user key config. Hints follow both.
+
+1. Each hint names the key that does the action, in that state.
+   Edge cases:
+   a. Message popup: scrolling shows popup_up and popup_down.
+      Proof: test `t8k_msg_hint_uses_popup_keys`.
+   b. Push and push tags, not pending: close shows exit_popup. Pending: close is disabled.
+      Proof: test `t8k_push_close_hint`.
+   c. Pull and fetch have no close key outside the credential prompt: no close hint there.
+      Proof: test `t8k_fetch_has_no_false_close`.
+   d. A credential prompt is open in any of those four: its own hints.
+      Proof: validator's trace.
+   e. Checkout option: the descriptions talk about checkout, not reset.
+      Proof: test `t8k_checkout_option_wording`.
+   f. Options: up/down selects and left/right changes the value, with no tree wording.
+      Proof: test `t8k_options_hint`.
+   g. Log search, search mode: the search hints also appear in full help.
+      Proof: test `t8k_search_hints_in_help`.
+   h. Log search, commit-id mode: Esc is shown as back, not close.
+      Proof: test `t8k_sha_mode_esc_is_back`.
+2. The command-bar toggle works while a popup without focused text input is on top.
+   Edge cases:
+   a. No text input is focused (confirm, message, pickers, lists, diff views, search options): the bar toggles.
+      Proof: test `t8k_dot_toggles_over_popup`.
+   b. Text input is focused (commit, names, URLs, credentials, search text, fuzzy find, go to line): the input wins and the bar doesn't toggle.
+      Proof: guard test `t8k_dot_stays_in_text_input`.
+   c. A text popup or tab lies under the top popup: it never receives the key.
+      Proof: test `t8k_dot_does_not_fall_through`.
+   d. The top popup uses that same configured key for an action: the action wins.
+      Proof: validator's trace.
+
+Must still work:
+- Modal popups consume every other key.
+- Tab switch, quit and options stay off while a popup is open.
+- The app snapshots, unchanged.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8k_ 2>&1 | grep -cE 't8k_.* ok$')" -ge 10
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8L: List and Diff Hints Match Their Keys
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8L: list and diff views offer exactly what their keys do.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/strings.rs
+  - src/components/diff.rs
+  - src/popups/branchlist.rs
+  - src/popups/remotelist.rs
+  - src/popups/inspect_commit.rs
+  - src/popups/compare_commits.rs
+  - src/popups/file_revlog.rs
+  - src/tabs/revlog.rs
+  - src/tabs/status.rs
+READ_ONLY_REFS:
+  - neb: BUG-0046 (rest), BUG-0068. Decision D9
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Left still scrolls a focused diff and still closes inspect and compare from the file list. The delete-remote key stays `r`.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of availability: selection, local/remote tab, configured remotes, focus, diff load, list refresh.
+
+1. Branch list hints match its keys.
+   Edge cases:
+   a. Remote tab: rename is neither offered nor handled.
+      Proof: test `t8l_no_rename_on_remote_tab`.
+   b. Current branch: Enter and compare are enabled, as their keys work. Delete, merge and rebase are disabled.
+      Proof: test `t8l_current_branch_hints`.
+   c. Empty list: every action that needs a selection is disabled.
+      Proof: test `t8l_empty_branch_hints`.
+   d. Fetch depends on configured remotes, not remote branches. Zero remotes: disabled. A remote with no branches yet: enabled.
+      Proof: test `t8l_fetch_uses_remotes`.
+   e. View remotes is always offered. The reset description doesn't say "confirm reset".
+      Proof: test `t8l_branch_static_hints`.
+2. The remote list offers Add with zero remotes.
+   Proof: test `t8l_add_remote_when_empty`.
+3. Diff popup hints follow focus.
+   Edge cases:
+   a. Diff focused in inspect, compare or file history: back shows exit_popup.
+      Proof: test `t8l_diff_back_is_exit`.
+   b. File list focused in inspect or compare: Left is shown as close where it closes, and close isn't listed twice for one key.
+      Proof: test `t8l_list_close_hints`.
+   c. File history: list scrolling when the list is focused, the diff's own hints when the diff is.
+      Proof: test `t8l_file_history_hints`.
+4. The Log's find hint shows log_find, including when it is rebound apart from file_find.
+   Proof: test `t8l_log_find_hint`.
+5. In Status, the focus-diff key and hint share one rule.
+   Edge cases:
+   a. Loaded with zero lines (empty file, mode-only): disabled.
+      Proof: test `t8l_zero_line_diff_not_focusable`.
+   b. Loading, including a reload after an option change: enabled.
+      Proof: guard test `t8l_loading_diff_focusable`.
+   c. Loaded with lines: enabled.
+      Proof: guard test `t8l_loaded_diff_focusable`.
+   d. No file selected: disabled.
+      Proof: validator's trace.
+
+Must still work:
+- 8D's confirmations and pending-state rule.
+- t7j_focus_leaves_only_loaded_empty_diff and t7n_zero_line_diff_returns_focus, unchanged.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8l_ 2>&1 | grep -cE 't8l_.* ok$')" -ge 13
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8M: Commit Details Fit Small Terminals
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8M: commit and compare details keep the message and files visible on small terminals.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/commit_details/*
+READ_ONLY_REFS:
+  - neb: BUG-0050 (part). Decision D11
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Scroll behavior is STEP 8N.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of pane heights: the available rect (resize, search bar, command bar), commit content (committer, tags), focus, single or compare mode. Rows below exclude borders.
+
+1. Pane sizes follow the content and the space.
+   Edge cases:
+   a. 80x24 app, committer and tags present, in the Log (with and without the search bar) and in inspect: every info line including tags, at least one message row and at least one file row are visible.
+      Proof: test `t8m_details_fit_80x24`.
+   b. Room to spare: keep the 40/60 split, or 60/40 with details focused, as far as case a's minimums allow. The minimums win over the percentages.
+      Proof: guard test `t8m_large_split_kept`.
+   c. Too short for everything: info clips from the bottom first. The message and files each keep one row, whichever is focused.
+      Proof: test `t8m_info_gives_way`.
+   d. No committer, no tags, or neither: info takes no rows for them.
+      Proof: test `t8m_info_height_follows_content`.
+   e. No commit, or it isn't loaded yet: the panes draw empty without a panic.
+      Proof: validator's trace.
+   f. Compare, with room for both infos (three rows each) and one file row: all are visible.
+      Proof: guard test `t8m_compare_fits`.
+   g. Compare, too short: the two infos shrink evenly and the files keep one row.
+      Proof: test `t8m_compare_info_gives_way`.
+   h. Too short even for those minimums, down to zero height: no panic.
+      Proof: guard test `t8m_tiny_no_panic`.
+
+Must still work:
+- Up and Down move focus between message and files.
+- The existing details tests and the app snapshots.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8m_ 2>&1 | grep -cE 't8m_.* ok$')" -ge 7
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8N: Scrolling Survives Resize
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 8N: scroll offsets stay valid on resize and small sizes.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/utils/scroll_vertical.rs
+  - src/components/utils/scroll_horizontal.rs
+  - src/components/syntax_text.rs
+  - src/components/commit_details/details.rs
+  - src/ui/stateful_paragraph.rs
+  - src/strings.rs
+READ_ONLY_REFS:
+  - neb: BUG-0050 (rest)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Resetting the file viewer on load is STEP 8P.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of an offset: keys, draw (size and content length), move-to-visible, reset, focusing the details (jump to the bottom), setting a commit.
+
+1. Draw clamps every offset to the content. The clamp wins over any other writer.
+   Edge cases:
+   a. The terminal grows or the content shrinks: vertical offset is at most the new maximum, and a selected row stays visible.
+      Proof: test `t8n_vertical_clamps`.
+   b. The same for horizontal offset.
+      Proof: test `t8n_horizontal_clamps`.
+   c. The file viewer: clamped in the same frame, with no blank frame and no u16 overflow.
+      Proof: test `t8n_file_view_clamps_first_frame`.
+   d. Zero size or empty content: offset 0 and no panic.
+      Proof: guard test `t8n_empty_is_zero`.
+2. Page keys never move backwards.
+   Edge cases:
+   a. Height 0 or not drawn yet: they don't move.
+      Proof: test `t8n_page_zero_height`.
+   b. Height 1: they move one line in their direction.
+      Proof: test `t8n_page_one_row`.
+   c. Height 2 or more: as today.
+      Proof: existing `test_scroll_with_pageup_pagedown`.
+3. Setting the commit in the details decides the message scroll.
+   Edge cases:
+   a. The same commit again (refresh, tags arriving): the user's scroll wins.
+      Proof: test `t8n_same_commit_keeps_scroll`.
+   b. A different commit, or none: scroll resets.
+      Proof: guard test `t8n_new_commit_resets_scroll`.
+   c. The details gain focus: the jump to the bottom wins, as today.
+      Proof: validator's trace.
+4. ellipsis_trim_start never returns more display columns than the width.
+   Edge cases:
+   a. Width 0, 1 or 2 with longer text, including wide characters.
+      Proof: test `t8n_ellipsis_tiny_width`.
+   b. Width 3 or more: the same output as today.
+      Proof: guard test `t8n_ellipsis_normal_width`.
+
+Must still work:
+- Hunk jumps in the diff, and scrolling in every list using these helpers.
+- The existing scroll tests and the app snapshots.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8n_ 2>&1 | grep -cE 't8n_.* ok$')" -ge 10
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8O: Marks and Column Widths
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8O: marks follow commits across batches and reloads, and columns line up for any text.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/components/commitlist.rs
+  - src/components/utils/mod.rs
+  - src/tabs/revlog.rs
+  - src/tabs/stashlist.rs
+READ_ONLY_REFS:
+  - neb: BUG-0054 (rest). Decision D12
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Selection, restore and search precedence don't change (BUG-0067 and BUG-0069 are parked).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of marks: the mark key, clear_marked, history clear, each loaded batch, load finish, set_commits, stash drop and pop.
+
+1. Marks are by commit and ordered by position in the whole list.
+   Edge cases:
+   a. Marks on both sides of a 1200-commit batch boundary, made in either order: list order.
+      Proof: test `t8o_marks_order_across_batches`.
+   b. Commits are added above, or a reload reorders them: the same commits stay marked, in the new order.
+      Proof: test `t8o_marks_follow_reload`.
+   c. History is loading and a marked commit hasn't arrived: the mark stays.
+      Proof: guard test `t8o_marks_survive_loading`.
+   d. Loading finished successfully without it, including an empty history: the mark is dropped, whether or not a selection restore was pending.
+      Proof: test `t8o_gone_mark_dropped`.
+   e. A load that failed or never finished: marks stay. Only a successful finish drops them.
+      Proof: validator's trace.
+   f. The stash list (always complete) loses a stash, including after a partly failed multi-drop: that mark is dropped on that update.
+      Proof: test `t8o_gone_stash_mark_dropped`.
+   g. The mark key while no commit is selected (restore pending or empty list): no change.
+      Proof: guard test `t8o_mark_without_selection`.
+   h. Search highlighting turns on or off: marks don't change.
+      Proof: validator's trace.
+2. Widths are measured in display columns.
+   Edge cases:
+   a. A CJK or emoji string is truncated and padded to exactly the requested width, also when a wide character straddles the edge.
+      Proof: test `t8o_align_wide_text`.
+   b. Non-ASCII author, tag and branch names: the message column fills exactly the remaining width.
+      Proof: test `t8o_message_width_uses_columns`.
+   c. ASCII: the same output as today.
+      Proof: existing `test_string_width_align`.
+
+Must still work:
+- Compare with one or two marks, copy of marked ids, multi-drop.
+- All t7m and t7n tests, and the app snapshots.
+
+Allowed test change: the mark-building helper and `impl Default for CommitList` in the tests may follow a changed mark type. No assertion changes.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8o_ 2>&1 | grep -cE 't8o_.* ok$')" -ge 8
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 8P: Files View Follows Its Revision
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 8P: the file view always shows its revision, handles an empty repo, and edits without a popup on top.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/gitui.rs
+  - src/queue.rs
+  - src/popup_stack.rs
+  - src/strings.rs
+  - src/tabs/files.rs
+  - src/popups/revision_files.rs
+  - src/components/revision_files.rs
+  - src/components/syntax_text.rs
+  - src/ui/syntax_text.rs
+  - filetreelist/src/filetree.rs
+READ_ONLY_REFS:
+  - neb: BUG-0056 (rest), BUG-0072, BUG-0050 (viewer reset). Decisions D13, D14
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. A failed file listing still shows one error and doesn't retry in a loop (7L).
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 trial): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Writers of revision, tree, selection, viewer and focus: HEAD updates, popup open, tree-load results, --select-file, navigation, fuzzy find, highlight results, Left and Right.
+
+1. The Files tab handles every HEAD state.
+   Edge cases:
+   a. Unborn: an empty tree, no "Loading", no error.
+      Proof: test `t8p_unborn_not_loading`.
+   b. Unborn becomes born: the files load.
+      Proof: guard test `t8p_first_commit_loads`.
+   c. Born becomes unborn: tree and viewer clear, and a result still in flight for the old commit loses.
+      Proof: test `t8p_becomes_unborn_clears`.
+   d. HEAD can't be read for another reason: one error (not one per update) and no "Loading".
+      Proof: validator's trace.
+2. When HEAD moves, the Files tab follows the selected path.
+   Edge cases:
+   a. The file still exists: it stays selected with its ancestors open, shows the new content, and scrolls to the top.
+      Proof: test `t8p_head_move_follows_path`.
+   b. The path is gone: select the top entry, clear the viewer, focus the tree.
+      Proof: test `t8p_head_move_path_gone`.
+   c. A directory is selected: it stays selected and the viewer is clear.
+      Proof: validator's trace.
+   d. The user changes the selection during loading: that path wins over the one selected when loading began.
+      Proof: test `t8p_user_choice_during_load_wins`.
+   e. --select-file on the first load: it wins.
+      Proof: guard test `t8p_select_file_first_load`.
+   f. The same HEAD again, loading or loaded: no reload, and selection and scroll stay.
+      Proof: guard test `t8p_same_head_is_stable`.
+   g. A tree result for an older revision arrives late: the current revision wins.
+      Proof: validator's trace.
+3. The viewer never shows another revision or file.
+   Edge cases:
+   a. The same path in another revision: content is loaded again.
+      Proof: test `t8p_same_path_new_revision`.
+   b. Another file: scroll starts at the top.
+      Proof: test `t8p_new_file_scroll_top`.
+   c. A highlight job for older content of the same path finishes late: the current content wins.
+      Proof: test `t8p_stale_highlight_loses`.
+   d. The popup opens on a different commit: top entry, clear viewer, tree focus. The same commit again: state stays.
+      Proof: test `t8p_popup_new_commit_resets`.
+4. The viewer can be focused only when it has lines.
+   Edge cases:
+   a. Nothing loaded, a directory, or a zero-line file: Right doesn't move focus there.
+      Proof: test `t8p_empty_viewer_not_focusable`.
+   b. Content, error text, or content still being highlighted: it can be focused.
+      Proof: guard test `t8p_content_focusable`.
+   c. A focused viewer becomes empty: focus returns to the tree.
+      Proof: test `t8p_emptied_viewer_returns_focus`.
+5. `e` in the revision-files popup edits in the open.
+   Edge cases:
+   a. The working-tree file exists: close the popup and everything stacked under it, switch to Status, then open the editor. Nothing reopens afterwards.
+      Proof: test `t8p_edit_closes_stack`.
+   b. It doesn't exist: show an error. Popup, stack and tab are unchanged.
+      Proof: test `t8p_edit_missing_keeps_popup`.
+   c. From the Files tab: as today.
+      Proof: guard test `t8p_edit_from_tab`.
+   d. A directory or nothing is selected: no effect.
+      Proof: validator's trace.
+
+Must still work:
+- Blame and file history return to the file tree (6D).
+- Fuzzy picks go to the view that opened the finder.
+- Highlighting finishes while the tab is hidden (6E).
+- The existing filetreelist tests.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t8p_ 2>&1 | grep -cE 't8p_.* ok$')" -ge 18
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

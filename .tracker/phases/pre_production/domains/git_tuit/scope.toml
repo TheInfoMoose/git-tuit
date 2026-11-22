@@ -335,7 +335,7 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0042"
 title = "Confirm revert, merge, rebase, detached checkout and submodule update"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:39Z"
 
@@ -363,7 +363,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0046"
 title = "Fix popup key-hint mismatches"
-status = "pending"
+status = "open"
 severity = "low"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -384,7 +384,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0050"
 title = "Fix details layout and scroll clamping on small terminals"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -433,7 +433,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0057"
 title = "Validate popup text input before submit"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -482,16 +482,65 @@ created_at = "2026-11-22T01:47:33Z"
 [[items.bugs]]
 id = "BUG-0065"
 title = "Return focus from a loaded zero-line diff"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T01:47:33Z"
 
 [[items.bugs]]
 id = "BUG-0066"
 title = "Stop error popup on every tag list open"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T01:47:33Z"
+
+[[items.bugs]]
+id = "BUG-0067"
+title = "Keep search and user selection ahead of a pending log restore"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T02:44:10Z"
+
+[[items.bugs]]
+id = "BUG-0068"
+title = "Disable diff focus for a loaded zero-line diff"
+status = "open"
+severity = "low"
+created_at = "2026-11-22T02:44:18Z"
+
+[[items.bugs]]
+id = "BUG-0069"
+title = "Handle unloaded search match when moving the log selection"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T03:06:32Z"
+
+[[items.bugs]]
+id = "BUG-0071"
+title = "Don't discard changes when the following checkout fails"
+status = "open"
+severity = "critical"
+created_at = "2026-11-22T05:16:48Z"
+
+[[items.bugs]]
+id = "BUG-0072"
+title = "Reload file view when the revision changes under the same path"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:16:48Z"
+
+[[items.bugs]]
+id = "BUG-0073"
+title = "Send the tag ref to pre-push when deleting a remote tag"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T05:16:48Z"
+
+[[items.bugs]]
+id = "BUG-0074"
+title = "Finish dropped confirmation fixes from P2-06 and P2-07"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:16:48Z"
 
 [[items.features]]
 id = "FEAT-0002"
@@ -979,7 +1028,7 @@ created_at = "2026-11-22T01:19:20Z"
 [[items.tasks]]
 id = "TASK-0087"
 title = "Confirm before reverting a commit from the log"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-22T02:23:02Z"
 
@@ -989,3 +1038,122 @@ title = "Phase 7 review fixes: log selection, zero-line diff focus, quiet tag lo
 status = "closed"
 severity = "medium"
 created_at = "2026-11-22T02:29:05Z"
+
+[[items.tasks]]
+id = "TASK-0089"
+title = "Require per-edge-case evidence in validator reports"
+status = "closed"
+severity = "medium"
+created_at = "2026-11-22T02:44:18Z"
+
+[[items.tasks]]
+id = "TASK-0090"
+title = "Remove host paths before pushing the fork"
+status = "pending"
+severity = "low"
+created_at = "2026-11-22T02:44:18Z"
+
+[[items.tasks]]
+id = "TASK-0091"
+title = "Require an edge case for every writer and state in outcome steps"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T04:07:19Z"
+
+[[items.tasks]]
+id = "TASK-0094"
+title = "Confirm Revert and Detached Checkout"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0095"
+title = "Confirm Merge, Rebase and Submodule Update"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0096"
+title = "Confirm Hard Reset, Discard and Undo"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0097"
+title = "Pushes and Prompts Name Their Targets"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0098"
+title = "Branch and Tag Input Is Validated"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0099"
+title = "Remote Input Is Validated"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0100"
+title = "Stash Message, Go to Line and Submodule Status"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0101"
+title = "Commit Popup Follows git"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0102"
+title = "Popup Hints Match Their Keys"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0103"
+title = "List and Diff Hints Match Their Keys"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0104"
+title = "Commit Details Fit Small Terminals"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0105"
+title = "Scrolling Survives Resize"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0106"
+title = "Marks and Column Widths"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"
+
+[[items.tasks]]
+id = "TASK-0107"
+title = "Files View Follows Its Revision"
+status = "open"
+severity = "medium"
+created_at = "2026-11-22T05:34:48Z"

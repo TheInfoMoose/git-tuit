@@ -1,0 +1,17 @@
+[item]
+id = "BUG-0074"
+type = "bug"
+title = "Finish dropped confirmation fixes from P2-06 and P2-07"
+status = "open"
+severity = "medium"
+scope_ref = "git_tuit"
+created_at = "2026-11-22T05:16:48Z"
+updated_at = "2026-11-22T05:34:38Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []
