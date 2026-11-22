@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0083"
 type = "task"
 title = "Status Tab and Diff Behave Correctly"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T01:19:19Z"
-updated_at = "2026-11-22T01:19:19Z"
+updated_at = "2026-11-22T01:32:51Z"
 source_ref = "STEP 7J"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 5
 iteration_count = 1
+last_timer_session = "TASK-0083@2026-11-22T01:26:52Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "8e1f07f6"
+summary = "STEP 7J: Status Tab and Diff Behave Correctly (phased check PASS)"
