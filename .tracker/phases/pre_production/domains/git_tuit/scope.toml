@@ -1217,6 +1217,6 @@ created_at = "2026-11-22T21:59:21Z"
 [[items.tasks]]
 id = "TASK-0111"
 title = "Force-Push Refuses a Moved Branch"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T21:59:21Z"
