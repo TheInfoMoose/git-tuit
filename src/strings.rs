@@ -205,7 +205,7 @@ pub fn confirm_title_abortrevert() -> String {
 	"Abort revert?".to_string()
 }
 pub fn confirm_msg_revertchanges() -> String {
-	"This will revert all uncommitted changes. Are you sure?"
+	"Files it changed go back to HEAD. Untracked files and unrelated edits are kept. Are you sure?"
 		.to_string()
 }
 pub fn confirm_title_abortrebase() -> String {
