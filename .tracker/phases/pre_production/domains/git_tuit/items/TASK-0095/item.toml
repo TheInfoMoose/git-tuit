@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0095"
 type = "task"
 title = "Confirm Merge, Rebase and Submodule Update"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T05:34:48Z"
+updated_at = "2026-11-22T06:33:24Z"
 source_ref = "STEP 8D"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 11
 iteration_count = 1
+last_timer_session = "TASK-0095@2026-11-22T06:22:06Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "8c31f94d"
+summary = "STEP 8D: Confirm Merge, Rebase and Submodule Update (phased check PASS)"
