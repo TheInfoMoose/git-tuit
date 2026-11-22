@@ -398,14 +398,14 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.bugs]]
 id = "BUG-0052"
 title = "Fix NeedsUpdate REMOTES bit collision and remote status handling"
-status = "open"
+status = "closed"
 severity = "high"
 created_at = "2026-11-21T05:36:40Z"
 
 [[items.bugs]]
 id = "BUG-0053"
 title = "Fix vim keymap collision and singleline Ctrl+n/p capture"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -461,16 +461,37 @@ created_at = "2026-11-21T18:13:08Z"
 [[items.bugs]]
 id = "BUG-0062"
 title = "Guard the 0-line discard prompt and show the full branch in force-push confirm"
-status = "open"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T20:03:58Z"
 
 [[items.bugs]]
 id = "BUG-0063"
 title = "Restore the previous selection when the fuzzy finder is cancelled"
-status = "open"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T21:33:44Z"
+
+[[items.bugs]]
+id = "BUG-0064"
+title = "Keep log selection across a history reload"
+status = "pending"
+severity = "high"
+created_at = "2026-11-22T01:47:33Z"
+
+[[items.bugs]]
+id = "BUG-0065"
+title = "Return focus from a loaded zero-line diff"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T01:47:33Z"
+
+[[items.bugs]]
+id = "BUG-0066"
+title = "Stop error popup on every tag list open"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T01:47:33Z"
 
 [[items.features]]
 id = "FEAT-0002"
@@ -923,7 +944,7 @@ created_at = "2026-11-21T21:40:36Z"
 [[items.tasks]]
 id = "TASK-0082"
 title = "Resolve dead_code error for DiffComponent::is_empty in STEP 7B"
-status = "pending"
+status = "closed"
 severity = "high"
 created_at = "2026-11-22T00:25:33Z"
 
@@ -954,3 +975,10 @@ title = "Selections Survive a Refresh"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-22T01:19:20Z"
+
+[[items.tasks]]
+id = "TASK-0087"
+title = "Confirm before reverting a commit from the log"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T02:23:02Z"

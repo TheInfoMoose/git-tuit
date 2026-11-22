@@ -62,10 +62,6 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 7J** | `/goal` | Status Tab and Diff Behave Correctly | `src/components/*`, `src/tabs/status.rs`, `src/strings.rs` | — |
-| 2 | **STEP 7K** | `/goal` | Keys and Hints Do What They Say | `src/components/textinput.rs`, `src/popups/*`, `src/tabs/revlog.rs`, `src/strings.rs`, `vim_style_key_config.ron` | — |
-| 3 | **STEP 7L** | `/goal` | Failures and Confirmations Tell the Truth | `src/components/revision_files.rs`, `src/popups/*`, `src/strings.rs` | — |
-| 4 | **STEP 7M** | `/goal` | Selections Survive a Refresh | `src/components/utils/*`, `src/components/commitlist.rs` | — |
 
 ### Completed
 
@@ -138,6 +134,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | STEP 7H | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7L | `src/popups/taglist.rs`, `src/popups/remotelist.rs` |
 | STEP 7I | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7K | `src/popups/fuzzy_find.rs` |
 | STEP 7C | ↪ withdrawn | `/goal` | Not run (pilot re-plan); replaced by STEP 7J | `src/tabs/status.rs` |
+| STEP 7J | ✅ 8e1f07f6 | `/goal` | Status Tab and Diff Behave Correctly | `src/components/*`, `src/tabs/status.rs`, `src/strings.rs` |
+| STEP 7K | ✅ 0e69200b | `/goal` | Keys and Hints Do What They Say | `src/components/textinput.rs`, `src/popups/*`, `src/tabs/revlog.rs`, `src/strings.rs`, `vim_style_key_config.ron` |
+| STEP 7L | ✅ 188e3826 | `/goal` | Failures and Confirmations Tell the Truth | `src/components/revision_files.rs`, `src/popups/*`, `src/strings.rs` |
+| STEP 7M | ✅ d5fd91ec | `/goal` | Selections Survive a Refresh | `src/components/utils/*`, `src/components/commitlist.rs` |
 
 ### User Step: IMAGE
 
