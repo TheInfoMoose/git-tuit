@@ -860,7 +860,7 @@ created_at = "2026-11-21T20:28:03Z"
 [[items.tasks]]
 id = "TASK-0073"
 title = "Bad tab index, Typechange symbol, key symbol errors"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 

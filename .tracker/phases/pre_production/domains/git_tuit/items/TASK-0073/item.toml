@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0073"
 type = "task"
 title = "Bad tab index, Typechange symbol, key symbol errors"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T21:40:36Z"
-updated_at = "2026-11-21T21:40:36Z"
+updated_at = "2026-11-22T00:24:18Z"
 source_ref = "STEP 7A"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 1
 iteration_count = 1
+last_timer_session = "TASK-0073@2026-11-22T00:22:31Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "b4eecc8c"
+summary = "STEP 7A: Bad Tab Index, Typechange Symbol, Key Symbol Errors (phased check PASS)"
