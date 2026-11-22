@@ -263,8 +263,8 @@ impl DiffComponent {
 		}
 	}
 
-	pub const fn is_empty(&self) -> bool {
-		!self.pending && self.diff.is_none()
+	pub fn is_empty(&self) -> bool {
+		!self.pending && self.lines_count() == 0
 	}
 
 	fn lines_count(&self) -> usize {

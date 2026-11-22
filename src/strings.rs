@@ -55,6 +55,9 @@ pub fn title_branches() -> String {
 pub fn title_tags() -> String {
 	"Tags".to_string()
 }
+pub fn title_tags_remote_unknown() -> String {
+	"Tags (remote status unknown)".to_string()
+}
 pub fn title_status(_key_config: &SharedKeyConfig) -> String {
 	"Unstaged Changes".to_string()
 }

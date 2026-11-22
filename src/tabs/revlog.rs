@@ -131,8 +131,12 @@ impl Revlog {
 				self.list.clear();
 			}
 
+			let is_loading = self.git_log.is_pending();
 			self.list
 				.refresh_extend_data(self.git_log.extract_items()?);
+			if !is_loading {
+				self.list.finish_loading();
+			}
 
 			self.git_tags.request(Duration::from_secs(3), false)?;
 
@@ -763,5 +767,95 @@ impl Component for Revlog {
 		self.update()?;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crossbeam_channel::{unbounded, Receiver};
+	use std::cell::RefCell;
+
+	fn env_for_repo(
+		path: &std::path::Path,
+	) -> (Environment, Receiver<AsyncGitNotification>) {
+		let mut env = Environment::test_env();
+		let (tx, rx) = unbounded();
+		env.sender_git = tx;
+		env.repo =
+			RefCell::new(sync::RepoPath::Path(path.to_path_buf()));
+		(env, rx)
+	}
+
+	fn drain_log(
+		revlog: &mut Revlog,
+		rx: &Receiver<AsyncGitNotification>,
+	) {
+		while revlog.git_log.is_pending() {
+			if rx.recv_timeout(Duration::from_secs(2)).is_err() {
+				break;
+			}
+		}
+		revlog.update().unwrap();
+	}
+
+	#[test]
+	fn t7n_reload_missing_commit_clamps() {
+		let (td, repo) = git2_testing::repo_init();
+		let sig = repo.signature().unwrap();
+		let tree = repo
+			.find_tree(repo.index().unwrap().write_tree().unwrap())
+			.unwrap();
+		let c0 = repo.head().unwrap().peel_to_commit().unwrap();
+		let c1_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c1", &tree, &[&c0])
+			.unwrap();
+		let c1 = repo.find_commit(c1_oid).unwrap();
+		let c2_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c2", &tree, &[&c1])
+			.unwrap();
+		let c2 = repo.find_commit(c2_oid).unwrap();
+		let c3_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c3", &tree, &[&c2])
+			.unwrap();
+		let c3 = repo.find_commit(c3_oid).unwrap();
+		let _c4_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c4", &tree, &[&c3])
+			.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut revlog = Revlog::new(&env);
+		revlog.show().unwrap();
+		drain_log(&mut revlog, &rx);
+
+		// History is [c4, c3, c2, c1, c0]. Select c2 (index 2).
+		revlog.select_commit(CommitId::new(c2_oid)).unwrap();
+		revlog.update().unwrap();
+		assert_eq!(
+			revlog.selected_commit(),
+			Some(CommitId::new(c2_oid))
+		);
+
+		// Rewrite HEAD to a 2-commit history [c1_alt, c0] where c2 is gone.
+		let c1_alt_oid = repo
+			.commit(None, &sig, &sig, "c1_alt", &tree, &[&c0])
+			.unwrap();
+		let head_ref =
+			repo.head().unwrap().name().unwrap().to_owned();
+		repo.reference(&head_ref, c1_alt_oid, true, "rewrite")
+			.unwrap();
+
+		revlog.update().unwrap();
+		drain_log(&mut revlog, &rx);
+
+		// Old index 2 clamped to len - 1 = 1 -> c0.
+		assert_eq!(
+			revlog.selected_commit(),
+			Some(CommitId::new(c0.id()))
+		);
+
+		// Empty history after clear is safe.
+		revlog.list.clear();
+		assert!(revlog.selected_commit().is_none());
 	}
 }

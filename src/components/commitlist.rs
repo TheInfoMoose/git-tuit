@@ -36,11 +36,18 @@ use std::{
 const ELEMENTS_PER_LINE: usize = 9;
 const SLICE_SIZE: usize = 1200;
 
+#[derive(Clone, Copy)]
+struct PendingRestore {
+	commit_id: CommitId,
+	old_index: usize,
+}
+
 ///
 pub struct CommitList {
 	repo: RepoPathRef,
 	title: Box<str>,
 	selection: usize,
+	pending_restore: Option<PendingRestore>,
 	highlighted_selection: Option<usize>,
 	items: ItemBatch,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
@@ -68,6 +75,7 @@ impl CommitList {
 			items: ItemBatch::default(),
 			marked: Vec::with_capacity(2),
 			selection: 0,
+			pending_restore: None,
 			highlighted_selection: None,
 			commits: IndexSet::new(),
 			highlights: None,
@@ -91,9 +99,19 @@ impl CommitList {
 
 	///
 	pub fn clear(&mut self) {
+		if self.pending_restore.is_none() && self.selection > 0 {
+			if let Some(&commit_id) =
+				self.commits.get_index(self.selection)
+			{
+				self.pending_restore = Some(PendingRestore {
+					commit_id,
+					old_index: self.selection,
+				});
+			}
+		}
 		self.items.clear();
 		self.commits.clear();
-		self.clamp_selection();
+		self.selection = 0;
 		self.set_highlighted_selection_index();
 	}
 
@@ -109,6 +127,9 @@ impl CommitList {
 
 	///
 	pub fn selected_entry(&self) -> Option<&LogEntry> {
+		if self.pending_restore.is_some() {
+			return None;
+		}
 		self.items.iter().nth(
 			self.selection.saturating_sub(self.items.index_offset()),
 		)
@@ -135,14 +156,7 @@ impl CommitList {
 	/// Build string of marked or selected (if none are marked) commit ids
 	fn concat_selected_commit_ids(&self) -> Option<String> {
 		match self.marked.as_slice() {
-			[] => self
-				.items
-				.iter()
-				.nth(
-					self.selection
-						.saturating_sub(self.items.index_offset()),
-				)
-				.map(|e| e.id.to_string()),
+			[] => self.selected_entry().map(|e| e.id.to_string()),
 			marked => Some(
 				marked
 					.iter()
@@ -209,6 +223,7 @@ impl CommitList {
 
 	///
 	pub fn set_commits(&mut self, commits: IndexSet<CommitId>) {
+		self.pending_restore = None;
 		if commits == self.commits {
 			self.clamp_selection();
 		} else {
@@ -224,13 +239,40 @@ impl CommitList {
 	pub fn refresh_extend_data(&mut self, commits: Vec<CommitId>) {
 		let new_commits = !commits.is_empty();
 		self.commits.extend(commits);
-		self.clamp_selection();
+		if let Some(restore) = self.pending_restore {
+			if let Some(index) =
+				self.commits.get_index_of(&restore.commit_id)
+			{
+				self.selection = index;
+				self.pending_restore = None;
+				self.set_highlighted_selection_index();
+			}
+		} else {
+			self.clamp_selection();
+		}
 
 		let selection = self.selection();
 		let selection_max = self.selection_max();
 
 		if self.needs_data(selection, selection_max) || new_commits {
 			self.fetch_commits(false);
+		}
+	}
+
+	/// Called once an async history load has finished so any
+	/// unresolved restore falls back to the clamped old position.
+	pub fn finish_loading(&mut self) {
+		if let Some(restore) = self.pending_restore.take() {
+			self.selection =
+				restore.old_index.min(self.selection_max());
+			self.set_highlighted_selection_index();
+
+			let selection = self.selection();
+			let selection_max = self.selection_max();
+
+			if self.needs_data(selection, selection_max) {
+				self.fetch_commits(false);
+			}
 		}
 	}
 
@@ -260,6 +302,7 @@ impl CommitList {
 
 		if let Some(index) = index {
 			self.selection = index;
+			self.pending_restore = None;
 			self.set_highlighted_selection_index();
 			Ok(())
 		} else {
@@ -363,6 +406,12 @@ impl CommitList {
 		&mut self,
 		scroll: ScrollType,
 	) -> Result<bool> {
+		if self.commits.is_empty() {
+			return Ok(false);
+		}
+
+		let was_pending = self.pending_restore.take().is_some();
+
 		self.update_scroll_speed();
 
 		#[allow(clippy::cast_possible_truncation)]
@@ -392,7 +441,8 @@ impl CommitList {
 
 		let new_selection =
 			cmp::min(new_selection, self.selection_max());
-		let needs_update = new_selection != self.selection;
+		let needs_update =
+			was_pending || new_selection != self.selection;
 
 		self.selection = new_selection;
 
@@ -620,7 +670,8 @@ impl CommitList {
 
 			txt.push(self.get_entry_to_add(
 				e,
-				idx + self.scroll_top.get() == selection,
+				self.pending_restore.is_none()
+					&& idx + self.scroll_top.get() == selection,
 				tags,
 				local_branches,
 				self.remote_branches_string(e),
@@ -757,8 +808,14 @@ impl CommitList {
 			.items
 			.index_offset_raw()
 			.is_some_and(|index| want_min == index);
+		let expected_len = (commits - want_min).min(SLICE_SIZE);
+		let len_in_sync = self.items.iter().len() == expected_len;
 
-		if !index_in_sync || !self.is_list_in_sync() || force {
+		if !index_in_sync
+			|| !len_in_sync
+			|| !self.is_list_in_sync()
+			|| force
+		{
 			let commits = sync::get_commits_info(
 				&self.repo.borrow(),
 				self.commits
@@ -919,6 +976,7 @@ mod tests {
 			Self {
 				title: String::new().into_boxed_str(),
 				selection: 0,
+				pending_restore: None,
 				highlighted_selection: Option::None,
 				highlights: Option::None,
 				tags: Option::None,
@@ -1125,5 +1183,110 @@ mod tests {
 		cl.clear();
 		assert_eq!(cl.selection(), 0);
 		assert!(cl.selected_entry().is_none());
+	}
+
+	fn repo_with_commits(
+		count: usize,
+	) -> (tempfile::TempDir, Environment, Vec<CommitId>) {
+		let (td, repo) = git2_testing::repo_init();
+		let mut env = Environment::test_env();
+		env.repo = std::cell::RefCell::new(sync::RepoPath::Path(
+			td.path().to_path_buf(),
+		));
+		let mut ids = Vec::with_capacity(count);
+		let mut head = repo.head().unwrap().peel_to_commit().unwrap();
+		ids.push(CommitId::new(head.id()));
+		let sig = repo.signature().unwrap();
+		let tree = repo
+			.find_tree(repo.index().unwrap().write_tree().unwrap())
+			.unwrap();
+		for i in 1..count {
+			let oid = repo
+				.commit(
+					Some("HEAD"),
+					&sig,
+					&sig,
+					&format!("commit {i}"),
+					&tree,
+					&[&head],
+				)
+				.unwrap();
+			head = repo.find_commit(oid).unwrap();
+			ids.push(CommitId::new(oid));
+		}
+		// Revlog order: newest first.
+		ids.reverse();
+		(td, env, ids)
+	}
+
+	#[test]
+	fn t7n_reload_newest_stays_newest() {
+		let (_td, env, ids) = repo_with_commits(4);
+		let mut cl = CommitList::new(&env, "Log");
+		// Initially loaded with [ids[1], ids[2], ids[3]]; newest (ids[1]) is selected.
+		cl.refresh_extend_data(ids[1..].to_vec());
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[1]));
+
+		// Reload with a new commit ids[0] added on top.
+		cl.clear();
+		cl.refresh_extend_data(ids.clone());
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[0]));
+	}
+
+	#[test]
+	fn t7n_reload_follows_commit() {
+		let (_td, env, ids) = repo_with_commits(6);
+		let mut cl = CommitList::new(&env, "Log");
+		// Initially loaded with older 4 commits [ids[2], ids[3], ids[4], ids[5]].
+		cl.refresh_extend_data(ids[2..].to_vec());
+		cl.select_commit(ids[4]).unwrap();
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[4]));
+
+		// Reload with 2 new commits on top, arriving in two batches.
+		cl.clear();
+		cl.refresh_extend_data(ids[..3].to_vec());
+		cl.refresh_extend_data(ids[3..].to_vec());
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[4]));
+	}
+
+	#[test]
+	fn t7n_reload_no_wrong_commit_while_loading() {
+		let (_td, env, ids) = repo_with_commits(5);
+		let mut cl = CommitList::new(&env, "Log");
+		cl.refresh_extend_data(ids[1..].to_vec());
+		cl.select_commit(ids[3]).unwrap();
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[3]));
+
+		// Start reload; first batch does not contain ids[3] yet.
+		cl.clear();
+		assert!(cl.selected_entry().is_none());
+		cl.refresh_extend_data(ids[..2].to_vec());
+		assert!(cl.selected_entry().is_none());
+		assert!(cl.concat_selected_commit_ids().is_none());
+	}
+
+	#[test]
+	fn t7n_reload_user_choice_wins() {
+		let (_td, env, ids) = repo_with_commits(6);
+
+		// User moves selection during loading.
+		let mut cl = CommitList::new(&env, "Log");
+		cl.refresh_extend_data(ids[1..].to_vec());
+		cl.select_commit(ids[4]).unwrap();
+		cl.clear();
+		cl.refresh_extend_data(ids[..3].to_vec());
+		cl.move_selection(ScrollType::Down).unwrap();
+		cl.refresh_extend_data(ids[3..].to_vec());
+		assert_eq!(cl.selected_entry().map(|e| e.id), Some(ids[1]));
+
+		// Jump-to-commit during loading also wins over restore.
+		let mut cl2 = CommitList::new(&env, "Log");
+		cl2.refresh_extend_data(ids[1..].to_vec());
+		cl2.select_commit(ids[4]).unwrap();
+		cl2.clear();
+		cl2.refresh_extend_data(ids[..3].to_vec());
+		cl2.select_commit(ids[2]).unwrap();
+		cl2.refresh_extend_data(ids[3..].to_vec());
+		assert_eq!(cl2.selected_entry().map(|e| e.id), Some(ids[2]));
 	}
 }

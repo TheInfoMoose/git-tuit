@@ -37,6 +37,12 @@ use ratatui::{
 };
 use ui::style::SharedTheme;
 
+enum RemoteTagsStatus {
+	Unknown,
+	Loaded(Vec<String>),
+	Failed,
+}
+
 ///
 pub struct TagListPopup {
 	repo: RepoPathRef,
@@ -46,7 +52,7 @@ pub struct TagListPopup {
 	visible: bool,
 	table_state: std::cell::Cell<TableState>,
 	current_height: std::cell::Cell<usize>,
-	missing_remote_tags: Option<Vec<String>>,
+	remote_tags: RemoteTagsStatus,
 	has_remotes: bool,
 	basic_credential: Option<BasicAuthCredential>,
 	async_remote_tags: AsyncSingleJob<AsyncRemoteTagsJob>,
@@ -99,7 +105,7 @@ impl DrawableComponent for TagListPopup {
 					Block::default()
 						.borders(Borders::ALL)
 						.title(Span::styled(
-							strings::title_tags(),
+							self.title(),
 							self.theme.title(true),
 						))
 						.border_style(self.theme.block(true))
@@ -296,12 +302,20 @@ impl TagListPopup {
 			table_state: std::cell::Cell::new(TableState::default()),
 			current_height: std::cell::Cell::new(0),
 			basic_credential: None,
-			missing_remote_tags: None,
+			remote_tags: RemoteTagsStatus::Unknown,
 			async_remote_tags: AsyncSingleJob::new(
 				env.sender_git.clone(),
 			),
 			key_config: env.key_config.clone(),
 			repo: env.repo.clone(),
+		}
+	}
+
+	fn title(&self) -> String {
+		if matches!(self.remote_tags, RemoteTagsStatus::Failed) {
+			strings::title_tags_remote_unknown()
+		} else {
+			strings::title_tags()
 		}
 	}
 
@@ -315,19 +329,33 @@ impl TagListPopup {
 				.is_ok_and(|branches| !branches.is_empty());
 
 		let basic_credential = if self.has_remotes {
-			if need_username_password(&self.repo.borrow())? {
-				let credential =
-					extract_username_password(&self.repo.borrow())?;
-
-				if credential.is_complete() {
-					Some(credential)
-				} else {
+			match need_username_password(&self.repo.borrow()) {
+				Ok(true) => {
+					match extract_username_password(
+						&self.repo.borrow(),
+					) {
+						Ok(credential)
+							if credential.is_complete() =>
+						{
+							Some(credential)
+						}
+						Ok(_) => None,
+						Err(e) => {
+							log::error!(
+								"remote tags credential error: {e}"
+							);
+							None
+						}
+					}
+				}
+				Ok(false) => None,
+				Err(e) => {
+					log::error!("remote tags error: {e}");
 					None
 				}
-			} else {
-				None
 			}
 		} else {
+			self.remote_tags = RemoteTagsStatus::Unknown;
 			None
 		};
 
@@ -348,14 +376,13 @@ impl TagListPopup {
 			if let Some(job) = self.async_remote_tags.take_last() {
 				match job.result() {
 					Some(Ok(missing_remote_tags)) => {
-						self.missing_remote_tags =
-							Some(missing_remote_tags);
+						self.remote_tags = RemoteTagsStatus::Loaded(
+							missing_remote_tags,
+						);
 					}
 					Some(Err(e)) => {
 						log::error!("remote tags error: {e}");
-						self.queue.push(InternalEvent::ShowErrorMsg(
-							format!("remote tags error:\n{e}"),
-						));
+						self.remote_tags = RemoteTagsStatus::Failed;
 					}
 					None => {}
 				}
@@ -455,14 +482,16 @@ impl TagListPopup {
 		const ATTACHMENT_SYMBOL: &str = "@";
 		const EMPTY_SYMBOL: &str = " ";
 
-		let is_tag_missing_on_remote = self
-			.missing_remote_tags
-			.as_ref()
-			.is_some_and(|missing_remote_tags| {
+		let is_tag_missing_on_remote = match &self.remote_tags {
+			RemoteTagsStatus::Loaded(missing_remote_tags) => {
 				let remote_tag = format!("refs/tags/{}", tag.name);
 
 				missing_remote_tags.contains(&remote_tag)
-			});
+			}
+			RemoteTagsStatus::Unknown | RemoteTagsStatus::Failed => {
+				false
+			}
+		};
 
 		let has_remote_str = if is_tag_missing_on_remote {
 			UPSTREAM_SYMBOL
@@ -510,5 +539,183 @@ impl TagListPopup {
 
 			tag
 		})
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crossbeam_channel::{unbounded, Receiver};
+	use ratatui::{backend::TestBackend, Terminal};
+	use std::{cell::RefCell, time::Duration};
+
+	fn env_for_repo(
+		path: &std::path::Path,
+	) -> (Environment, Receiver<AsyncGitNotification>) {
+		let mut env = Environment::test_env();
+		let (tx, rx) = unbounded();
+		env.sender_git = tx;
+		env.repo =
+			RefCell::new(sync::RepoPath::Path(path.to_path_buf()));
+		(env, rx)
+	}
+
+	fn wait_remote_tags(
+		popup: &mut TagListPopup,
+		rx: &Receiver<AsyncGitNotification>,
+	) {
+		loop {
+			match rx.recv_timeout(Duration::from_secs(5)) {
+				Ok(AsyncGitNotification::RemoteTags) | Err(_) => {
+					break
+				}
+				Ok(_) => {}
+			}
+		}
+		popup.update(AsyncNotification::Git(
+			AsyncGitNotification::RemoteTags,
+		));
+	}
+
+	fn render_popup(popup: &TagListPopup) -> String {
+		let backend = TestBackend::new(80, 24);
+		let mut terminal = Terminal::new(backend).unwrap();
+		terminal
+			.draw(|f| {
+				let area = f.area();
+				popup.draw(f, area).unwrap();
+			})
+			.unwrap();
+		let buf = terminal.backend().buffer();
+		let mut out = String::new();
+		for y in 0..buf.area.height {
+			for x in 0..buf.area.width {
+				out.push_str(buf[(x, y)].symbol());
+			}
+			out.push('\n');
+		}
+		out
+	}
+
+	#[test]
+	fn t7n_remote_tags_failure_is_inline() {
+		// Case 1: unreachable remote (offline).
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		repo.remote(
+			"origin",
+			td.path()
+				.join("nonexistent-remote.git")
+				.to_str()
+				.unwrap(),
+		)
+		.unwrap();
+		repo.reference(
+			"refs/remotes/origin/main",
+			head_oid,
+			true,
+			"test",
+		)
+		.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut popup = TagListPopup::new(&env);
+		popup.open().unwrap();
+		wait_remote_tags(&mut popup, &rx);
+
+		assert!(env.queue.pop().is_none());
+		let rendered = render_popup(&popup);
+		assert!(
+			rendered.contains("remote status unknown"),
+			"expected inline unknown status, got:\n{rendered}"
+		);
+
+		// Case 2: several remotes without origin.
+		let (td2, repo2) = git2_testing::repo_init();
+		let head_oid2 = repo2.head().unwrap().target().unwrap();
+		repo2
+			.remote("upstream", "https://example.com/upstream.git")
+			.unwrap();
+		repo2
+			.remote("fork", "https://example.com/fork.git")
+			.unwrap();
+		repo2
+			.reference(
+				"refs/remotes/upstream/main",
+				head_oid2,
+				true,
+				"test",
+			)
+			.unwrap();
+
+		let (env2, rx2) = env_for_repo(td2.path());
+		let mut popup2 = TagListPopup::new(&env2);
+		popup2.open().unwrap();
+		wait_remote_tags(&mut popup2, &rx2);
+
+		assert!(env2.queue.pop().is_none());
+		let rendered2 = render_popup(&popup2);
+		assert!(
+			rendered2.contains("remote status unknown"),
+			"expected inline unknown status, got:\n{rendered2}"
+		);
+	}
+
+	#[test]
+	fn t7n_remote_tags_state_resets() {
+		let (bare_td, _bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		let head_obj = repo.find_object(head_oid, None).unwrap();
+		repo.tag_lightweight("v1", &head_obj, false).unwrap();
+
+		let bare_url = bare_td.path().to_str().unwrap().to_owned();
+		repo.remote("origin", &bare_url).unwrap();
+		repo.reference(
+			"refs/remotes/origin/main",
+			head_oid,
+			true,
+			"test",
+		)
+		.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut popup = TagListPopup::new(&env);
+
+		// First lookup succeeds: v1 is missing on remote -> shows ↑, no unknown notice.
+		popup.open().unwrap();
+		wait_remote_tags(&mut popup, &rx);
+		assert!(env.queue.pop().is_none());
+		let rendered_ok = render_popup(&popup);
+		assert!(rendered_ok.contains('\u{2191}'));
+		assert!(!rendered_ok.contains("remote status unknown"));
+
+		// Break remote so next lookup fails: old ↑ markers cleared, unknown notice shown, no popup.
+		repo.remote_set_url(
+			"origin",
+			td.path()
+				.join("nonexistent-remote.git")
+				.to_str()
+				.unwrap(),
+		)
+		.unwrap();
+		popup.update_missing_remote_tags();
+		wait_remote_tags(&mut popup, &rx);
+		assert!(env.queue.pop().is_none());
+		let rendered_err = render_popup(&popup);
+		assert!(
+			!rendered_err.contains('\u{2191}'),
+			"expected old remote markers to be cleared, got:\n{rendered_err}"
+		);
+		assert!(rendered_err.contains("remote status unknown"));
+
+		// Restore remote so later success clears unknown notice and restores ↑.
+		repo.remote_set_url("origin", &bare_url).unwrap();
+		popup.update_missing_remote_tags();
+		wait_remote_tags(&mut popup, &rx);
+		assert!(env.queue.pop().is_none());
+		let rendered_ok2 = render_popup(&popup);
+		assert!(rendered_ok2.contains('\u{2191}'));
+		assert!(!rendered_ok2.contains("remote status unknown"));
 	}
 }

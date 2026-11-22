@@ -1165,4 +1165,44 @@ mod tests {
 		status.event(&push_ev).unwrap();
 		assert!(env.queue.pop().is_none());
 	}
+
+	#[test]
+	fn t7n_zero_line_diff_returns_focus() {
+		let (td, _repo) = git2_testing::repo_init();
+		let empty_path = td.path().join("empty.txt");
+		std::fs::write(&empty_path, b"").unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+		status.update_status().unwrap();
+
+		// Focus diff on the empty untracked file (WorkDir).
+		status.switch_focus(Focus::Diff).unwrap();
+		drain_pending(&status, &rx);
+		status.update_diff().unwrap();
+
+		assert!(!status.is_focus_on_diff());
+		assert!(status.focus == Focus::WorkDir);
+		assert!(status.index_wd.focused());
+
+		// Stage the empty file and verify focus returns to Stage.
+		sync::stage_add_file(
+			&env.repo.borrow(),
+			std::path::Path::new("empty.txt"),
+		)
+		.unwrap();
+		status.update().unwrap();
+		drain_pending(&status, &rx);
+		status.update_status().unwrap();
+		status.switch_focus(Focus::Stage).unwrap();
+		status.switch_focus(Focus::Diff).unwrap();
+		drain_pending(&status, &rx);
+		status.update_diff().unwrap();
+
+		assert!(!status.is_focus_on_diff());
+		assert!(status.focus == Focus::Stage);
+		assert!(status.index.focused());
+	}
 }
