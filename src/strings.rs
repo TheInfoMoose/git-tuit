@@ -146,6 +146,13 @@ pub fn commit_editor_msg(_key_config: &SharedKeyConfig) -> String {
 # Lines starting with '#' will be ignored"
 		.to_string()
 }
+pub fn commit_err_empty_msg() -> String {
+	"commit message is empty".to_string()
+}
+pub fn commit_err_signoff_identity() -> String {
+	"signoff requires both user.name and user.email in git config"
+		.to_string()
+}
 pub fn stash_popup_title(_key_config: &SharedKeyConfig) -> String {
 	"Stash".to_string()
 }
