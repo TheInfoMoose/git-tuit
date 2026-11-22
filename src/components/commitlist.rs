@@ -30,6 +30,7 @@ use std::{
 	borrow::Cow, cell::Cell, cmp, collections::BTreeMap, rc::Rc,
 	time::Instant,
 };
+use unicode_width::UnicodeWidthStr;
 
 const ELEMENTS_PER_LINE: usize = 9;
 const SLICE_SIZE: usize = 1200;
@@ -50,10 +51,8 @@ pub struct CommitList {
 	items: ItemBatch,
 	highlights: Option<Rc<IndexSet<CommitId>>>,
 	commits: IndexSet<CommitId>,
-	/// The marked commits.
-	/// `self.marked[].0` holds the commit index into `self.items.items` - used for ordering the list.
-	/// `self.marked[].1` is the commit id of the marked commit.
-	marked: Vec<(usize, CommitId)>,
+	/// The marked commits, ordered by position in `self.commits`.
+	marked: Vec<CommitId>,
 	scroll_state: (Instant, f32),
 	tags: Option<Tags>,
 	local_branches: BTreeMap<CommitId, Vec<BranchInfo>>,
@@ -145,22 +144,27 @@ impl CommitList {
 
 	///
 	pub fn marked_commits(&self) -> Vec<CommitId> {
-		let (_, commits): (Vec<_>, Vec<CommitId>) =
-			self.marked.iter().copied().unzip();
+		self.marked.clone()
+	}
 
-		commits
+	fn sort_marked(&mut self) {
+		self.marked.sort_by_key(|id| {
+			self.commits.get_index_of(id).unwrap_or(usize::MAX)
+		});
+	}
+
+	fn prune_and_sort_marked(&mut self) {
+		self.marked.retain(|id| self.commits.contains(id));
+		self.sort_marked();
 	}
 
 	/// Build string of marked or selected (if none are marked) commit ids
 	fn concat_selected_commit_ids(&self) -> Option<String> {
 		match self.marked.as_slice() {
 			[] => self.selected_entry().map(|e| e.id.to_string()),
-			marked => Some(
-				marked
-					.iter()
-					.map(|(_idx, commit)| commit.to_string())
-					.join(" "),
-			),
+			marked => {
+				Some(marked.iter().map(ToString::to_string).join(" "))
+			}
 		}
 	}
 
@@ -218,12 +222,18 @@ impl CommitList {
 			self.set_highlighted_selection_index();
 			self.fetch_commits(false);
 		}
+		if !self.marked.is_empty() {
+			self.prune_and_sort_marked();
+		}
 	}
 
 	///
 	pub fn refresh_extend_data(&mut self, commits: Vec<CommitId>) {
 		let new_commits = !commits.is_empty();
 		self.commits.extend(commits);
+		if new_commits && !self.marked.is_empty() {
+			self.sort_marked();
+		}
 		if let Some(restore) = self.pending_restore {
 			if let Some(index) =
 				self.commits.get_index_of(&restore.commit_id)
@@ -247,6 +257,9 @@ impl CommitList {
 	/// Called once an async history load has finished so any
 	/// unresolved restore falls back to the clamped old position.
 	pub fn finish_loading(&mut self) {
+		if !self.marked.is_empty() {
+			self.prune_and_sort_marked();
+		}
 		if let Some(restore) = self.pending_restore.take() {
 			self.selection =
 				restore.old_index.min(self.selection_max());
@@ -437,17 +450,11 @@ impl CommitList {
 	fn mark(&mut self) {
 		if let Some(e) = self.selected_entry() {
 			let id = e.id;
-			let selected = self
-				.selection
-				.saturating_sub(self.items.index_offset());
-			if self.is_marked(&id).unwrap_or_default() {
-				self.marked.retain(|marked| marked.1 != id);
+			if self.marked.contains(&id) {
+				self.marked.retain(|marked| *marked != id);
 			} else {
-				self.marked.push((selected, id));
-
-				self.marked.sort_unstable_by(|first, second| {
-					first.0.cmp(&second.0)
-				});
+				self.marked.push(id);
+				self.sort_marked();
 			}
 		}
 	}
@@ -480,9 +487,7 @@ impl CommitList {
 		if self.marked.is_empty() {
 			None
 		} else {
-			let found =
-				self.marked.iter().any(|entry| entry.1 == *id);
-			Some(found)
+			Some(self.marked.contains(id))
 		}
 	}
 
@@ -599,15 +604,21 @@ impl CommitList {
 
 		txt.push(splitter);
 
-		let message_width = width.saturating_sub(
-			txt.iter().map(|span| span.content.len()).sum(),
-		);
+		let message_width =
+			width.saturating_sub(txt.iter().map(Span::width).sum());
+		let msg_width = UnicodeWidthStr::width(&*e.msg);
+		let msg = if msg_width < message_width {
+			format!(
+				"{}{}",
+				e.msg,
+				" ".repeat(message_width - msg_width)
+			)
+		} else {
+			e.msg.to_string()
+		};
 
 		// commit msg
-		txt.push(Span::styled(
-			format!("{:message_width$}", e.msg),
-			style_msg,
-		));
+		txt.push(Span::styled(msg, style_msg));
 
 		Line::from(txt)
 	}
@@ -1037,13 +1048,11 @@ mod tests {
 	fn build_marked_from_indices(
 		cl: &CommitList,
 		marked_indices: &[usize],
-	) -> Vec<(usize, CommitId)> {
+	) -> Vec<CommitId> {
 		let offset = cl.items.index_offset();
 		marked_indices
 			.iter()
-			.map(|idx| {
-				(*idx, cl.items.iter().nth(*idx - offset).unwrap().id)
-			})
+			.map(|idx| cl.items.iter().nth(*idx - offset).unwrap().id)
 			.collect()
 	}
 
@@ -1267,5 +1276,193 @@ mod tests {
 		cl2.select_commit(ids[2]).unwrap();
 		cl2.refresh_extend_data(ids[3..].to_vec());
 		assert_eq!(cl2.selected_entry().map(|e| e.id), Some(ids[2]));
+	}
+
+	fn fake_commit_id(idx: usize) -> CommitId {
+		CommitId::from_str_unchecked(&format!("{idx:040}")).unwrap()
+	}
+
+	fn load_window(cl: &mut CommitList, start: usize, len: usize) {
+		let items = (start..start + len)
+			.map(|idx| CommitInfo {
+				message: format!("msg {idx}"),
+				time: 0,
+				author: String::from("testuser"),
+				id: cl.commits[idx],
+			})
+			.collect();
+		cl.items.set_items(start, items, None);
+	}
+
+	#[test]
+	fn t8o_marks_order_across_batches() {
+		let ids: Vec<CommitId> =
+			(0..1300).map(fake_commit_id).collect();
+
+		// Order 1: mark earlier commit (index 1000, offset 0) then later commit (index 1250, offset 650).
+		let mut cl = CommitList {
+			commits: ids.iter().copied().collect(),
+			selection: 1000,
+			..Default::default()
+		};
+		load_window(&mut cl, 0, SLICE_SIZE);
+		cl.mark();
+		cl.selection = 1250;
+		load_window(&mut cl, 650, 650);
+		cl.mark();
+		assert_eq!(cl.marked_commits(), vec![ids[1000], ids[1250]]);
+
+		// Order 2: mark later commit (index 1250) first, then earlier commit (index 1000).
+		let mut cl2 = CommitList {
+			commits: ids.iter().copied().collect(),
+			selection: 1250,
+			..Default::default()
+		};
+		load_window(&mut cl2, 650, 650);
+		cl2.mark();
+		cl2.selection = 1000;
+		load_window(&mut cl2, 0, SLICE_SIZE);
+		cl2.mark();
+		assert_eq!(cl2.marked_commits(), vec![ids[1000], ids[1250]]);
+	}
+
+	#[test]
+	fn t8o_marks_follow_reload() {
+		let (_td, env, ids) = repo_with_commits(5);
+		let mut cl = CommitList::new(&env, "Log");
+
+		// Load [ids[2], ids[3], ids[4]], mark ids[2] and ids[4].
+		cl.refresh_extend_data(ids[2..].to_vec());
+		cl.select_commit(ids[2]).unwrap();
+		cl.mark();
+		cl.select_commit(ids[4]).unwrap();
+		cl.mark();
+		assert_eq!(cl.marked_commits(), vec![ids[2], ids[4]]);
+
+		// Reload with commits added above: [ids[0], ids[1], ids[2], ids[3], ids[4]].
+		cl.clear();
+		cl.refresh_extend_data(ids.clone());
+		cl.finish_loading();
+		assert_eq!(cl.marked_commits(), vec![ids[2], ids[4]]);
+
+		// Reload with commits reordered: [ids[4], ids[3], ids[2]].
+		cl.clear();
+		cl.refresh_extend_data(vec![ids[4], ids[3], ids[2]]);
+		cl.finish_loading();
+		assert_eq!(cl.marked_commits(), vec![ids[4], ids[2]]);
+	}
+
+	#[test]
+	fn t8o_marks_survive_loading() {
+		let (_td, env, ids) = repo_with_commits(4);
+		let mut cl = CommitList::new(&env, "Log");
+		cl.refresh_extend_data(ids.clone());
+		cl.select_commit(ids[3]).unwrap();
+		cl.mark();
+		assert_eq!(cl.marked_commits(), vec![ids[3]]);
+
+		// Reload starts; first batch does not contain ids[3] yet, and loading has not finished.
+		cl.clear();
+		cl.refresh_extend_data(ids[..2].to_vec());
+		assert_eq!(cl.marked_commits(), vec![ids[3]]);
+	}
+
+	#[test]
+	fn t8o_gone_mark_dropped() {
+		let (_td, env, ids) = repo_with_commits(4);
+		let mut cl = CommitList::new(&env, "Log");
+
+		// Subcase A: no selection restore pending (selection at 0).
+		cl.refresh_extend_data(ids[..3].to_vec());
+		cl.select_commit(ids[1]).unwrap();
+		cl.mark();
+		cl.select_commit(ids[2]).unwrap();
+		cl.mark();
+		cl.select_commit(ids[0]).unwrap();
+		cl.clear();
+		assert!(cl.pending_restore.is_none());
+		cl.refresh_extend_data(ids[..2].to_vec());
+		cl.finish_loading();
+		assert_eq!(cl.marked_commits(), vec![ids[1]]);
+
+		// Subcase B: selection restore pending (selection > 0).
+		cl.select_commit(ids[1]).unwrap();
+		cl.clear();
+		assert!(cl.pending_restore.is_some());
+		cl.refresh_extend_data(vec![ids[0]]);
+		cl.finish_loading();
+		assert_eq!(cl.marked_commits(), Vec::<CommitId>::new());
+
+		// Subcase C: empty history after load finishes.
+		cl.select_commit(ids[0]).unwrap();
+		cl.mark();
+		assert_eq!(cl.marked_commits(), vec![ids[0]]);
+		cl.clear();
+		cl.finish_loading();
+		assert_eq!(cl.marked_commits(), Vec::<CommitId>::new());
+	}
+
+	#[test]
+	fn t8o_mark_without_selection() {
+		let (_td, env, ids) = repo_with_commits(3);
+		let mark_key = Event::Key(crossterm::event::KeyEvent::new(
+			env.key_config.keys.log_mark_commit.code,
+			env.key_config.keys.log_mark_commit.modifiers,
+		));
+
+		// Empty list: mark key makes no change.
+		let mut cl = CommitList::new(&env, "Log");
+		cl.event(&mark_key).unwrap();
+		assert_eq!(cl.marked_commits(), Vec::<CommitId>::new());
+
+		// Pending restore: mark key makes no change.
+		cl.refresh_extend_data(ids.clone());
+		cl.select_commit(ids[1]).unwrap();
+		cl.mark();
+		cl.select_commit(ids[2]).unwrap();
+		cl.clear();
+		cl.refresh_extend_data(vec![ids[0]]);
+		assert!(cl.selected_entry().is_none());
+		cl.event(&mark_key).unwrap();
+		assert_eq!(cl.marked_commits(), vec![ids[1]]);
+	}
+
+	#[test]
+	fn t8o_message_width_uses_columns() {
+		let cl = CommitList::default();
+		let entry = LogEntry::from(CommitInfo {
+			message: String::from("fix bug"),
+			time: 0,
+			author: String::from("田中太郎"),
+			id: fake_commit_id(1),
+		});
+		let now = Zoned::now();
+		let width = 80;
+
+		let line = cl.get_entry_to_add(
+			&entry,
+			false,
+			Some(String::from("<リリース>")),
+			Some(String::from("{機能}")),
+			Some(String::from("[リモート]")),
+			&Theme::default(),
+			width,
+			&now,
+			None,
+		);
+		assert_eq!(line.width(), width);
+
+		let marked_line = cl.get_entry_to_add(
+			&entry,
+			false,
+			Some(String::from("<リリース>")),
+			Some(String::from("{機能}")),
+			None,
+			&Theme::default(),
+			width,
+			&now,
+			Some(true),
+		);
+		assert_eq!(marked_line.width(), width);
 	}
 }

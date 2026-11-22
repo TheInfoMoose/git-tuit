@@ -115,14 +115,24 @@ impl StashList {
 		repo: &RepoPath,
 		ids: &[CommitId],
 	) -> Result<()> {
+		let mut drop_err = None;
 		for id in ids {
-			sync::stash_drop(repo, *id)?;
+			if let Err(err) = sync::stash_drop(repo, *id) {
+				drop_err = Some(err);
+				break;
+			}
 		}
 
-		self.list.clear_marked();
-		self.update()?;
+		if drop_err.is_none() {
+			self.list.clear_marked();
+		}
+		let update_res = self.update();
 
-		Ok(())
+		if let Some(err) = drop_err {
+			return Err(err.into());
+		}
+
+		update_res
 	}
 
 	fn pop(&mut self, repo: &RepoPath, id: CommitId) -> Result<()> {
@@ -324,5 +334,87 @@ mod tests {
 		);
 		assert!(!repo.head_detached().unwrap());
 		assert!(env.queue.pop().is_none());
+	}
+
+	#[test]
+	fn t8o_gone_stash_mark_dropped() {
+		let (td, mut repo) = git2_testing::repo_init();
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		let repo_path = RepoPath::Path(td.path().to_path_buf());
+
+		std::fs::write(workdir.join("f.txt"), "base").unwrap();
+		{
+			let mut idx = repo.index().unwrap();
+			idx.add_path(std::path::Path::new("f.txt")).unwrap();
+			idx.write().unwrap();
+			let tree =
+				repo.find_tree(idx.write_tree().unwrap()).unwrap();
+			let sig = repo.signature().unwrap();
+			let parent =
+				repo.head().unwrap().peel_to_commit().unwrap();
+			repo.commit(
+				Some("HEAD"),
+				&sig,
+				&sig,
+				"base",
+				&tree,
+				&[&parent],
+			)
+			.unwrap();
+		}
+
+		let sig = repo.signature().unwrap();
+		for label in ["s1", "s2", "s3"] {
+			std::fs::write(workdir.join("f.txt"), label).unwrap();
+			repo.stash_save(&sig, label, None).unwrap();
+		}
+
+		let mut env = Environment::test_env();
+		env.repo = RefCell::new(repo_path.clone());
+
+		let mut stashlist = StashList::new(&env);
+		stashlist.show().unwrap();
+
+		let stashes = sync::get_stashes(&repo_path).unwrap();
+		assert_eq!(stashes.len(), 3);
+		let mark_key = Event::Key(KeyEvent::new(
+			env.key_config.keys.log_mark_commit.code,
+			env.key_config.keys.log_mark_commit.modifiers,
+		));
+
+		// Mark stashes[0] and stashes[2].
+		stashlist.list.select_commit(stashes[0]).unwrap();
+		stashlist.event(&mark_key).unwrap();
+		stashlist.list.select_commit(stashes[2]).unwrap();
+		stashlist.event(&mark_key).unwrap();
+		assert_eq!(
+			stashlist.list.marked_commits(),
+			vec![stashes[0], stashes[2]]
+		);
+
+		// Subcase A: stash disappears externally; update drops its mark.
+		sync::stash_drop(&repo_path, stashes[2]).unwrap();
+		stashlist.update().unwrap();
+		assert_eq!(stashlist.list.marked_commits(), vec![stashes[0]]);
+
+		// Subcase B: partly failed multi-drop drops the mark of the
+		// removed stash while keeping the remaining marked stash.
+		stashlist.list.select_commit(stashes[1]).unwrap();
+		stashlist.event(&mark_key).unwrap();
+		assert_eq!(
+			stashlist.list.marked_commits(),
+			vec![stashes[0], stashes[1]]
+		);
+
+		let bogus = CommitId::from_str_unchecked(
+			"1111111111111111111111111111111111111111",
+		)
+		.unwrap();
+		let res = stashlist.action_confirmed(
+			&repo_path,
+			&Action::StashDrop(vec![stashes[0], bogus]),
+		);
+		assert!(res.is_err());
+		assert_eq!(stashlist.list.marked_commits(), vec![stashes[1]]);
 	}
 }
