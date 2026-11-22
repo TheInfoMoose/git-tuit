@@ -1080,4 +1080,46 @@ mod tests {
 			assert!(!repo.head_detached().unwrap());
 		}
 	}
+
+	#[test]
+	fn t8l_log_find_hint() {
+		use crate::keys::KeyConfig;
+		use crossterm::event::{KeyCode, KeyModifiers};
+
+		let (td, _repo) = git2_testing::repo_init();
+		let (mut env, _rx) = env_for_repo(td.path());
+		let mut cfg = KeyConfig::default();
+		cfg.keys.file_find.code = KeyCode::Char('f');
+		cfg.keys.file_find.modifiers = KeyModifiers::empty();
+		cfg.keys.log_find.code = KeyCode::Char('?');
+		cfg.keys.log_find.modifiers = KeyModifiers::empty();
+		env.key_config = Rc::new(cfg);
+
+		let mut revlog = Revlog::new(&env);
+		revlog.visible = true;
+
+		let mut cmds = Vec::new();
+		revlog.commands(&mut cmds, false);
+
+		let find_cmd = cmds
+			.iter()
+			.find(|c| c.text.desc == "start commit search")
+			.unwrap();
+		let log_find_hint =
+			env.key_config.get_hint(env.key_config.keys.log_find);
+		let file_find_hint =
+			env.key_config.get_hint(env.key_config.keys.file_find);
+		assert!(
+			find_cmd.text.name.contains(&log_find_hint),
+			"log find hint '{}' must show log_find '{}'",
+			find_cmd.text.name,
+			log_find_hint
+		);
+		assert!(
+			!find_cmd.text.name.contains(&file_find_hint),
+			"log find hint '{}' must not show file_find '{}'",
+			find_cmd.text.name,
+			file_find_hint
+		);
+	}
 }

@@ -82,9 +82,11 @@ impl Component for CompareCommitsPopup {
 
 			out.push(
 				CommandInfo::new(
-					strings::commands::close_popup(&self.key_config),
+					strings::commands::close_popup_left(
+						&self.key_config,
+					),
 					true,
-					true,
+					!self.diff.focused() || force_all,
 				)
 				.order(1),
 			);
@@ -95,11 +97,16 @@ impl Component for CompareCommitsPopup {
 				!self.diff.focused() || force_all,
 			));
 
-			out.push(CommandInfo::new(
-				strings::commands::diff_focus_left(&self.key_config),
-				true,
-				self.diff.focused() || force_all,
-			));
+			out.push(
+				CommandInfo::new(
+					strings::commands::diff_focus_left(
+						&self.key_config,
+					),
+					true,
+					self.diff.focused() || force_all,
+				)
+				.order(1),
+			);
 		}
 
 		visibility_blocking(self)

@@ -267,6 +267,11 @@ impl DiffComponent {
 		!self.pending && self.lines_count() == 0
 	}
 
+	pub fn is_loaded_empty(&self) -> bool {
+		!self.pending
+			&& self.diff.as_ref().is_some_and(|d| d.lines == 0)
+	}
+
 	fn lines_count(&self) -> usize {
 		self.diff.as_ref().map_or(0, |diff| diff.lines)
 	}

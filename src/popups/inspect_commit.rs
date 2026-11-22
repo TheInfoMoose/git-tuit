@@ -110,9 +110,11 @@ impl Component for InspectCommitPopup {
 
 			out.push(
 				CommandInfo::new(
-					strings::commands::close_popup(&self.key_config),
+					strings::commands::close_popup_left(
+						&self.key_config,
+					),
 					true,
-					true,
+					!self.diff.focused() || force_all,
 				)
 				.order(1),
 			);
@@ -123,11 +125,16 @@ impl Component for InspectCommitPopup {
 				!self.diff.focused() || force_all,
 			));
 
-			out.push(CommandInfo::new(
-				strings::commands::close_popup(&self.key_config),
-				true,
-				self.diff.focused() || force_all,
-			));
+			out.push(
+				CommandInfo::new(
+					strings::commands::diff_focus_left(
+						&self.key_config,
+					),
+					true,
+					self.diff.focused() || force_all,
+				)
+				.order(1),
+			);
 
 			out.push(CommandInfo::new(
 				strings::commands::inspect_file_tree(
@@ -331,5 +338,250 @@ impl InspectCommitPopup {
 		} else {
 			self.queue.push(InternalEvent::PopupStackPop);
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::popups::{
+		CompareCommitsPopup, FileRevOpen, FileRevlogPopup,
+	};
+	use asyncgit::sync::RepoPath;
+	use crossbeam_channel::{unbounded, Receiver};
+	use crossterm::event::{Event, KeyEvent};
+	use std::{cell::RefCell, path::Path, time::Duration};
+
+	fn repo_with_two_commits(
+	) -> (tempfile::TempDir, CommitId, CommitId) {
+		let (td, repo) = git2_testing::repo_init();
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		let sig = repo.signature().unwrap();
+		let c0 = repo.head().unwrap().peel_to_commit().unwrap();
+
+		std::fs::write(workdir.join("a.txt"), "one\n").unwrap();
+		let mut idx = repo.index().unwrap();
+		idx.add_path(Path::new("a.txt")).unwrap();
+		idx.write().unwrap();
+		let tree1 =
+			repo.find_tree(idx.write_tree().unwrap()).unwrap();
+		let c1_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c1", &tree1, &[&c0])
+			.unwrap();
+		let c1 = repo.find_commit(c1_oid).unwrap();
+
+		std::fs::write(workdir.join("a.txt"), "one\ntwo\n").unwrap();
+		let mut idx = repo.index().unwrap();
+		idx.add_path(Path::new("a.txt")).unwrap();
+		idx.write().unwrap();
+		let tree2 =
+			repo.find_tree(idx.write_tree().unwrap()).unwrap();
+		let c2_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c2", &tree2, &[&c1])
+			.unwrap();
+
+		(td, CommitId::new(c1_oid), CommitId::new(c2_oid))
+	}
+
+	fn env_for_repo(
+		path: &Path,
+	) -> (Environment, Receiver<AsyncGitNotification>) {
+		let mut env = Environment::test_env();
+		let (tx, rx) = unbounded();
+		env.sender_git = tx;
+		env.repo = RefCell::new(RepoPath::Path(path.to_path_buf()));
+		(env, rx)
+	}
+
+	fn assert_diff_back_is_exit(
+		cmds: &[CommandInfo],
+		key_config: &SharedKeyConfig,
+		label: &str,
+	) {
+		let exit_hint =
+			key_config.get_hint(key_config.keys.exit_popup);
+		let left_hint =
+			key_config.get_hint(key_config.keys.move_left);
+		let visible_back: Vec<_> = cmds
+			.iter()
+			.filter(|c| {
+				c.show_in_quickbar()
+					&& c.text.name.starts_with("Back")
+			})
+			.collect();
+		assert_eq!(
+			visible_back.len(),
+			1,
+			"{label} diff focus must show one Back hint"
+		);
+		assert!(
+			visible_back[0].text.name.contains(&exit_hint)
+				&& !visible_back[0].text.name.contains(&left_hint),
+			"{label} Back hint '{}' must show exit_popup '{}'",
+			visible_back[0].text.name,
+			exit_hint
+		);
+	}
+
+	#[test]
+	fn t8l_diff_back_is_exit() {
+		let (td, c1, c2) = repo_with_two_commits();
+		let (env, rx) = env_for_repo(td.path());
+		let right = env.key_config.keys.move_right;
+		let right_ev =
+			Event::Key(KeyEvent::new(right.code, right.modifiers));
+
+		// 1. InspectCommitPopup
+		let mut inspect = InspectCommitPopup::new(&env);
+		inspect.open(InspectCommitOpen::new(c2)).unwrap();
+		while inspect.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				inspect.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		inspect.update().unwrap();
+		inspect.event(&right_ev).unwrap();
+		assert!(inspect.diff.focused());
+
+		let mut cmds = Vec::new();
+		inspect.commands(&mut cmds, false);
+		assert_diff_back_is_exit(&cmds, &env.key_config, "inspect");
+
+		// 2. CompareCommitsPopup
+		let mut compare = CompareCommitsPopup::new(&env);
+		compare
+			.open(InspectCommitOpen {
+				commit_id: c2,
+				compare_id: Some(c1),
+				tags: None,
+			})
+			.unwrap();
+		while compare.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				compare.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		compare
+			.update_git(AsyncGitNotification::CommitFiles)
+			.unwrap();
+		compare.event(&right_ev).unwrap();
+
+		cmds.clear();
+		compare.commands(&mut cmds, false);
+		assert_diff_back_is_exit(&cmds, &env.key_config, "compare");
+
+		// 3. FileRevlogPopup
+		let mut history = FileRevlogPopup::new(&env);
+		history.open(FileRevOpen::new("a.txt".into())).unwrap();
+		while history.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				history.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		history.update().unwrap();
+		history.event(&right_ev).unwrap();
+
+		cmds.clear();
+		history.commands(&mut cmds, false);
+		assert_diff_back_is_exit(
+			&cmds,
+			&env.key_config,
+			"file history",
+		);
+	}
+
+	#[test]
+	fn t8l_list_close_hints() {
+		let (td, c1, c2) = repo_with_two_commits();
+		let (env, rx) = env_for_repo(td.path());
+		let exit_hint =
+			env.key_config.get_hint(env.key_config.keys.exit_popup);
+		let left_hint =
+			env.key_config.get_hint(env.key_config.keys.move_left);
+
+		// InspectCommitPopup with file list focused
+		let mut inspect = InspectCommitPopup::new(&env);
+		inspect.open(InspectCommitOpen::new(c2)).unwrap();
+		while inspect.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				inspect.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		inspect.update().unwrap();
+		assert!(!inspect.diff.focused());
+
+		let mut cmds = Vec::new();
+		inspect.commands(&mut cmds, false);
+		let close_cmds: Vec<_> = cmds
+			.iter()
+			.filter(|c| {
+				c.show_in_quickbar()
+					&& c.text.name.starts_with("Close")
+			})
+			.collect();
+		assert_eq!(
+			close_cmds.len(),
+			1,
+			"inspect list focus must not list Close twice"
+		);
+		assert!(
+			close_cmds[0].text.name.contains(&exit_hint)
+				&& close_cmds[0].text.name.contains(&left_hint),
+			"inspect Close hint '{}' must show both '{}' and '{}'",
+			close_cmds[0].text.name,
+			exit_hint,
+			left_hint
+		);
+
+		// CompareCommitsPopup with file list focused
+		let mut compare = CompareCommitsPopup::new(&env);
+		compare
+			.open(InspectCommitOpen {
+				commit_id: c2,
+				compare_id: Some(c1),
+				tags: None,
+			})
+			.unwrap();
+		while compare.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				compare.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		compare
+			.update_git(AsyncGitNotification::CommitFiles)
+			.unwrap();
+
+		cmds.clear();
+		compare.commands(&mut cmds, false);
+		let close_cmds: Vec<_> = cmds
+			.iter()
+			.filter(|c| {
+				c.show_in_quickbar()
+					&& c.text.name.starts_with("Close")
+			})
+			.collect();
+		assert_eq!(
+			close_cmds.len(),
+			1,
+			"compare list focus must not list Close twice"
+		);
+		assert!(
+			close_cmds[0].text.name.contains(&exit_hint)
+				&& close_cmds[0].text.name.contains(&left_hint),
+			"compare Close hint '{}' must show both '{}' and '{}'",
+			close_cmds[0].text.name,
+			exit_hint,
+			left_hint
+		);
 	}
 }

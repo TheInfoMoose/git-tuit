@@ -115,7 +115,7 @@ impl Component for RemoteListPopup {
 			out.push(CommandInfo::new(
 				strings::commands::create_remote(&self.key_config),
 				true,
-				self.valid_selection(),
+				true,
 			));
 
 			out.push(CommandInfo::new(
@@ -488,5 +488,41 @@ impl RemoteListPopup {
 				));
 			}
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use asyncgit::sync::RepoPath;
+	use std::cell::RefCell;
+
+	#[test]
+	fn t8l_add_remote_when_empty() {
+		let (td, _repo) = git2_testing::repo_init();
+		let mut env = Environment::test_env();
+		env.repo =
+			RefCell::new(RepoPath::Path(td.path().to_path_buf()));
+
+		let mut popup = RemoteListPopup::new(&env);
+		popup.open().unwrap();
+		assert_eq!(popup.remote_names.len(), 0);
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		let add_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::create_remote(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			add_cmd.show_in_quickbar() && add_cmd.enabled,
+			"Add remote must be offered with zero remotes"
+		);
 	}
 }

@@ -589,11 +589,18 @@ impl Component for FileRevlogPopup {
 		force_all: bool,
 	) -> CommandBlocking {
 		if self.is_visible() || force_all {
+			self.diff.commands(out, force_all);
+
+			out.push(CommandInfo::new(
+				strings::commands::scroll(&self.key_config),
+				true,
+				!self.diff.focused(),
+			));
 			out.push(
 				CommandInfo::new(
 					strings::commands::close_popup(&self.key_config),
 					true,
-					true,
+					!self.diff.focused() || force_all,
 				)
 				.order(1),
 			);
@@ -619,13 +626,18 @@ impl Component for FileRevlogPopup {
 			out.push(CommandInfo::new(
 				strings::commands::diff_focus_right(&self.key_config),
 				self.can_focus_diff(),
-				!self.diff.focused(),
+				!self.diff.focused() || force_all,
 			));
-			out.push(CommandInfo::new(
-				strings::commands::diff_focus_left(&self.key_config),
-				true,
-				self.diff.focused(),
-			));
+			out.push(
+				CommandInfo::new(
+					strings::commands::diff_focus_left(
+						&self.key_config,
+					),
+					true,
+					self.diff.focused() || force_all,
+				)
+				.order(1),
+			);
 		}
 
 		visibility_blocking(self)
@@ -643,5 +655,102 @@ impl Component for FileRevlogPopup {
 		self.visible = true;
 
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use asyncgit::sync::RepoPath;
+	use crossbeam_channel::unbounded;
+	use crossterm::event::{Event, KeyEvent};
+	use std::{cell::RefCell, path::Path, time::Duration};
+
+	#[test]
+	fn t8l_file_history_hints() {
+		let (td, repo) = git2_testing::repo_init();
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		let sig = repo.signature().unwrap();
+		let c0 = repo.head().unwrap().peel_to_commit().unwrap();
+
+		std::fs::write(workdir.join("a.txt"), "line1\nline2\n")
+			.unwrap();
+		let mut idx = repo.index().unwrap();
+		idx.add_path(Path::new("a.txt")).unwrap();
+		idx.write().unwrap();
+		let tree = repo.find_tree(idx.write_tree().unwrap()).unwrap();
+		repo.commit(Some("HEAD"), &sig, &sig, "c1", &tree, &[&c0])
+			.unwrap();
+
+		let mut env = Environment::test_env();
+		let (tx, rx) = unbounded();
+		env.sender_git = tx;
+		env.repo =
+			RefCell::new(RepoPath::Path(td.path().to_path_buf()));
+
+		let mut popup = FileRevlogPopup::new(&env);
+		popup.open(FileRevOpen::new("a.txt".into())).unwrap();
+		while popup.any_work_pending() {
+			if let Ok(ev) = rx.recv_timeout(Duration::from_secs(2)) {
+				popup.update_git(ev).unwrap();
+			} else {
+				break;
+			}
+		}
+		popup.update().unwrap();
+		assert!(!popup.diff.focused());
+
+		// List focused: list scrolling is shown; diff-only hints are not.
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+		let has_scroll = cmds.iter().any(|c| {
+			c.show_in_quickbar()
+				&& c.text
+					== strings::commands::scroll(&env.key_config)
+		});
+		let has_copy = cmds.iter().any(|c| {
+			c.show_in_quickbar()
+				&& c.text == strings::commands::copy(&env.key_config)
+		});
+		assert!(
+			has_scroll,
+			"file history list focus must show scroll hint"
+		);
+		assert!(
+			!has_copy,
+			"file history list focus must not show diff copy hint"
+		);
+
+		// Focus diff: diff's own hints are shown.
+		let right = env.key_config.keys.move_right;
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				right.code,
+				right.modifiers,
+			)))
+			.unwrap();
+		assert!(popup.diff.focused());
+
+		cmds.clear();
+		popup.commands(&mut cmds, false);
+		let has_copy = cmds.iter().any(|c| {
+			c.show_in_quickbar()
+				&& c.text == strings::commands::copy(&env.key_config)
+		});
+		let has_next_hunk = cmds.iter().any(|c| {
+			c.show_in_quickbar()
+				&& c.text
+					== strings::commands::diff_hunk_next(
+						&env.key_config,
+					)
+		});
+		assert!(
+			has_copy,
+			"file history diff focus must show diff copy hint"
+		);
+		assert!(
+			has_next_hunk,
+			"file history diff focus must show diff hunk hint"
+		);
 	}
 }

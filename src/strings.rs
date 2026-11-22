@@ -1094,6 +1094,24 @@ pub mod commands {
 			CMD_GROUP_GENERAL,
 		)
 	}
+	pub fn close_popup_left(
+		key_config: &SharedKeyConfig,
+	) -> CommandText {
+		let exit_hint =
+			key_config.get_hint(key_config.keys.exit_popup);
+		let left_hint =
+			key_config.get_hint(key_config.keys.move_left);
+		let keys = if exit_hint == left_hint {
+			exit_hint
+		} else {
+			format!("{exit_hint},{left_hint}")
+		};
+		CommandText::new(
+			format!("Close [{keys}]"),
+			"close overlay (e.g commit, help)",
+			CMD_GROUP_GENERAL,
+		)
+	}
 	pub fn scroll_popup(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(
@@ -1585,7 +1603,7 @@ pub mod commands {
 		CommandText::new(
 			format!(
 				"Back [{}]",
-				key_config.get_hint(key_config.keys.move_left),
+				key_config.get_hint(key_config.keys.exit_popup),
 			),
 			"view and select changed files",
 			CMD_GROUP_GENERAL,
@@ -1872,7 +1890,7 @@ pub mod commands {
 		CommandText::new(
 			format!(
 				"Find [{}]",
-				key_config.get_hint(key_config.keys.file_find),
+				key_config.get_hint(key_config.keys.log_find),
 			),
 			"start commit search",
 			CMD_GROUP_LOG,
@@ -1908,7 +1926,7 @@ pub mod commands {
 				"Reset [{}]",
 				key_config.get_hint(key_config.keys.reset_branch),
 			),
-			"confirm reset",
+			"reset to branch",
 			CMD_GROUP_BRANCHES,
 		)
 	}

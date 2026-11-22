@@ -318,11 +318,25 @@ impl Status {
 	}
 
 	fn can_focus_diff(&self) -> bool {
-		match self.focus {
+		let file_selected = match self.focus {
 			Focus::WorkDir => self.index_wd.is_file_selected(),
 			Focus::Stage => self.index.is_file_selected(),
 			Focus::Diff => false,
+		};
+
+		if !file_selected {
+			return false;
 		}
+
+		if self.git_diff.is_pending() {
+			return true;
+		}
+
+		let diff_matches_selection = self
+			.selected_path()
+			.is_some_and(|sel| self.diff.current() == sel);
+
+		!(diff_matches_selection && self.diff.is_loaded_empty())
 	}
 
 	fn is_focus_on_diff(&self) -> bool {
@@ -1462,5 +1476,170 @@ mod tests {
 			env.queue.pop().is_none(),
 			"normal push key must do nothing when only behind upstream"
 		);
+	}
+
+	#[test]
+	fn t8l_zero_line_diff_not_focusable() {
+		let (td, _repo) = git2_testing::repo_init();
+		std::fs::write(td.path().join("empty.txt"), b"").unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+		status.update_status().unwrap();
+		drain_pending(&status, &rx);
+		status.update_diff().unwrap();
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let diff_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::diff_focus_right(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			!diff_cmd.enabled,
+			"focus-diff hint must be disabled for loaded zero-line diff"
+		);
+
+		let right = env.key_config.keys.move_right;
+		let ev =
+			Event::Key(KeyEvent::new(right.code, right.modifiers));
+		assert!(
+			!status.event(&ev).unwrap().is_consumed(),
+			"focus-diff key must not focus loaded zero-line diff"
+		);
+		assert!(!status.is_focus_on_diff());
+	}
+
+	#[test]
+	fn t8l_loading_diff_focusable() {
+		let (td, repo) = git2_testing::repo_init();
+		let file_path = td.path().join("ws.txt");
+		std::fs::write(&file_path, "hello\n").unwrap();
+		{
+			let mut idx = repo.index().unwrap();
+			idx.add_path(std::path::Path::new("ws.txt")).unwrap();
+			idx.write().unwrap();
+			let tree =
+				repo.find_tree(idx.write_tree().unwrap()).unwrap();
+			let sig = repo.signature().unwrap();
+			let head = repo.head().unwrap().peel_to_commit().unwrap();
+			repo.commit(
+				Some("HEAD"),
+				&sig,
+				&sig,
+				"add ws.txt",
+				&tree,
+				&[&head],
+			)
+			.unwrap();
+		}
+		// Whitespace-only edit: 0 lines when ignoring whitespace,
+		// non-empty when not ignoring whitespace.
+		std::fs::write(&file_path, "hello  \n").unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		env.options.borrow_mut().diff_toggle_whitespace();
+		assert!(
+			env.options.borrow().diff_options().ignore_whitespace
+		);
+
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+		status.update_status().unwrap();
+
+		// Immediately after update_status, diff is loading (pending).
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let diff_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::diff_focus_right(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			diff_cmd.enabled,
+			"focus-diff hint must be enabled while diff is loading"
+		);
+
+		// Wait for zero-line diff to finish loading, then trigger a
+		// reload by toggling ignore_whitespace off.
+		drain_pending(&status, &rx);
+		status.update_diff().unwrap();
+		assert!(!status.can_focus_diff());
+
+		env.options.borrow_mut().diff_toggle_whitespace();
+		status.update_diff().unwrap();
+
+		cmds.clear();
+		status.commands(&mut cmds, false);
+		let diff_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::diff_focus_right(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			diff_cmd.enabled,
+			"focus-diff hint must be enabled while reloading after option change"
+		);
+
+		let right = env.key_config.keys.move_right;
+		let ev =
+			Event::Key(KeyEvent::new(right.code, right.modifiers));
+		assert!(status.event(&ev).unwrap().is_consumed());
+		assert!(status.is_focus_on_diff());
+
+		drain_pending(&status, &rx);
+	}
+
+	#[test]
+	fn t8l_loaded_diff_focusable() {
+		let (td, _repo) = git2_testing::repo_init();
+		std::fs::write(td.path().join("file.txt"), "hello\n")
+			.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut status = Status::new(&env);
+		status.show().unwrap();
+		drain_pending(&status, &rx);
+		status.update_status().unwrap();
+		drain_pending(&status, &rx);
+		status.update_diff().unwrap();
+
+		let mut cmds = Vec::new();
+		status.commands(&mut cmds, false);
+		let diff_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::diff_focus_right(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			diff_cmd.enabled,
+			"focus-diff hint must be enabled for loaded non-empty diff"
+		);
+
+		let right = env.key_config.keys.move_right;
+		let ev =
+			Event::Key(KeyEvent::new(right.code, right.modifiers));
+		assert!(status.event(&ev).unwrap().is_consumed());
+		assert!(status.is_focus_on_diff());
 	}
 }

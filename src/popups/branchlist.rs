@@ -144,6 +144,7 @@ impl Component for BranchListPopup {
 			{
 				self.queue.push(InternalEvent::CreateBranch);
 			} else if key_match(e, self.key_config.keys.rename_branch)
+				&& self.local
 				&& self.valid_selection()
 			{
 				self.rename_branch();
@@ -299,9 +300,8 @@ impl BranchListPopup {
 
 	fn check_remotes(&mut self) {
 		if self.visible {
-			self.has_remotes =
-				get_branches_info(&self.repo.borrow(), false)
-					.is_ok_and(|branches| !branches.is_empty());
+			self.has_remotes = sync::get_remotes(&self.repo.borrow())
+				.is_ok_and(|remotes| !remotes.is_empty());
 		}
 	}
 
@@ -743,13 +743,13 @@ impl BranchListPopup {
 
 		out.push(CommandInfo::new(
 			strings::commands::commit_details_open(&self.key_config),
-			true,
+			self.valid_selection(),
 			true,
 		));
 
 		out.push(CommandInfo::new(
 			strings::commands::compare_with_head(&self.key_config),
-			!selection_is_cur_branch,
+			self.valid_selection(),
 			true,
 		));
 
@@ -764,7 +764,7 @@ impl BranchListPopup {
 
 		out.push(CommandInfo::new(
 			strings::commands::select_branch_popup(&self.key_config),
-			!selection_is_cur_branch && self.valid_selection(),
+			self.valid_selection(),
 			true,
 		));
 
@@ -778,7 +778,7 @@ impl BranchListPopup {
 
 		out.push(CommandInfo::new(
 			strings::commands::delete_branch_popup(&self.key_config),
-			!selection_is_cur_branch,
+			!selection_is_cur_branch && self.valid_selection(),
 			true,
 		));
 
@@ -796,7 +796,7 @@ impl BranchListPopup {
 
 		out.push(CommandInfo::new(
 			strings::commands::rename_branch_popup(&self.key_config),
-			true,
+			self.valid_selection(),
 			self.local,
 		));
 
@@ -821,7 +821,253 @@ impl BranchListPopup {
 		out.push(CommandInfo::new(
 			strings::commands::view_remotes(&self.key_config),
 			true,
-			self.has_remotes,
+			true,
 		));
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crossterm::event::{Event, KeyEvent};
+	use std::cell::RefCell;
+
+	fn env_for_repo(path: &std::path::Path) -> Environment {
+		let mut env = Environment::test_env();
+		env.repo =
+			RefCell::new(sync::RepoPath::Path(path.to_path_buf()));
+		env
+	}
+
+	fn key_event(
+		code: crossterm::event::KeyCode,
+		modifiers: crossterm::event::KeyModifiers,
+	) -> Event {
+		Event::Key(KeyEvent::new(code, modifiers))
+	}
+
+	#[test]
+	fn t8l_no_rename_on_remote_tab() {
+		let (td, repo) = git2_testing::repo_init();
+		let head_oid = repo.head().unwrap().target().unwrap();
+		repo.remote("origin", "https://example.com/repo.git")
+			.unwrap();
+		repo.reference(
+			"refs/remotes/origin/main",
+			head_oid,
+			true,
+			"test",
+		)
+		.unwrap();
+
+		let env = env_for_repo(td.path());
+		let mut popup = BranchListPopup::new(&env);
+		popup.open().unwrap();
+		// Switch to Remote tab.
+		let tab = env.key_config.keys.tab_toggle;
+		popup.event(&key_event(tab.code, tab.modifiers)).unwrap();
+		assert!(!popup.local);
+		assert!(popup.valid_selection());
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+		let rename_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::rename_branch_popup(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			!rename_cmd.show_in_quickbar(),
+			"rename hint must not be offered on remote tab"
+		);
+
+		let rename = env.key_config.keys.rename_branch;
+		popup
+			.event(&key_event(rename.code, rename.modifiers))
+			.unwrap();
+		assert!(
+			env.queue.pop().is_none(),
+			"rename key must not be handled on remote tab"
+		);
+	}
+
+	#[test]
+	fn t8l_current_branch_hints() {
+		let (td, _repo) = git2_testing::repo_init();
+		let env = env_for_repo(td.path());
+		let mut popup = BranchListPopup::new(&env);
+		popup.open().unwrap();
+		assert!(popup.selection_is_cur_branch());
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		let find_enabled =
+			|expected: crate::components::CommandText| {
+				cmds.iter()
+					.find(|c| c.text == expected)
+					.unwrap()
+					.enabled
+			};
+
+		assert!(
+			find_enabled(strings::commands::select_branch_popup(
+				&env.key_config
+			)),
+			"Enter/Checkout must be enabled on current branch"
+		);
+		assert!(
+			find_enabled(strings::commands::compare_with_head(
+				&env.key_config
+			)),
+			"Compare must be enabled on current branch"
+		);
+		assert!(
+			!find_enabled(strings::commands::delete_branch_popup(
+				&env.key_config
+			)),
+			"Delete must be disabled on current branch"
+		);
+		assert!(
+			!find_enabled(strings::commands::merge_branch_popup(
+				&env.key_config
+			)),
+			"Merge must be disabled on current branch"
+		);
+		assert!(
+			!find_enabled(strings::commands::branch_popup_rebase(
+				&env.key_config
+			)),
+			"Rebase must be disabled on current branch"
+		);
+	}
+
+	#[test]
+	fn t8l_empty_branch_hints() {
+		let (td, _repo) = git2_testing::repo_init();
+		let env = env_for_repo(td.path());
+		let mut popup = BranchListPopup::new(&env);
+		popup.open().unwrap();
+		// Empty local list:
+		popup.branches.clear();
+		assert!(!popup.valid_selection());
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		let selection_cmds = [
+			strings::commands::commit_details_open(&env.key_config),
+			strings::commands::compare_with_head(&env.key_config),
+			strings::commands::select_branch_popup(&env.key_config),
+			strings::commands::delete_branch_popup(&env.key_config),
+			strings::commands::merge_branch_popup(&env.key_config),
+			strings::commands::branch_popup_rebase(&env.key_config),
+			strings::commands::rename_branch_popup(&env.key_config),
+			strings::commands::reset_branch(&env.key_config),
+		];
+
+		for expected in selection_cmds {
+			let cmd =
+				cmds.iter().find(|c| c.text == expected).unwrap();
+			assert!(
+				!cmd.enabled,
+				"command '{}' must be disabled when list is empty",
+				cmd.text.name
+			);
+		}
+	}
+
+	#[test]
+	fn t8l_fetch_uses_remotes() {
+		let (td, repo) = git2_testing::repo_init();
+		let env = env_for_repo(td.path());
+		let mut popup = BranchListPopup::new(&env);
+		popup.open().unwrap();
+
+		// Zero remotes: Fetch disabled.
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+		let fetch_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::fetch_remotes(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			!fetch_cmd.enabled,
+			"fetch must be disabled with zero remotes"
+		);
+		let fetch = env.key_config.keys.fetch;
+		popup
+			.event(&key_event(fetch.code, fetch.modifiers))
+			.unwrap();
+		assert!(env.queue.pop().is_none());
+
+		// Add a remote with no remote branches yet: Fetch enabled.
+		repo.remote("origin", "https://example.com/repo.git")
+			.unwrap();
+		popup.update_branches().unwrap();
+
+		cmds.clear();
+		popup.commands(&mut cmds, false);
+		let fetch_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::fetch_remotes(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			fetch_cmd.enabled,
+			"fetch must be enabled when a remote is configured even with no remote branches"
+		);
+		popup
+			.event(&key_event(fetch.code, fetch.modifiers))
+			.unwrap();
+		assert!(matches!(
+			env.queue.pop(),
+			Some(InternalEvent::FetchRemotes)
+		));
+	}
+
+	#[test]
+	fn t8l_branch_static_hints() {
+		let (td, _repo) = git2_testing::repo_init();
+		let env = env_for_repo(td.path());
+		let mut popup = BranchListPopup::new(&env);
+		popup.open().unwrap();
+
+		let mut cmds = Vec::new();
+		popup.commands(&mut cmds, false);
+
+		let remotes_cmd = cmds
+			.iter()
+			.find(|c| {
+				c.text
+					== strings::commands::view_remotes(
+						&env.key_config,
+					)
+			})
+			.unwrap();
+		assert!(
+			remotes_cmd.show_in_quickbar() && remotes_cmd.enabled,
+			"view remotes must always be offered even with zero remotes"
+		);
+
+		let reset_cmd =
+			strings::commands::reset_branch(&env.key_config);
+		assert_ne!(
+			reset_cmd.desc, "confirm reset",
+			"reset_branch description must not say 'confirm reset'"
+		);
 	}
 }
