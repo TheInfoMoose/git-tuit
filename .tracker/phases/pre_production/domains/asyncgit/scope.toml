@@ -124,7 +124,7 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.bugs]]
 id = "BUG-0070"
 title = "Keep untracked files when aborting a merge or revert"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-22T05:16:48Z"
 
@@ -138,14 +138,14 @@ created_at = "2026-11-22T05:32:55Z"
 [[items.bugs]]
 id = "BUG-0077"
 title = "Keep untracked files with a staged deletion on discard-and-switch"
-status = "pending"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-22T17:27:22Z"
 
 [[items.bugs]]
 id = "BUG-0078"
 title = "Clear staged changes and merge state on discard-and-switch"
-status = "pending"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-22T17:27:22Z"
 

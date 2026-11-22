@@ -517,7 +517,7 @@ created_at = "2026-11-22T03:06:32Z"
 [[items.bugs]]
 id = "BUG-0071"
 title = "Don't discard changes when the following checkout fails"
-status = "open"
+status = "closed"
 severity = "critical"
 created_at = "2026-11-22T05:16:48Z"
 

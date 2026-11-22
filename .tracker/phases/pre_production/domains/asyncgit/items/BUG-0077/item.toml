@@ -2,11 +2,11 @@
 id = "BUG-0077"
 type = "bug"
 title = "Keep untracked files with a staged deletion on discard-and-switch"
-status = "pending"
+status = "closed"
 severity = "critical"
 scope_ref = "asyncgit"
 created_at = "2026-11-22T17:27:22Z"
-updated_at = "2026-11-22T17:27:22Z"
+updated_at = "2026-11-22T23:00:51Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "9d55c33"
+summary = "STEP 9B: un-indexed files, including git rm --cached ones, count as collisions and are never overwritten or deleted. Reviewed in Phase 9; over-refusal follow-up BUG-0089."
