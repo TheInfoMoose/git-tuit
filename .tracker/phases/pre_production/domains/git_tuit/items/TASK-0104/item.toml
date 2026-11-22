@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0104"
 type = "task"
 title = "Commit Details Fit Small Terminals"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T05:34:48Z"
+updated_at = "2026-11-22T14:57:33Z"
 source_ref = "STEP 8M"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 7
 iteration_count = 1
+last_timer_session = "TASK-0104@2026-11-22T14:50:20Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "95df4677"
+summary = "STEP 8M: Commit Details Fit Small Terminals (phased check PASS)"
