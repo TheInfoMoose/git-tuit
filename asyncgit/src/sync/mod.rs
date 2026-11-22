@@ -64,6 +64,10 @@ pub use config::{
 	get_config_string, untracked_files_config,
 	ShowUntrackedFilesConfig,
 };
+pub use cred::{
+	extract_username_password_for_push_remote,
+	need_username_password_for_push_remote,
+};
 pub use diff::get_diff_commit;
 pub use git2::BranchType;
 pub use hooks::{

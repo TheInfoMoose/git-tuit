@@ -67,6 +67,53 @@ fn ensure_no_control_chars(url: &str) -> Result<()> {
 	Ok(())
 }
 
+fn remote_push_url(
+	repo: &git2::Repository,
+	remote_name: &str,
+) -> Result<String> {
+	let remote = repo.find_remote(remote_name)?;
+	let url = remote
+		.pushurl()
+		.ok()
+		.flatten()
+		.or_else(|| remote.url().ok())
+		.ok_or(Error::UnknownRemote)?
+		.to_owned();
+	ensure_no_control_chars(&url)?;
+	Ok(url)
+}
+
+/// know if username and password are needed for pushing to `remote`
+pub fn need_username_password_for_push_remote(
+	repo_path: &RepoPath,
+	remote: &str,
+) -> Result<bool> {
+	let repo = repo(repo_path)?;
+	let url = remote_push_url(&repo, remote)?;
+	Ok(is_http_url(&url))
+}
+
+/// extract username and password for pushing to `remote`
+pub fn extract_username_password_for_push_remote(
+	repo_path: &RepoPath,
+	remote: &str,
+) -> Result<BasicAuthCredential> {
+	let repo = repo(repo_path)?;
+	let url = remote_push_url(&repo, remote)?;
+	let mut helper = CredentialHelper::new(&url);
+
+	if let Ok(config) = repo.config() {
+		helper.config(&config);
+	}
+
+	Ok(match helper.execute() {
+		Some((username, password)) => {
+			BasicAuthCredential::new(Some(username), Some(password))
+		}
+		None => extract_cred_from_url(&url),
+	})
+}
+
 /// know if username and password are needed for this url
 pub fn need_username_password(repo_path: &RepoPath) -> Result<bool> {
 	let repo = repo(repo_path)?;
@@ -441,5 +488,114 @@ mod tests {
 		assert!(shown.contains("testuser"));
 		assert!(!shown.contains("s3cret-value"));
 		assert!(shown.contains("<redacted>"));
+	}
+
+	#[test]
+	#[serial]
+	fn t9c_cred_from_named_remote() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		repo.remote(
+			DEFAULT_REMOTE_NAME,
+			"https://originuser:originpass@git.example.com/r.git",
+		)
+		.unwrap();
+		repo.remote(
+			"fork",
+			"https://forkuser:forkpass@fork.example.org/r.git",
+		)
+		.unwrap();
+		repo.config()
+			.unwrap()
+			.set_str("remote.pushDefault", DEFAULT_REMOTE_NAME)
+			.unwrap();
+
+		assert_eq!(
+			super::extract_username_password_for_push_remote(
+				repo_path, "fork"
+			)
+			.unwrap(),
+			BasicAuthCredential::new(
+				Some("forkuser".to_owned()),
+				Some("forkpass".to_owned())
+			)
+		);
+	}
+
+	#[test]
+	#[serial]
+	fn t9c_cred_prefers_pushurl() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		repo.remote("fork", "git@fork.example.org:r.git").unwrap();
+		repo.remote_set_pushurl(
+			"fork",
+			Some("https://pushuser@fork.example.org/r.git"),
+		)
+		.unwrap();
+
+		assert!(super::need_username_password_for_push_remote(
+			repo_path, "fork"
+		)
+		.unwrap());
+		assert_eq!(
+			super::extract_username_password_for_push_remote(
+				repo_path, "fork"
+			)
+			.unwrap()
+			.username
+			.as_deref(),
+			Some("pushuser")
+		);
+	}
+
+	#[test]
+	#[serial]
+	fn t9c_need_cred_named_remote() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		repo.remote(
+			DEFAULT_REMOTE_NAME,
+			"https://git.example.com/r.git",
+		)
+		.unwrap();
+		repo.remote("fork", "git@fork.example.org:r.git").unwrap();
+
+		assert!(!super::need_username_password_for_push_remote(
+			repo_path, "fork"
+		)
+		.unwrap());
+		assert!(super::need_username_password_for_push_remote(
+			repo_path,
+			DEFAULT_REMOTE_NAME
+		)
+		.unwrap());
+	}
+
+	#[test]
+	#[serial]
+	fn t9c_unknown_remote_errs() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		assert!(super::need_username_password_for_push_remote(
+			repo_path, "nosuch"
+		)
+		.is_err());
+		assert!(super::extract_username_password_for_push_remote(
+			repo_path, "nosuch"
+		)
+		.is_err());
 	}
 }

@@ -13,7 +13,8 @@ use anyhow::Result;
 use asyncgit::{
 	sync::{
 		cred::{
-			extract_username_password, need_username_password,
+			extract_username_password_for_push_remote,
+			need_username_password_for_push_remote,
 			BasicAuthCredential,
 		},
 		get_default_remote, hooks_pre_push, AsyncProgress,
@@ -65,16 +66,26 @@ impl PushTagsPopup {
 
 	///
 	pub fn push_tags(&mut self, remote: String) -> Result<()> {
-		self.remote = Some(remote);
+		let remote = if remote.is_empty() {
+			get_default_remote(&self.repo.borrow())?
+		} else {
+			remote
+		};
+		self.remote = Some(remote.clone());
 		self.show()?;
-		let need_cred = need_username_password(&self.repo.borrow());
+		let need_cred = need_username_password_for_push_remote(
+			&self.repo.borrow(),
+			&remote,
+		);
 		let res = match need_cred {
 			Ok(true) => {
-				let cred =
-					extract_username_password(&self.repo.borrow())
-						.unwrap_or_else(|_| {
-							BasicAuthCredential::new(None, None)
-						});
+				let cred = extract_username_password_for_push_remote(
+					&self.repo.borrow(),
+					&remote,
+				)
+				.unwrap_or_else(|_| {
+					BasicAuthCredential::new(None, None)
+				});
 				if cred.is_complete() {
 					self.push_to_remote(Some(cred))
 				} else {
@@ -165,6 +176,11 @@ impl PushTagsPopup {
 	#[cfg(test)]
 	pub(crate) const fn set_pending(&mut self, pending: bool) {
 		self.pending = pending;
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn input_cred(&self) -> &CredComponent {
+		&self.input_cred
 	}
 
 	///

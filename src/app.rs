@@ -3874,4 +3874,96 @@ mod tests {
 		assert!(app.external_editor_popup.is_visible());
 		assert_eq!(app.file_to_open.as_deref(), Some("./tab.txt"));
 	}
+
+	fn init_origin_and_fork_repo(
+		upstream_fork_push_default_origin: bool,
+	) -> (tempfile::TempDir, tempfile::TempDir, String) {
+		let (bare_td, _bare_repo) = git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		repo.remote("origin", bare_td.path().to_str().unwrap())
+			.unwrap();
+		repo.remote(
+			"fork",
+			"https://forkuser@fork.example.org/r.git",
+		)
+		.unwrap();
+		if upstream_fork_push_default_origin {
+			let mut cfg = repo.config().unwrap();
+			cfg.set_str(&format!("branch.{branch}.remote"), "fork")
+				.unwrap();
+			cfg.set_str("remote.pushDefault", "origin").unwrap();
+		}
+		(bare_td, td, branch)
+	}
+
+	#[test]
+	fn t9c_tag_delete_fork_creds() {
+		let (_bare_td, td, _branch) =
+			init_origin_and_fork_repo(false);
+		let (mut app, _kc) = make_test_app(td.path());
+
+		app.push_popup
+			.delete_remote_tag("fork".into(), "v1".into())
+			.unwrap();
+
+		assert!(
+			app.push_popup.input_cred().is_visible(),
+			"credential prompt must open for fork remote-tag delete"
+		);
+		assert_eq!(
+			app.push_popup
+				.input_cred()
+				.get_cred()
+				.username
+				.as_deref(),
+			Some("forkuser")
+		);
+	}
+
+	#[test]
+	fn t9c_branch_push_upstream_creds() {
+		let (_bare_td, td, branch) = init_origin_and_fork_repo(true);
+		let (mut app, _kc) = make_test_app(td.path());
+
+		app.push_popup
+			.push(branch, PushType::Branch, false, false)
+			.unwrap();
+
+		assert!(
+			app.push_popup.input_cred().is_visible(),
+			"credential prompt must open for upstream fork branch push"
+		);
+		assert_eq!(
+			app.push_popup
+				.input_cred()
+				.get_cred()
+				.username
+				.as_deref(),
+			Some("forkuser")
+		);
+	}
+
+	#[test]
+	fn t9c_push_tags_named_remote() {
+		let (_bare_td, td, _branch) =
+			init_origin_and_fork_repo(false);
+		let (mut app, _kc) = make_test_app(td.path());
+
+		app.push_tags_popup.push_tags("fork".into()).unwrap();
+
+		assert!(
+			app.push_tags_popup.input_cred().is_visible(),
+			"credential prompt must open for fork push_tags"
+		);
+		assert_eq!(
+			app.push_tags_popup
+				.input_cred()
+				.get_cred()
+				.username
+				.as_deref(),
+			Some("forkuser")
+		);
+	}
 }

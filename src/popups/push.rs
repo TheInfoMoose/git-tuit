@@ -13,8 +13,9 @@ use anyhow::Result;
 use asyncgit::{
 	sync::{
 		cred::{
-			extract_username_password_for_push,
-			need_username_password_for_push, BasicAuthCredential,
+			extract_username_password_for_push_remote,
+			need_username_password_for_push_remote,
+			BasicAuthCredential,
 		},
 		get_branch_remote, hooks_pre_push,
 		remotes::get_default_remote_for_push,
@@ -59,7 +60,7 @@ pub struct PushPopup {
 	pending: bool,
 	branch: String,
 	push_type: PushType,
-	remote_override: Option<String>,
+	remote: Option<String>,
 	queue: Queue,
 	theme: SharedTheme,
 	key_config: SharedKeyConfig,
@@ -77,7 +78,7 @@ impl PushPopup {
 			visible: false,
 			branch: String::new(),
 			push_type: PushType::Branch,
-			remote_override: None,
+			remote: None,
 			git_push: AsyncPush::new(
 				env.repo.borrow().clone(),
 				&env.sender_git,
@@ -111,8 +112,7 @@ impl PushPopup {
 		force: bool,
 		delete: bool,
 	) -> Result<()> {
-		self.remote_override = None;
-		self.start_push(branch, push_type, force, delete)
+		self.start_push(None, branch, push_type, force, delete)
 	}
 
 	/// push to an explicit `remote` (cleared when the push finishes or closes)
@@ -124,8 +124,13 @@ impl PushPopup {
 		force: bool,
 		delete: bool,
 	) -> Result<()> {
-		self.remote_override = Some(remote);
-		self.start_push(branch, push_type, force, delete)
+		self.start_push(
+			Some(remote),
+			branch,
+			push_type,
+			force,
+			delete,
+		)
 	}
 
 	/// delete `branch` on the given `remote` (not the upstream/default remote)
@@ -154,6 +159,7 @@ impl PushPopup {
 
 	fn start_push(
 		&mut self,
+		remote_override: Option<String>,
 		branch: String,
 		push_type: PushType,
 		force: bool,
@@ -170,12 +176,44 @@ impl PushPopup {
 
 		self.show()?;
 
-		let need_cred =
-			need_username_password_for_push(&self.repo.borrow());
+		let remote = if let Some(remote) = remote_override {
+			log::info!(
+				"push: branch '{}' to explicit remote '{}'",
+				self.branch,
+				remote
+			);
+			remote
+		} else {
+			let resolved = Self::resolve_branch_remote(
+				&self.repo.borrow(),
+				&self.branch,
+			);
+			match resolved {
+				Ok(remote) => {
+					log::info!(
+						"push: branch '{}' to remote '{}'",
+						self.branch,
+						remote
+					);
+					remote
+				}
+				Err(e) => {
+					self.hide();
+					return Err(e.into());
+				}
+			}
+		};
+		self.remote = Some(remote.clone());
+
+		let need_cred = need_username_password_for_push_remote(
+			&self.repo.borrow(),
+			&remote,
+		);
 		let res = match need_cred {
 			Ok(true) => {
-				let cred = extract_username_password_for_push(
+				let cred = extract_username_password_for_push_remote(
 					&self.repo.borrow(),
+					&remote,
 				)
 				.unwrap_or_else(|_| {
 					BasicAuthCredential::new(None, None)
@@ -201,26 +239,10 @@ impl PushPopup {
 		cred: Option<BasicAuthCredential>,
 		force: bool,
 	) -> Result<()> {
-		let remote = if let Some(remote) = self.remote_override.take()
-		{
-			log::info!(
-				"push: branch '{}' to explicit remote '{}'",
-				self.branch,
-				remote
-			);
-			remote
-		} else {
-			let remote = Self::resolve_branch_remote(
-				&self.repo.borrow(),
-				&self.branch,
-			)?;
-			log::info!(
-				"push: branch '{}' to remote '{}'",
-				self.branch,
-				remote
-			);
-			remote
-		};
+		let remote = self
+			.remote
+			.take()
+			.ok_or_else(|| anyhow::anyhow!("missing push remote"))?;
 
 		// run pre push hook - can reject push
 		let hook_res = {
@@ -290,6 +312,11 @@ impl PushPopup {
 	///
 	pub const fn any_work_pending(&self) -> bool {
 		self.pending
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn input_cred(&self) -> &CredComponent {
+		&self.input_cred
 	}
 
 	///
@@ -430,7 +457,7 @@ impl Component for PushPopup {
 
 	fn hide(&mut self) {
 		self.visible = false;
-		self.remote_override = None;
+		self.remote = None;
 	}
 
 	fn show(&mut self) -> Result<()> {
