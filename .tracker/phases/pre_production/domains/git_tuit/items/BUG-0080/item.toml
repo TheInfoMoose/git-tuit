@@ -2,11 +2,11 @@
 id = "BUG-0080"
 type = "bug"
 title = "Refuse force-push when the branch moved during confirmation"
-status = "pending"
+status = "closed"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T17:27:22Z"
-updated_at = "2026-11-22T17:27:22Z"
+updated_at = "2026-11-22T22:58:10Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-22"
+commit = "1724dad"
+summary = "STEP 9D: force-push confirm pins the local branch tip on open and refuses on Enter if it moved or vanished; t9d_moved_branch_refuses, t9d_same_tip_pushes. Reviewed in Phase 9."
