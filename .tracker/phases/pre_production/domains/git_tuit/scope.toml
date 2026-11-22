@@ -1070,7 +1070,7 @@ created_at = "2026-11-22T04:07:19Z"
 [[items.tasks]]
 id = "TASK-0094"
 title = "Confirm Revert and Detached Checkout"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
