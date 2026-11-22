@@ -867,7 +867,7 @@ created_at = "2026-11-21T21:40:36Z"
 [[items.tasks]]
 id = "TASK-0074"
 title = "Diff selection end, is_empty, no 0-line discard"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
 
@@ -919,3 +919,10 @@ title = "Status focus, fetch/pull/push availability"
 status = "open"
 severity = "medium"
 created_at = "2026-11-21T21:40:36Z"
+
+[[items.tasks]]
+id = "TASK-0082"
+title = "Resolve dead_code error for DiffComponent::is_empty in STEP 7B"
+status = "pending"
+severity = "high"
+created_at = "2026-11-22T00:25:33Z"

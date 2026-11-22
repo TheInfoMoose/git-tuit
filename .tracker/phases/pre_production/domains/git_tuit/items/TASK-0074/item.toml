@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0074"
 type = "task"
 title = "Diff selection end, is_empty, no 0-line discard"
-status = "open"
+status = "pending"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T21:40:36Z"
-updated_at = "2026-11-21T21:40:36Z"
+updated_at = "2026-11-22T01:17:59Z"
 source_ref = "STEP 7B"
 
 [effort]
