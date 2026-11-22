@@ -1161,6 +1161,6 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0107"
 title = "Files View Follows Its Revision"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
