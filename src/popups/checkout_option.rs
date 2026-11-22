@@ -313,8 +313,9 @@ mod tests {
 	use super::*;
 	use asyncgit::sync::{
 		commit, create_branch, delete_branch, get_branches_info,
-		get_head, stage_add_file,
+		get_head, repo_state, stage_add_file,
 		status::{get_status, StatusType},
+		RepoState,
 	};
 	use std::{fs, path::Path, process::Command};
 	use tempfile::TempDir;
@@ -723,6 +724,291 @@ mod tests {
 			cmds.iter()
 				.map(|c| (&c.text.name, c.text.desc))
 				.collect::<Vec<_>>()
+		);
+	}
+
+	fn run_git(root: &Path, args: &[&str]) -> std::process::Output {
+		Command::new("git")
+			.current_dir(root)
+			.args(args)
+			.output()
+			.unwrap()
+	}
+
+	#[test]
+	fn t9b_rebase_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		write_and_commit(&repo_path, root, "other.txt", "orig", "c2");
+		create_branch(&repo_path, "target").unwrap();
+		checkout_branch(&repo_path, "master").unwrap();
+
+		create_branch(&repo_path, "feature").unwrap();
+		write_and_commit(
+			&repo_path, root, "a.txt", "feature", "c_feat",
+		);
+
+		checkout_branch(&repo_path, "master").unwrap();
+		write_and_commit(
+			&repo_path, root, "a.txt", "master", "c_master",
+		);
+
+		checkout_branch(&repo_path, "feature").unwrap();
+		let rebase_out = run_git(root, &["rebase", "master"]);
+		assert!(
+			!rebase_out.status.success(),
+			"rebase should stop on conflict"
+		);
+		assert!(
+			root.join(".git/rebase-merge").exists()
+				|| root.join(".git/rebase-apply").exists(),
+			"rebase state directory should exist"
+		);
+
+		fs::write(root.join("other.txt"), "tracked_edit").unwrap();
+		let head_before = get_head(&repo_path).unwrap();
+		let target = branch_info(&repo_path, true, "target");
+
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		assert!(
+			err.to_string().contains("a rebase is in progress"),
+			"unexpected error: {err}"
+		);
+		assert_eq!(
+			fs::read_to_string(root.join("other.txt")).unwrap(),
+			"tracked_edit"
+		);
+		assert_eq!(get_head(&repo_path).unwrap(), head_before);
+		assert!(
+			root.join(".git/rebase-merge").exists()
+				|| root.join(".git/rebase-apply").exists(),
+			"rebase state should remain unchanged"
+		);
+	}
+
+	#[test]
+	fn t9b_linked_worktree_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "feature").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "feat", "c2");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let wt_dir = TempDir::new().unwrap();
+		let wt_path = wt_dir.path().join("wt-feature");
+		let wt_out = run_git(
+			root,
+			&[
+				"worktree",
+				"add",
+				wt_path.to_str().unwrap(),
+				"feature",
+			],
+		);
+		assert!(
+			wt_out.status.success(),
+			"git worktree add failed: {}",
+			String::from_utf8_lossy(&wt_out.stderr)
+		);
+
+		fs::write(root.join("a.txt"), "tracked_edit").unwrap();
+		let target = branch_info(&repo_path, true, "feature");
+
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		assert!(
+			err.to_string().contains("feature"),
+			"error should name feature: {err}"
+		);
+		assert_eq!(
+			fs::read_to_string(root.join("a.txt")).unwrap(),
+			"tracked_edit"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+	}
+
+	#[test]
+	fn t9b_upstream_failure_refuses() {
+		let (_bare, clone2_dir, c2_path) = setup_remote_clone();
+		let c2_root = clone2_dir.path();
+
+		let head_oid = get_head(&c2_path).unwrap().to_string();
+		let out = run_git(
+			c2_root,
+			&["update-ref", "refs/remotes/origin/topic", &head_oid],
+		);
+		assert!(out.status.success());
+
+		// Restrict fetch refspec so it only maps main, not topic
+		let out = run_git(
+			c2_root,
+			&[
+				"config",
+				"remote.origin.fetch",
+				"+refs/heads/main:refs/remotes/origin/main",
+			],
+		);
+		assert!(out.status.success());
+
+		fs::write(c2_root.join("test.txt"), "tracked_edit").unwrap();
+		let target = branch_info(&c2_path, false, "origin/topic");
+
+		let res = checkout_branch_discard(&c2_path, &target);
+		assert!(res.is_err(), "expected upstream failure to refuse");
+		assert_eq!(
+			fs::read_to_string(c2_root.join("test.txt")).unwrap(),
+			"tracked_edit"
+		);
+		assert!(
+			!local_branch_names(&c2_path)
+				.iter()
+				.any(|b| b == "topic"),
+			"no local topic branch should be left behind"
+		);
+		assert_eq!(head_branch_name(&c2_path), "master");
+	}
+
+	#[test]
+	fn t9b_index_deleted_overwrite_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "notes.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(
+			&repo_path,
+			root,
+			"notes.txt",
+			"other",
+			"c2",
+		);
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let out = run_git(root, &["rm", "--cached", "notes.txt"]);
+		assert!(out.status.success());
+		fs::write(root.join("notes.txt"), "precious_edit").unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		assert!(
+			err.to_string().contains("notes.txt"),
+			"error should name notes.txt: {err}"
+		);
+		assert_eq!(
+			fs::read_to_string(root.join("notes.txt")).unwrap(),
+			"precious_edit"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+	}
+
+	#[test]
+	fn t9b_index_deleted_remove_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "b.txt", "other", "c2");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		write_and_commit(
+			&repo_path,
+			root,
+			"notes.txt",
+			"master_notes",
+			"c3",
+		);
+		let out = run_git(root, &["rm", "--cached", "notes.txt"]);
+		assert!(out.status.success());
+		fs::write(root.join("notes.txt"), "precious_edit").unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		assert!(
+			err.to_string().contains("notes.txt"),
+			"error should name notes.txt: {err}"
+		);
+		assert!(root.join("notes.txt").exists());
+		assert_eq!(
+			fs::read_to_string(root.join("notes.txt")).unwrap(),
+			"precious_edit"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+	}
+
+	#[test]
+	fn t9b_index_matches_target() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "b.txt", "other", "c2");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		// Staged edit reverted on disk (worktree copy equals HEAD and target)
+		fs::write(root.join("a.txt"), "staged_edit").unwrap();
+		stage_add_file(&repo_path, Path::new("a.txt")).unwrap();
+		fs::write(root.join("a.txt"), "base").unwrap();
+
+		// Staged new file deleted from disk
+		fs::write(root.join("ghost.txt"), "new").unwrap();
+		stage_add_file(&repo_path, Path::new("ghost.txt")).unwrap();
+		fs::remove_file(root.join("ghost.txt")).unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		checkout_branch_discard(&repo_path, &target).unwrap();
+
+		assert_eq!(head_branch_name(&repo_path), "other");
+		assert_eq!(
+			get_status(&repo_path, StatusType::Both, None).unwrap(),
+			vec![]
+		);
+	}
+
+	#[test]
+	fn t9b_merge_state_cleared() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "side").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "side", "c2");
+		create_branch(&repo_path, "target").unwrap();
+		checkout_branch(&repo_path, "master").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "master", "c3");
+
+		let merge_out = run_git(root, &["merge", "side"]);
+		assert!(
+			!merge_out.status.success(),
+			"merge should stop on conflict"
+		);
+		assert_eq!(repo_state(&repo_path).unwrap(), RepoState::Merge);
+		assert!(root.join(".git/MERGE_HEAD").exists());
+
+		let target = branch_info(&repo_path, true, "target");
+		checkout_branch_discard(&repo_path, &target).unwrap();
+
+		assert_eq!(head_branch_name(&repo_path), "target");
+		assert_eq!(repo_state(&repo_path).unwrap(), RepoState::Clean);
+		assert!(!root.join(".git/MERGE_HEAD").exists());
+		assert!(!root.join(".git/MERGE_MSG").exists());
+		assert_eq!(
+			get_status(&repo_path, StatusType::Both, None).unwrap(),
+			vec![]
 		);
 	}
 }

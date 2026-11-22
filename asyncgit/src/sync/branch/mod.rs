@@ -476,24 +476,107 @@ fn find_untracked_collisions(
 
 	for entry in statuses.iter() {
 		let status = entry.status();
-		if !status.is_wt_new() || status.is_index_deleted() {
+		if !status.is_wt_new() {
 			continue;
 		}
 
 		let path = bytes2string(entry.path_bytes())?;
 		let rel_path = std::path::Path::new(&path);
 
-		if head_tree.get_path(rel_path).is_ok() {
-			continue;
-		}
-
-		if untracked_path_collides_with_tree(target_tree, rel_path) {
+		if head_tree.get_path(rel_path).is_ok()
+			|| untracked_path_collides_with_tree(
+				target_tree,
+				rel_path,
+			) {
 			collisions.push(path);
 		}
 	}
 
 	collisions.sort();
 	Ok(collisions)
+}
+
+fn should_cleanup_state_after_discard(
+	repo: &Repository,
+) -> Result<bool> {
+	match repo.state() {
+		git2::RepositoryState::Rebase
+		| git2::RepositoryState::RebaseInteractive
+		| git2::RepositoryState::RebaseMerge
+		| git2::RepositoryState::ApplyMailbox
+		| git2::RepositoryState::ApplyMailboxOrRebase => {
+			Err(Error::Generic(String::from(
+				"a rebase is in progress: abort it first",
+			)))
+		}
+		git2::RepositoryState::Merge
+		| git2::RepositoryState::Revert
+		| git2::RepositoryState::RevertSequence
+		| git2::RepositoryState::CherryPick
+		| git2::RepositoryState::CherryPickSequence => Ok(true),
+		_ => Ok(false),
+	}
+}
+
+fn head_points_to(other_repo: &Repository, ref_name: &str) -> bool {
+	other_repo.find_reference("HEAD").is_ok_and(|head| {
+		head.symbolic_target_bytes() == Some(ref_name.as_bytes())
+	})
+}
+
+fn check_branch_not_checked_out_elsewhere(
+	repo: &Repository,
+	branch_name: &str,
+	ref_name: &str,
+) -> Result<()> {
+	let self_gitdir = std::fs::canonicalize(repo.path())
+		.unwrap_or_else(|_| repo.path().to_path_buf());
+
+	if repo.is_worktree() {
+		if let Ok(main_repo) = Repository::open(repo.commondir()) {
+			let main_gitdir = std::fs::canonicalize(main_repo.path())
+				.unwrap_or_else(|_| main_repo.path().to_path_buf());
+			if main_gitdir != self_gitdir
+				&& head_points_to(&main_repo, ref_name)
+			{
+				let wt_path = main_repo
+					.workdir()
+					.unwrap_or_else(|| main_repo.path());
+				return Err(Error::Generic(format!(
+					"branch '{branch_name}' is checked out at {}",
+					wt_path.display()
+				)));
+			}
+		}
+	}
+
+	let worktrees = repo.worktrees()?;
+	for wt_name in &worktrees {
+		let Ok(Some(wt_name)) = wt_name else {
+			continue;
+		};
+		let Ok(wt) = repo.find_worktree(wt_name) else {
+			continue;
+		};
+		let Ok(wt_repo) = Repository::open_from_worktree(&wt) else {
+			continue;
+		};
+		let wt_gitdir = std::fs::canonicalize(wt_repo.path())
+			.unwrap_or_else(|_| wt_repo.path().to_path_buf());
+		if wt_gitdir == self_gitdir {
+			continue;
+		}
+		if head_points_to(&wt_repo, ref_name) {
+			let wt_path =
+				wt_repo.workdir().unwrap_or_else(|| wt.path());
+			return Err(Error::Generic(format!(
+				"branch '{branch_name}' is checked out at {}",
+				wt_path.display()
+			)));
+		}
+	}
+
+	Ok(())
 }
 
 enum DiscardTarget<'repo> {
@@ -573,41 +656,27 @@ fn resolve_discard_target<'repo>(
 	})
 }
 
-fn apply_discard_target_head(
+fn apply_discard_checkout(
 	repo: &Repository,
-	target: DiscardTarget<'_>,
+	target_tree: &git2::Tree<'_>,
+	target_ref_name: &str,
+	cleanup_state: bool,
 ) -> Result<()> {
-	match target {
-		DiscardTarget::Local { ref_name, .. } => {
-			repo.set_head(&ref_name)?;
-		}
-		DiscardTarget::Remote {
-			local_name,
-			upstream_name,
-			commit,
-			..
-		} => {
-			let mut new_branch =
-				repo.branch(&local_name, &commit, false)?;
-			if let Err(e) =
-				new_branch.set_upstream(Some(&upstream_name))
-			{
-				let _ = new_branch.delete();
-				return Err(e.into());
-			}
-			let ref_name =
-				match bytes2string(new_branch.get().name_bytes()) {
-					Ok(name) => name,
-					Err(e) => {
-						let _ = new_branch.delete();
-						return Err(e);
-					}
-				};
-			if let Err(e) = repo.set_head(&ref_name) {
-				let _ = new_branch.delete();
-				return Err(e.into());
-			}
-		}
+	let mut checkout_opts = git2::build::CheckoutBuilder::new();
+	checkout_opts.force().overwrite_ignored(true);
+	repo.checkout_tree(
+		target_tree.as_object(),
+		Some(&mut checkout_opts),
+	)?;
+
+	let mut index = repo.index()?;
+	index.read_tree(target_tree)?;
+	index.write()?;
+
+	repo.set_head(target_ref_name)?;
+
+	if cleanup_state {
+		repo.cleanup_state()?;
 	}
 
 	Ok(())
@@ -615,10 +684,10 @@ fn apply_discard_target_head(
 
 /// Discard all staged and unstaged tracked changes and switch to `branch`.
 ///
-/// Validates HEAD, the target branch (and local branch name availability for
-/// remote branches), and checks for untracked (non-ignored) files that would
-/// be overwritten by the target tree before mutating the worktree, index,
-/// branches, or HEAD.
+/// Validates repository state, HEAD, the target branch (including linked
+/// worktrees and local branch creation + upstream setup for remote targets),
+/// and checks for un-indexed worktree files that would be overwritten or
+/// removed before mutating the worktree, index, HEAD, or pending merge state.
 pub fn checkout_branch_discard(
 	repo_path: &RepoPath,
 	branch: &BranchInfo,
@@ -626,6 +695,8 @@ pub fn checkout_branch_discard(
 	scope_time!("checkout_branch_discard");
 
 	let repo = repo(repo_path)?;
+
+	let cleanup_state = should_cleanup_state_after_discard(&repo)?;
 
 	let head = repo.head().map_err(|e| {
 		if e.code() == git2::ErrorCode::UnbornBranch {
@@ -638,6 +709,14 @@ pub fn checkout_branch_discard(
 
 	let target = resolve_discard_target(&repo, branch)?;
 
+	if let DiscardTarget::Local { ref ref_name, .. } = target {
+		check_branch_not_checked_out_elsewhere(
+			&repo,
+			&branch.name,
+			ref_name,
+		)?;
+	}
+
 	let collisions =
 		find_untracked_collisions(&repo, &head_tree, target.tree())?;
 	if !collisions.is_empty() {
@@ -647,14 +726,51 @@ pub fn checkout_branch_discard(
 		)));
 	}
 
-	let mut checkout_opts = git2::build::CheckoutBuilder::new();
-	checkout_opts.force().overwrite_ignored(true);
-	repo.checkout_tree(
-		target.tree().as_object(),
-		Some(&mut checkout_opts),
-	)?;
+	let (target_ref_name, created_branch) = match &target {
+		DiscardTarget::Local { ref_name, .. } => {
+			(ref_name.clone(), None)
+		}
+		DiscardTarget::Remote {
+			local_name,
+			upstream_name,
+			commit,
+			..
+		} => {
+			let mut new_branch =
+				repo.branch(local_name, commit, false)?;
+			if let Err(e) =
+				new_branch.set_upstream(Some(upstream_name))
+			{
+				let _ = new_branch.delete();
+				return Err(e.into());
+			}
+			let ref_name =
+				match bytes2string(new_branch.get().name_bytes()) {
+					Ok(name) => name,
+					Err(e) => {
+						let _ = new_branch.delete();
+						return Err(e);
+					}
+				};
+			(ref_name, Some(new_branch))
+		}
+	};
 
-	apply_discard_target_head(&repo, target)
+	let switch_result = apply_discard_checkout(
+		&repo,
+		target.tree(),
+		&target_ref_name,
+		cleanup_state,
+	);
+
+	if let Err(err) = switch_result {
+		if let Some(mut new_branch) = created_branch {
+			let _ = new_branch.delete();
+		}
+		return Err(err);
+	}
+
+	Ok(())
 }
 
 /// The user must not be on the branch for the branch to be deleted
