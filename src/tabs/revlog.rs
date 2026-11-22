@@ -7,7 +7,7 @@ use crate::{
 	},
 	keys::{key_match, SharedKeyConfig},
 	popups::{FileTreeOpen, InspectCommitOpen},
-	queue::{InternalEvent, Queue, StackablePopupOpen},
+	queue::{Action, InternalEvent, Queue, StackablePopupOpen},
 	strings::{self, order},
 	try_or_popup,
 	ui::style::{SharedTheme, Theme},
@@ -227,13 +227,59 @@ impl Revlog {
 		self.list.select_commit(id)
 	}
 
-	fn revert_commit(&self) -> Result<()> {
-		if let Some(c) = self.selected_commit() {
-			sync::revert_commit(&self.repo.borrow(), c)?;
-			self.queue.push(InternalEvent::TabSwitchStatus);
-		}
+	fn is_repo_state_clean(&self) -> bool {
+		matches!(
+			sync::repo_state(&self.repo.borrow()),
+			Ok(sync::RepoState::Clean)
+		)
+	}
 
-		Ok(())
+	fn request_revert_commit(&self) -> EventState {
+		let Some(entry) = self.list.selected_entry() else {
+			return EventState::NotConsumed;
+		};
+		match sync::repo_state(&self.repo.borrow()) {
+			Ok(sync::RepoState::Clean) => {
+				self.queue.push(InternalEvent::ConfirmAction(
+					Action::RevertCommit {
+						id: entry.id,
+						subject: entry.msg.to_string(),
+					},
+				));
+				EventState::Consumed
+			}
+			Ok(_) => EventState::NotConsumed,
+			Err(err) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("revert error:\n{err}"),
+				));
+				EventState::Consumed
+			}
+		}
+	}
+
+	fn request_checkout_commit(&self) -> EventState {
+		let Some(entry) = self.list.selected_entry() else {
+			return EventState::NotConsumed;
+		};
+		match sync::repo_state(&self.repo.borrow()) {
+			Ok(sync::RepoState::Clean) => {
+				self.queue.push(InternalEvent::ConfirmAction(
+					Action::CheckoutCommit {
+						id: entry.id,
+						subject: entry.msg.to_string(),
+					},
+				));
+				EventState::Consumed
+			}
+			Ok(_) => EventState::NotConsumed,
+			Err(err) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("failed to checkout commit:\n{err}"),
+				));
+				EventState::Consumed
+			}
+		}
 	}
 
 	fn inspect_commit(&self) {
@@ -411,6 +457,59 @@ impl Revlog {
 	fn can_start_search(&self) -> bool {
 		!self.git_log.is_pending() && !self.is_search_pending()
 	}
+
+	fn push_commit_commands(
+		&self,
+		out: &mut Vec<CommandInfo>,
+		force_all: bool,
+	) {
+		let repo_state_clean =
+			(self.visible || force_all) && self.is_repo_state_clean();
+		let has_selection = self.selected_commit().is_some();
+		let show_not_searching =
+			(self.visible && !self.is_search_pending()) || force_all;
+
+		out.push(CommandInfo::new(
+			strings::commands::log_checkout_commit(&self.key_config),
+			has_selection && repo_state_clean,
+			show_not_searching,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::open_tags_popup(&self.key_config),
+			true,
+			self.visible || force_all,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::push_tags(&self.key_config),
+			true,
+			self.visible || force_all,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::inspect_file_tree(&self.key_config),
+			has_selection,
+			show_not_searching,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::revert_commit(&self.key_config),
+			has_selection && repo_state_clean,
+			show_not_searching,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_reset_commit(&self.key_config),
+			has_selection,
+			show_not_searching,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_reword_commit(&self.key_config),
+			has_selection,
+			show_not_searching,
+		));
+		out.push(CommandInfo::new(
+			strings::commands::log_find_commit(&self.key_config),
+			self.can_start_search(),
+			self.visible || force_all,
+		));
+	}
 }
 
 impl DrawableComponent for Revlog {
@@ -522,13 +621,13 @@ impl Component for Revlog {
 					self.key_config.keys.status_reset_item,
 				) && !self.is_search_pending()
 				{
-					try_or_popup!(
-						self,
-						"revert error:",
-						self.revert_commit()
-					);
-
-					return Ok(EventState::Consumed);
+					return Ok(self.request_revert_commit());
+				} else if key_match(
+					k,
+					self.key_config.keys.log_checkout_commit,
+				) && !self.is_search_pending()
+				{
+					return Ok(self.request_checkout_commit());
 				} else if key_match(
 					k,
 					self.key_config.keys.open_file_tree,
@@ -693,51 +792,7 @@ impl Component for Revlog {
 			self.visible || force_all,
 		));
 
-		out.push(CommandInfo::new(
-			strings::commands::log_checkout_commit(&self.key_config),
-			self.selected_commit().is_some(),
-			self.visible || force_all,
-		));
-
-		out.push(CommandInfo::new(
-			strings::commands::open_tags_popup(&self.key_config),
-			true,
-			self.visible || force_all,
-		));
-
-		out.push(CommandInfo::new(
-			strings::commands::push_tags(&self.key_config),
-			true,
-			self.visible || force_all,
-		));
-
-		out.push(CommandInfo::new(
-			strings::commands::inspect_file_tree(&self.key_config),
-			self.selected_commit().is_some(),
-			(self.visible && !self.is_search_pending()) || force_all,
-		));
-
-		out.push(CommandInfo::new(
-			strings::commands::revert_commit(&self.key_config),
-			self.selected_commit().is_some(),
-			(self.visible && !self.is_search_pending()) || force_all,
-		));
-
-		out.push(CommandInfo::new(
-			strings::commands::log_reset_commit(&self.key_config),
-			self.selected_commit().is_some(),
-			(self.visible && !self.is_search_pending()) || force_all,
-		));
-		out.push(CommandInfo::new(
-			strings::commands::log_reword_commit(&self.key_config),
-			self.selected_commit().is_some(),
-			(self.visible && !self.is_search_pending()) || force_all,
-		));
-		out.push(CommandInfo::new(
-			strings::commands::log_find_commit(&self.key_config),
-			self.can_start_search(),
-			self.visible || force_all,
-		));
+		self.push_commit_commands(out, force_all);
 
 		visibility_blocking(self)
 	}
@@ -857,5 +912,172 @@ mod tests {
 		// Empty history after clear is safe.
 		revlog.list.clear();
 		assert!(revlog.selected_commit().is_none());
+	}
+
+	fn drain_all(
+		revlog: &mut Revlog,
+		rx: &Receiver<AsyncGitNotification>,
+	) {
+		while revlog.any_work_pending() {
+			if rx.recv_timeout(Duration::from_secs(2)).is_err() {
+				break;
+			}
+		}
+		revlog.update().unwrap();
+	}
+
+	#[test]
+	fn t8c_no_selection_no_prompt() {
+		let (td, repo) = git2_testing::repo_init();
+		let sig = repo.signature().unwrap();
+		let tree = repo
+			.find_tree(repo.index().unwrap().write_tree().unwrap())
+			.unwrap();
+		let c0 = repo.head().unwrap().peel_to_commit().unwrap();
+		let c1_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c1", &tree, &[&c0])
+			.unwrap();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut revlog = Revlog::new(&env);
+		revlog.visible = true;
+
+		let revert_key = Event::Key(crossterm::event::KeyEvent::new(
+			env.key_config.keys.status_reset_item.code,
+			env.key_config.keys.status_reset_item.modifiers,
+		));
+		let checkout_key =
+			Event::Key(crossterm::event::KeyEvent::new(
+				env.key_config.keys.log_checkout_commit.code,
+				env.key_config.keys.log_checkout_commit.modifiers,
+			));
+
+		// Empty list: neither key queues a confirmation.
+		revlog.event(&revert_key).unwrap();
+		revlog.event(&checkout_key).unwrap();
+		assert!(env.queue.pop().is_none());
+
+		// Load commits, select non-zero commit, then clear to enter pending_restore.
+		revlog.show().unwrap();
+		drain_all(&mut revlog, &rx);
+		revlog.select_commit(CommitId::new(c0.id())).unwrap();
+		revlog.update().unwrap();
+		revlog.list.clear();
+		// Feed only the newest commit so restore for c0 is still pending.
+		revlog.list.refresh_extend_data(vec![CommitId::new(c1_oid)]);
+		assert!(revlog.selected_commit().is_none());
+
+		revlog.event(&revert_key).unwrap();
+		revlog.event(&checkout_key).unwrap();
+		assert!(env.queue.pop().is_none());
+		drain_all(&mut revlog, &rx);
+	}
+
+	fn set_pending_state(
+		git_dir: &std::path::Path,
+		kind: &str,
+		oid: &str,
+	) {
+		let _ = std::fs::remove_file(git_dir.join("MERGE_HEAD"));
+		let _ = std::fs::remove_file(git_dir.join("REVERT_HEAD"));
+		let _ =
+			std::fs::remove_file(git_dir.join("CHERRY_PICK_HEAD"));
+		let _ = std::fs::remove_dir_all(git_dir.join("rebase-merge"));
+		match kind {
+			"merge" => std::fs::write(
+				git_dir.join("MERGE_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			"revert" => std::fs::write(
+				git_dir.join("REVERT_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			"rebase" => {
+				std::fs::create_dir_all(git_dir.join("rebase-merge"))
+					.unwrap();
+			}
+			"cherry-pick" => std::fs::write(
+				git_dir.join("CHERRY_PICK_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			_ => unreachable!(),
+		}
+	}
+
+	#[test]
+	fn t8c_pending_state_blocks() {
+		let (td, repo) = git2_testing::repo_init();
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		std::fs::write(workdir.join("a.txt"), "one").unwrap();
+		let mut idx = repo.index().unwrap();
+		idx.add_path(std::path::Path::new("a.txt")).unwrap();
+		idx.write().unwrap();
+		let tree = repo.find_tree(idx.write_tree().unwrap()).unwrap();
+		let sig = repo.signature().unwrap();
+		let c0 = repo.head().unwrap().peel_to_commit().unwrap();
+		let c1_oid = repo
+			.commit(Some("HEAD"), &sig, &sig, "c1", &tree, &[&c0])
+			.unwrap()
+			.to_string();
+
+		let (env, rx) = env_for_repo(td.path());
+		let mut revlog = Revlog::new(&env);
+		revlog.show().unwrap();
+		drain_all(&mut revlog, &rx);
+
+		let git_dir = repo.path().to_path_buf();
+		let revert_key = Event::Key(crossterm::event::KeyEvent::new(
+			env.key_config.keys.status_reset_item.code,
+			env.key_config.keys.status_reset_item.modifiers,
+		));
+		let checkout_key =
+			Event::Key(crossterm::event::KeyEvent::new(
+				env.key_config.keys.log_checkout_commit.code,
+				env.key_config.keys.log_checkout_commit.modifiers,
+			));
+		let revert_hint =
+			strings::commands::revert_commit(&env.key_config).name;
+		let checkout_hint =
+			strings::commands::log_checkout_commit(&env.key_config)
+				.name;
+
+		for label in ["merge", "revert", "rebase", "cherry-pick"] {
+			set_pending_state(&git_dir, label, &c1_oid);
+			assert_ne!(
+				sync::repo_state(&env.repo.borrow()).unwrap(),
+				sync::RepoState::Clean,
+				"expected non-clean state for {label}"
+			);
+
+			let mut cmds = Vec::new();
+			revlog.commands(&mut cmds, false);
+			assert!(
+				!cmds
+					.iter()
+					.find(|c| c.text.name == revert_hint)
+					.is_some_and(|c| c.enabled),
+				"revert hint must be disabled during {label}"
+			);
+			assert!(
+				!cmds
+					.iter()
+					.find(|c| c.text.name == checkout_hint)
+					.is_some_and(|c| c.enabled),
+				"checkout hint must be disabled during {label}"
+			);
+			assert!(!revlog
+				.event(&revert_key)
+				.unwrap()
+				.is_consumed());
+			assert!(!revlog
+				.event(&checkout_key)
+				.unwrap()
+				.is_consumed());
+			assert!(env.queue.pop().is_none());
+			assert!(!repo.head_detached().unwrap());
+		}
 	}
 }

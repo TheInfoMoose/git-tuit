@@ -496,6 +496,26 @@ impl App {
 			false
 		}
 	}
+
+	#[cfg(test)]
+	pub(crate) fn is_confirm_popup_visible(&self) -> bool {
+		self.confirm_popup.is_visible()
+	}
+
+	#[cfg(test)]
+	pub(crate) fn is_msg_popup_visible(&self) -> bool {
+		self.msg_popup.is_visible()
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn current_tab(&self) -> usize {
+		self.tab
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn revlog_mut(&mut self) -> &mut Revlog {
+		&mut self.revlog
+	}
 }
 
 // private impls
@@ -1059,11 +1079,34 @@ impl App {
 					undo_last_commit(&self.repo.borrow())
 				);
 			}
+			Action::RevertCommit { id, .. } => {
+				self.revert_commit(id);
+			}
+			Action::CheckoutCommit { id, .. } => {
+				try_or_popup!(
+					self,
+					"failed to checkout commit:",
+					sync::checkout_commit(&self.repo.borrow(), id)
+				);
+			}
 		}
 
 		flags.insert(NeedsUpdate::ALL);
 
 		Ok(())
+	}
+
+	fn revert_commit(&self, id: asyncgit::sync::CommitId) {
+		match sync::revert_commit(&self.repo.borrow(), id) {
+			Ok(()) => {
+				self.queue.push(InternalEvent::TabSwitchStatus);
+			}
+			Err(e) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("revert error:\n{e}"),
+				));
+			}
+		}
 	}
 
 	fn delete_tag(&mut self, tag_name: String) -> Result<()> {

@@ -8,14 +8,12 @@ use crate::{
 	keys::{key_match, SharedKeyConfig},
 	queue::{InternalEvent, Queue},
 	strings::{self, symbol},
-	try_or_popup,
 	ui::style::{SharedTheme, Theme},
 	ui::{calc_scroll_top, draw_scrollbar, Orientation},
 };
 use anyhow::Result;
 use asyncgit::sync::{
-	self, checkout_commit, BranchDetails, BranchInfo, CommitId,
-	RepoPathRef, Tags,
+	self, BranchDetails, BranchInfo, CommitId, RepoPathRef, Tags,
 };
 use crossterm::event::Event;
 use indexmap::IndexSet;
@@ -176,19 +174,6 @@ impl CommitList {
 			));
 		}
 		Ok(())
-	}
-
-	///
-	pub fn checkout(&self) {
-		if let Some(commit_hash) =
-			self.selected_entry().map(|entry| entry.id)
-		{
-			try_or_popup!(
-				self,
-				"failed to checkout commit:",
-				checkout_commit(&self.repo.borrow(), commit_hash)
-			);
-		}
 	}
 
 	///
@@ -927,12 +912,6 @@ impl Component for CommitList {
 					self.key_config.keys.log_mark_commit,
 				) {
 					self.mark();
-					true
-				} else if key_match(
-					k,
-					self.key_config.keys.log_checkout_commit,
-				) {
-					self.checkout();
 					true
 				} else {
 					false

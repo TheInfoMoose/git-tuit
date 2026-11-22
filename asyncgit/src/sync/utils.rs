@@ -24,6 +24,49 @@ pub struct Head {
 	pub id: CommitId,
 }
 
+/// Snapshot of HEAD (commit id, refname, detached flag) and repository state.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct RepoSnapshot {
+	/// Commit id HEAD currently points to
+	pub head_id: CommitId,
+	/// Full refname of HEAD (e.g. `refs/heads/main`) or `"HEAD"` when detached
+	pub head_name: String,
+	/// Whether HEAD is detached
+	pub detached: bool,
+	state: git2::RepositoryState,
+}
+
+impl RepoSnapshot {
+	/// Display label for HEAD: branch name without `refs/heads/`,
+	/// or short commit id when HEAD is detached.
+	pub fn head_label(&self) -> String {
+		if self.detached {
+			self.head_id.get_short_string()
+		} else {
+			self.head_name
+				.strip_prefix("refs/heads/")
+				.unwrap_or(&self.head_name)
+				.to_string()
+		}
+	}
+}
+
+/// Capture HEAD and repository state for stale-confirmation checks.
+pub fn repo_snapshot(repo_path: &RepoPath) -> Result<RepoSnapshot> {
+	let repo = repo(repo_path)?;
+	let head_id = get_head_repo(&repo)?;
+	let head_name = get_head_refname(&repo)?;
+	let detached = repo.head_detached()?;
+	let state = repo.state();
+
+	Ok(RepoSnapshot {
+		head_id,
+		head_name,
+		detached,
+		state,
+	})
+}
+
 ///
 pub fn repo_open_error(repo_path: &RepoPath) -> Option<String> {
 	if let Err(e) = Repository::open_ext(

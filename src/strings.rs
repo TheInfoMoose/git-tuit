@@ -303,6 +303,54 @@ pub fn confirm_msg_force_push(
         "Confirm force push to branch '{branch_ref}' ?  This may rewrite history."
     )
 }
+pub fn confirm_title_revert_commit() -> String {
+	"Revert Commit".to_string()
+}
+pub fn confirm_msg_revert_commit(
+	short_id: &str,
+	subject: &str,
+	head_label: &str,
+	detached: bool,
+	max_name_width: usize,
+) -> String {
+	let subject = ellipsis_trim_middle(subject, max_name_width);
+	let head = ellipsis_trim_middle(head_label, max_name_width);
+	if detached {
+		format!(
+			"Revert commit {short_id} ({subject})\nat detached HEAD {head}?"
+		)
+	} else {
+		format!(
+			"Revert commit {short_id} ({subject})\non branch '{head}'?"
+		)
+	}
+}
+pub fn confirm_title_checkout_commit() -> String {
+	"Checkout Commit".to_string()
+}
+pub fn confirm_msg_checkout_commit(
+	short_id: &str,
+	subject: &str,
+	head_label: &str,
+	detached: bool,
+	max_name_width: usize,
+) -> String {
+	let subject = ellipsis_trim_middle(subject, max_name_width);
+	let head = ellipsis_trim_middle(head_label, max_name_width);
+	if detached {
+		format!(
+			"Checkout commit {short_id} ({subject})\nfrom detached HEAD {head}?\nHEAD will be detached."
+		)
+	} else {
+		format!(
+			"Checkout commit {short_id} ({subject})\nfrom branch '{head}'?\nHEAD will be detached."
+		)
+	}
+}
+pub fn confirm_err_repo_changed() -> String {
+	"Repository changed while confirmation was open; action cancelled."
+		.to_string()
+}
 pub fn log_title(_key_config: &SharedKeyConfig) -> String {
 	"Commit".to_string()
 }
@@ -439,6 +487,27 @@ pub fn ellipsis_trim_start(s: &str, width: usize) -> Cow<'_, str> {
 			.0
 		))
 	}
+}
+
+pub fn ellipsis_trim_middle(
+	s: &str,
+	max_width: usize,
+) -> Cow<'_, str> {
+	if s.width() <= max_width {
+		return Cow::Borrowed(s);
+	}
+	if max_width == 0 {
+		return Cow::Borrowed("");
+	}
+	if max_width == 1 {
+		return Cow::Owned(symbol::ELLIPSIS.to_string());
+	}
+	let budget = max_width - 1;
+	let head_w = budget.div_ceil(2);
+	let tail_w = budget - head_w;
+	let (head, _) = s.unicode_truncate(head_w);
+	let (tail, _) = s.unicode_truncate_start(tail_w);
+	Cow::Owned(format!("{head}{}{tail}", symbol::ELLIPSIS))
 }
 
 pub const fn normalize_branch_name_char(c: char) -> char {

@@ -233,3 +233,93 @@ impl Component for StashList {
 		Ok(())
 	}
 }
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crossterm::event::KeyEvent;
+	use std::cell::RefCell;
+
+	#[test]
+	fn t8c_stashlist_has_no_checkout() {
+		let (td, mut repo) = git2_testing::repo_init();
+		let workdir = repo.workdir().unwrap().to_path_buf();
+		let initial_head_ref =
+			repo.head().unwrap().name().unwrap().to_string();
+
+		// Create a tracked file, commit it, modify it, then stash it.
+		std::fs::write(workdir.join("f.txt"), "v1").unwrap();
+		{
+			let mut idx = repo.index().unwrap();
+			idx.add_path(std::path::Path::new("f.txt")).unwrap();
+			idx.write().unwrap();
+			let tree =
+				repo.find_tree(idx.write_tree().unwrap()).unwrap();
+			let sig = repo.signature().unwrap();
+			let parent =
+				repo.head().unwrap().peel_to_commit().unwrap();
+			repo.commit(
+				Some("HEAD"),
+				&sig,
+				&sig,
+				"add f",
+				&tree,
+				&[&parent],
+			)
+			.unwrap();
+		}
+		std::fs::write(workdir.join("f.txt"), "v2").unwrap();
+		let sig = repo.signature().unwrap();
+		repo.stash_save(&sig, "my stash", None).unwrap();
+
+		let mut env = Environment::test_env();
+		env.repo =
+			RefCell::new(RepoPath::Path(td.path().to_path_buf()));
+
+		let mut stashlist = StashList::new(&env);
+		stashlist.show().unwrap();
+
+		// No checkout hint in commands.
+		let mut cmds = Vec::new();
+		stashlist.commands(&mut cmds, false);
+		let checkout_hint =
+			strings::commands::log_checkout_commit(&env.key_config)
+				.name;
+		assert!(
+			!cmds.iter().any(|c| c.text.name == checkout_hint),
+			"StashList must not expose checkout hint"
+		);
+
+		let checkout_key = Event::Key(KeyEvent::new(
+			env.key_config.keys.log_checkout_commit.code,
+			env.key_config.keys.log_checkout_commit.modifiers,
+		));
+
+		// Without marks: key is not consumed, HEAD stays attached, no confirm queued.
+		let res = stashlist.event(&checkout_key).unwrap();
+		assert!(
+			!res.is_consumed(),
+			"StashList must not consume checkout key without marks"
+		);
+		assert!(!repo.head_detached().unwrap());
+		assert_eq!(
+			repo.head().unwrap().name().unwrap(),
+			initial_head_ref
+		);
+		assert!(env.queue.pop().is_none());
+
+		// With a mark: still no action, prompt, or hint.
+		let mark_key = Event::Key(KeyEvent::new(
+			env.key_config.keys.log_mark_commit.code,
+			env.key_config.keys.log_mark_commit.modifiers,
+		));
+		assert!(stashlist.event(&mark_key).unwrap().is_consumed());
+		let res_marked = stashlist.event(&checkout_key).unwrap();
+		assert!(
+			!res_marked.is_consumed(),
+			"StashList must not consume checkout key with marks"
+		);
+		assert!(!repo.head_detached().unwrap());
+		assert!(env.queue.pop().is_none());
+	}
+}

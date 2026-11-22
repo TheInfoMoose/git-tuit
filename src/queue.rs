@@ -58,6 +58,19 @@ pub enum Action {
 	AbortRebase,
 	AbortRevert,
 	UndoCommit,
+	RevertCommit { id: CommitId, subject: String },
+	CheckoutCommit { id: CommitId, subject: String },
+}
+
+impl Action {
+	/// Whether this confirmation must refuse if HEAD or repo state
+	/// changed while the prompt was open.
+	pub const fn guards_repo(&self) -> bool {
+		matches!(
+			self,
+			Self::RevertCommit { .. } | Self::CheckoutCommit { .. }
+		)
+	}
 }
 
 #[derive(Debug)]
