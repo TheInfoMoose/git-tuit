@@ -12,8 +12,9 @@ updated_at = "2026-11-22T14:20:33Z"
 source_ref = "STEP 8I"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 418
 iteration_count = 1
+last_timer_session = "TASK-0100@2026-11-22T07:22:17Z"
 
 [history]
 recurrence_count = 0
