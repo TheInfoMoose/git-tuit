@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0100"
 type = "task"
 title = "Stash Message, Go to Line and Submodule Status"
-status = "open"
+status = "pending"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-22T05:34:48Z"
-updated_at = "2026-11-22T05:34:48Z"
+updated_at = "2026-11-22T14:20:33Z"
 source_ref = "STEP 8I"
 
 [effort]

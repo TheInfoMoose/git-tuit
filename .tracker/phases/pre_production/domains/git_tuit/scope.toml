@@ -1112,7 +1112,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0100"
 title = "Stash Message, Go to Line and Submodule Status"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
