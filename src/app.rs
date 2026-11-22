@@ -3966,4 +3966,110 @@ mod tests {
 			Some("forkuser")
 		);
 	}
+
+	fn bare_branch_tip(path: &Path, branch: &str) -> CommitId {
+		sync::get_branches_info(
+			&RepoPath::Path(path.to_path_buf()),
+			true,
+		)
+		.unwrap()
+		.into_iter()
+		.find(|b| b.name == branch)
+		.unwrap()
+		.top_commit
+	}
+
+	fn init_force_push_repo() -> (
+		tempfile::TempDir,
+		tempfile::TempDir,
+		String,
+		CommitId,
+		CommitId,
+	) {
+		let (origin_td, _origin_bare) =
+			git2_testing::repo_init_bare();
+		let (td, repo) = git2_testing::repo_init();
+		let branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let initial_oid = repo.head().unwrap().target().unwrap();
+
+		repo.remote("origin", origin_td.path().to_str().unwrap())
+			.unwrap();
+		{
+			let mut rem = repo.find_remote("origin").unwrap();
+			let refspec =
+				format!("refs/heads/{branch}:refs/heads/{branch}");
+			rem.push(&[&refspec], None).unwrap();
+		}
+		{
+			let mut cfg = repo.config().unwrap();
+			cfg.set_str(&format!("branch.{branch}.remote"), "origin")
+				.unwrap();
+			cfg.set_str(
+				&format!("branch.{branch}.merge"),
+				&format!("refs/heads/{branch}"),
+			)
+			.unwrap();
+		}
+		repo.reference(
+			&format!("refs/remotes/origin/{branch}"),
+			initial_oid,
+			true,
+			"test",
+		)
+		.unwrap();
+		commit_file(td.path(), "a.txt", "ahead", "ahead");
+		let local_tip =
+			CommitId::new(repo.head().unwrap().target().unwrap());
+
+		(origin_td, td, branch, CommitId::new(initial_oid), local_tip)
+	}
+
+	#[test]
+	fn t9d_moved_branch_refuses() {
+		let (origin_td, td, branch, origin_tip, _local_tip) =
+			init_force_push_repo();
+		let (mut app, kc, rx_git) = make_test_app_with_rx(td.path());
+
+		app.set_tab(0).unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+
+		commit_file(td.path(), "b.txt", "moved", "moved");
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.push_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"moved branch must show repo-changed error"
+		);
+
+		drain_app_work(&mut app, &rx_git);
+		assert_eq!(
+			bare_branch_tip(origin_td.path(), &branch),
+			origin_tip,
+			"origin branch must remain unchanged when branch moved"
+		);
+	}
+
+	#[test]
+	fn t9d_same_tip_pushes() {
+		let (origin_td, td, branch, _origin_tip, local_tip) =
+			init_force_push_repo();
+		let (mut app, kc, rx_git) = make_test_app_with_rx(td.path());
+
+		app.set_tab(0).unwrap();
+		send_key!(&mut app, kc.keys.force_push);
+		assert!(app.confirm_popup.is_visible());
+
+		send_key!(&mut app, kc.keys.enter);
+		drain_app_work(&mut app, &rx_git);
+
+		assert_eq!(
+			bare_branch_tip(origin_td.path(), &branch),
+			local_tip,
+			"origin branch must equal local tip after force-push"
+		);
+	}
 }

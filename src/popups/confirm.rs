@@ -67,7 +67,19 @@ fn wrapped_line_count(msg: &str, inner_width: usize) -> usize {
 
 enum PushRemoteKind {
 	DefaultRemote,
-	Branch(String),
+	Branch { name: String, tip: CommitId },
+}
+
+fn local_branch_tip(
+	repo: &sync::RepoPath,
+	branch: &str,
+) -> asyncgit::Result<Option<CommitId>> {
+	let short = branch.strip_prefix("refs/heads/").unwrap_or(branch);
+	let branches = sync::get_branches_info(repo, true)?;
+	Ok(branches
+		.into_iter()
+		.find(|b| b.name == short)
+		.map(|b| b.top_commit))
 }
 
 enum ConfirmGuard {
@@ -272,8 +284,18 @@ impl ConfirmPopup {
 				})
 			}
 			Action::ForcePush(branch, remote, _) => {
+				let tip =
+					local_branch_tip(&self.repo.borrow(), branch)?
+						.ok_or_else(|| {
+							anyhow::anyhow!(
+								strings::confirm_err_repo_changed()
+							)
+						})?;
 				Some(ConfirmGuard::PushRemote {
-					kind: PushRemoteKind::Branch(branch.clone()),
+					kind: PushRemoteKind::Branch {
+						name: branch.clone(),
+						tip,
+					},
 					remote: remote.clone(),
 				})
 			}
@@ -383,9 +405,26 @@ impl ConfirmPopup {
 			PushRemoteKind::DefaultRemote => {
 				sync::get_default_remote(&repo)
 			}
-			PushRemoteKind::Branch(branch) => {
+			PushRemoteKind::Branch { name, tip } => {
+				match local_branch_tip(&repo, name) {
+					Ok(Some(current)) if current == *tip => {}
+					Ok(_) => {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							strings::confirm_err_repo_changed(),
+						));
+						return false;
+					}
+					Err(e) => {
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!(
+								"failed to verify repository state:\n{e}"
+							),
+						));
+						return false;
+					}
+				}
 				crate::popups::PushPopup::resolve_branch_remote(
-					&repo, branch,
+					&repo, name,
 				)
 			}
 		};
