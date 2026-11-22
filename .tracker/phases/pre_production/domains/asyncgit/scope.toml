@@ -292,6 +292,6 @@ created_at = "2026-11-22T21:59:21Z"
 [[items.tasks]]
 id = "TASK-0109"
 title = "Discard-and-Switch Checks First, Leaves a Clean Target"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T21:59:21Z"
