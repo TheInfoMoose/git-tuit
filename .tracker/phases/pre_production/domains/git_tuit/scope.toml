@@ -1091,7 +1091,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0097"
 title = "Pushes and Prompts Name Their Targets"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
