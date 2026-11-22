@@ -285,7 +285,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0108"
 title = "Abort Undoes Only the Merge (re-split 8A)"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T21:59:21Z"
 
