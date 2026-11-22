@@ -31,6 +31,8 @@ pub struct CompareDetailsComponent {
 }
 
 impl CompareDetailsComponent {
+	pub(super) const IDEAL_HEIGHT: u16 = 10;
+
 	///
 	pub fn new(env: &Environment, focused: bool) -> Self {
 		Self {
@@ -97,15 +99,39 @@ impl CompareDetailsComponent {
 
 		res
 	}
+
+	const fn split_heights(total: u16) -> (u16, u16) {
+		const IDEAL_EACH: u16 = 5;
+		if total >= IDEAL_EACH * 2 {
+			return (IDEAL_EACH, IDEAL_EACH);
+		}
+		let first = total / 2;
+		let second = total.saturating_sub(first);
+		(first, second)
+	}
+
+	#[cfg(test)]
+	pub(super) fn set_test_data(
+		&mut self,
+		data: Option<OldNew<CommitDetails>>,
+	) {
+		self.data = data;
+	}
 }
 
 impl DrawableComponent for CompareDetailsComponent {
 	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
+		let (old_height, new_height) =
+			Self::split_heights(rect.height);
+
 		let chunks = Layout::default()
 			.direction(Direction::Vertical)
 			.constraints(
-				[Constraint::Length(5), Constraint::Length(5)]
-					.as_ref(),
+				[
+					Constraint::Length(old_height),
+					Constraint::Length(new_height),
+				]
+				.as_ref(),
 			)
 			.split(rect);
 

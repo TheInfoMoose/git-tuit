@@ -138,29 +138,78 @@ impl CommitDetailsComponent {
 	}
 }
 
+const BORDER_HEIGHT: u16 = 2;
+const MIN_PANE_HEIGHT: u16 = 1 + BORDER_HEIGHT;
+
+fn split_single_heights(
+	total: u16,
+	info_rows: u16,
+	details_focused: bool,
+) -> (u16, u16) {
+	let min_both = MIN_PANE_HEIGHT.saturating_mul(2);
+	if total < min_both {
+		let files = total / 2;
+		return (total.saturating_sub(files), files);
+	}
+
+	let info_ideal = info_rows.saturating_add(BORDER_HEIGHT);
+	let details_min_full = info_ideal.saturating_add(MIN_PANE_HEIGHT);
+	let max_details = total.saturating_sub(MIN_PANE_HEIGHT);
+
+	if details_min_full >= max_details {
+		return (max_details, MIN_PANE_HEIGHT);
+	}
+
+	let pct: u32 = if details_focused { 60 } else { 40 };
+	let desired_details =
+		u16::try_from((u32::from(total) * pct + 50) / 100)
+			.unwrap_or(total);
+	let details =
+		desired_details.clamp(details_min_full, max_details);
+	let files = total.saturating_sub(details);
+
+	(details, files)
+}
+
+const fn split_compare_heights(total: u16) -> (u16, u16) {
+	if total < MIN_PANE_HEIGHT {
+		return (0, total);
+	}
+
+	let max_compare = total.saturating_sub(MIN_PANE_HEIGHT);
+	let compare =
+		if CompareDetailsComponent::IDEAL_HEIGHT < max_compare {
+			CompareDetailsComponent::IDEAL_HEIGHT
+		} else {
+			max_compare
+		};
+	let files = total.saturating_sub(compare);
+
+	(compare, files)
+}
+
 impl DrawableComponent for CommitDetailsComponent {
 	fn draw(&self, f: &mut Frame, rect: Rect) -> Result<()> {
 		if !self.visible {
 			return Ok(());
 		}
 
-		let constraints = if self.is_compare() {
-			[Constraint::Length(10), Constraint::Min(0)]
+		let (details_height, files_height) = if self.is_compare() {
+			split_compare_heights(rect.height)
 		} else {
-			let details_focused = self.details_focused();
-			let percentages = if self.file_tree.focused() {
-				(40, 60)
-			} else if details_focused {
-				(60, 40)
-			} else {
-				(40, 60)
-			};
-
-			[
-				Constraint::Percentage(percentages.0),
-				Constraint::Percentage(percentages.1),
-			]
+			let details_focused =
+				!self.file_tree.focused() && self.details_focused();
+			split_single_heights(
+				rect.height,
+				self.single_details.info_line_count(),
+				details_focused,
+			)
 		};
+
+		let constraints = [
+			Constraint::Length(details_height),
+			Constraint::Length(files_height),
+		];
 
 		let chunks = Layout::default()
 			.direction(Direction::Vertical)
@@ -251,5 +300,369 @@ impl Component for CommitDetailsComponent {
 		self.compare_details.focus(false);
 		self.file_tree.focus(focus);
 		self.file_tree.show_selection(true);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use asyncgit::{
+		sync::{
+			CommitDetails, CommitId, CommitMessage, CommitSignature,
+			Tag,
+		},
+		StatusItem, StatusItemType,
+	};
+	use ratatui::{backend::TestBackend, Terminal};
+
+	fn sample_commit(
+		with_committer: bool,
+		subject: &str,
+		hash: &str,
+	) -> CommitDetails {
+		CommitDetails {
+			author: CommitSignature {
+				name: String::from("testuser"),
+				email: String::from("testuser@example.com"),
+				time: 1_700_000_000,
+			},
+			committer: with_committer.then(|| CommitSignature {
+				name: String::from("committer"),
+				email: String::from("committer@example.com"),
+				time: 1_700_000_100,
+			}),
+			message: Some(CommitMessage {
+				subject: String::from(subject),
+				body: Some(String::from(
+					"body line one\nbody line two",
+				)),
+			}),
+			hash: String::from(hash),
+		}
+	}
+
+	fn make_single_component(
+		with_committer: bool,
+		with_tags: bool,
+	) -> Result<CommitDetailsComponent> {
+		let env = Environment::test_env();
+		let mut comp = CommitDetailsComponent::new(&env);
+		comp.show()?;
+		comp.commit =
+			Some(CommitFilesParams::from(CommitId::default()));
+		let tags = if with_tags {
+			vec![Tag::new("v1.0.0")]
+		} else {
+			vec![]
+		};
+		comp.single_details.set_test_data(
+			Some(sample_commit(
+				with_committer,
+				"subject_marker",
+				"0123456789abcdef0123456789abcdef01234567",
+			)),
+			tags,
+		);
+		comp.file_tree.update(&[StatusItem {
+			path: String::from("changed_file.rs"),
+			status: StatusItemType::Modified,
+		}])?;
+		comp.file_tree.set_title(comp.get_files_title());
+		Ok(comp)
+	}
+
+	fn make_compare_component() -> Result<CommitDetailsComponent> {
+		let env = Environment::test_env();
+		let mut comp = CommitDetailsComponent::new(&env);
+		comp.show()?;
+		let id = CommitId::default();
+		comp.commit = Some(CommitFilesParams {
+			id,
+			other: Some(id),
+		});
+		comp.compare_details.set_test_data(Some(OldNew {
+			old: sample_commit(
+				false,
+				"old_subject",
+				"1111111000000000000000000000000000000000",
+			),
+			new: sample_commit(
+				false,
+				"new_subject",
+				"2222222000000000000000000000000000000000",
+			),
+		}));
+		comp.file_tree.update(&[StatusItem {
+			path: String::from("changed_file.rs"),
+			status: StatusItemType::Modified,
+		}])?;
+		comp.file_tree.set_title(comp.get_files_title());
+		Ok(comp)
+	}
+
+	fn render_lines(
+		comp: &CommitDetailsComponent,
+		width: u16,
+		height: u16,
+	) -> Result<Vec<String>> {
+		let backend = TestBackend::new(width, height);
+		let mut terminal = Terminal::new(backend)?;
+		terminal.draw(|f| {
+			let _ = comp.draw(f, Rect::new(0, 0, width, height));
+		})?;
+		let buf = terminal.backend().buffer();
+		let mut lines = Vec::with_capacity(usize::from(height));
+		for y in 0..height {
+			let mut row = String::with_capacity(usize::from(width));
+			for x in 0..width {
+				row.push_str(buf[(x, y)].symbol());
+			}
+			lines.push(row);
+		}
+		Ok(lines)
+	}
+
+	fn find_row(lines: &[String], needle: &str) -> Option<usize> {
+		lines.iter().position(|l| l.contains(needle))
+	}
+
+	#[test]
+	fn t8m_details_fit_80x24() -> Result<()> {
+		let comp = make_single_component(true, true)?;
+		// 80x24 terminal:
+		// - Log without search bar: top(2) + cmdbar(1) -> height 21, width 40% = 32
+		// - Log with search bar: 21 - search(3) -> height 18, width 32
+		// - Inspect popup: 24 - cmdbar(1) -> height 23, width 50% = 40
+		for (label, width, height) in [
+			("log_no_search", 32, 21),
+			("log_with_search", 32, 18),
+			("inspect", 40, 23),
+		] {
+			let lines = render_lines(&comp, width, height)?;
+			let screen = lines.join("\n");
+			assert!(
+				screen.contains("testuser"),
+				"{label}: missing author\n{screen}"
+			);
+			assert!(
+				screen.contains("committer"),
+				"{label}: missing committer\n{screen}"
+			);
+			assert!(
+				screen.contains("0123456"),
+				"{label}: missing sha\n{screen}"
+			);
+			assert!(
+				screen.contains("v1.0.0"),
+				"{label}: missing tags\n{screen}"
+			);
+			assert!(
+				screen.contains("subject_marker"),
+				"{label}: missing message row\n{screen}"
+			);
+			assert!(
+				screen.contains("changed_file.rs"),
+				"{label}: missing file row\n{screen}"
+			);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_large_split_kept() -> Result<()> {
+		let mut comp = make_single_component(true, true)?;
+
+		// Room to spare (height 50): 40/60 when files focused
+		comp.focus(true);
+		let lines = render_lines(&comp, 40, 50)?;
+		let files_y = find_row(&lines, "Files")
+			.ok_or_else(|| anyhow::anyhow!("missing Files title"))?;
+		assert_eq!(files_y, 20, "expected 40/60 split at height 50");
+
+		// Room to spare (height 50): 60/40 when details focused
+		comp.file_tree.focus(false);
+		comp.set_details_focus(true);
+		let lines = render_lines(&comp, 40, 50)?;
+		let files_y = find_row(&lines, "Files")
+			.ok_or_else(|| anyhow::anyhow!("missing Files title"))?;
+		assert_eq!(files_y, 30, "expected 60/40 split at height 50");
+
+		// Minimums win over 40/60 when 40% is too small (height 20: 40% = 8 < 12)
+		comp.focus(true);
+		let lines = render_lines(&comp, 40, 20)?;
+		let files_y = find_row(&lines, "Files")
+			.ok_or_else(|| anyhow::anyhow!("missing Files title"))?;
+		assert_eq!(
+			files_y, 12,
+			"expected minimums (9 info + 3 msg = 12) to win over 40%"
+		);
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_info_gives_way() -> Result<()> {
+		let mut comp = make_single_component(true, true)?;
+		for details_focused in [false, true] {
+			if details_focused {
+				comp.file_tree.focus(false);
+				comp.set_details_focus(true);
+			} else {
+				comp.focus(true);
+			}
+
+			// Height 10 (< 15 needed for full info + 1 msg + 1 file):
+			// info clips from bottom first, message and files keep 1 row each.
+			// Focusing details scrolls to the bottom message line.
+			let expected_msg = if details_focused {
+				"body line two"
+			} else {
+				"subject_marker"
+			};
+			let lines = render_lines(&comp, 40, 10)?;
+			let screen = lines.join("\n");
+			assert!(
+				screen.contains("testuser"),
+				"focused={details_focused} h=10: top info line should remain\n{screen}"
+			);
+			assert!(
+				!screen.contains("v1.0.0"),
+				"focused={details_focused} h=10: bottom info line should clip first\n{screen}"
+			);
+			assert!(
+				screen.contains(expected_msg),
+				"focused={details_focused} h=10: message must keep 1 row\n{screen}"
+			);
+			assert!(
+				screen.contains("changed_file.rs"),
+				"focused={details_focused} h=10: files must keep 1 row\n{screen}"
+			);
+
+			// Height 6 (exact room for 1 message row + 1 file row, 0 info rows):
+			let lines = render_lines(&comp, 40, 6)?;
+			let screen = lines.join("\n");
+			assert!(
+				screen.contains(expected_msg),
+				"focused={details_focused} h=6: message must keep 1 row\n{screen}"
+			);
+			assert!(
+				screen.contains("changed_file.rs"),
+				"focused={details_focused} h=6: files must keep 1 row\n{screen}"
+			);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_info_height_follows_content() -> Result<()> {
+		for (with_committer, with_tags, expected_info_height) in [
+			(false, false, 5), // 3 rows + 2 borders
+			(true, false, 7),  // 5 rows + 2 borders
+			(false, true, 7),  // 5 rows + 2 borders
+			(true, true, 9),   // 7 rows + 2 borders
+		] {
+			let comp =
+				make_single_component(with_committer, with_tags)?;
+			let lines = render_lines(&comp, 40, 40)?;
+			let msg_y =
+				find_row(&lines, "Message").ok_or_else(|| {
+					anyhow::anyhow!("missing Message title")
+				})?;
+			assert_eq!(
+				msg_y, expected_info_height,
+				"committer={with_committer}, tags={with_tags}: unexpected info height"
+			);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_compare_fits() -> Result<()> {
+		let comp = make_compare_component()?;
+		for height in [13, 24] {
+			let lines = render_lines(&comp, 40, height)?;
+			let screen = lines.join("\n");
+			assert!(
+				screen.contains("old_subject"),
+				"h={height}: missing old commit subject\n{screen}"
+			);
+			assert!(
+				screen.contains("new_subject"),
+				"h={height}: missing new commit subject\n{screen}"
+			);
+			assert!(
+				screen.contains("changed_file.rs"),
+				"h={height}: missing file row\n{screen}"
+			);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_compare_info_gives_way() -> Result<()> {
+		let comp = make_compare_component()?;
+		for (height, expected_old_h, expected_new_h) in
+			[(12, 4, 5), (11, 4, 4), (9, 3, 3)]
+		{
+			let lines = render_lines(&comp, 40, height)?;
+			let screen = lines.join("\n");
+			assert!(
+				screen.contains("changed_file.rs"),
+				"h={height}: files must keep 1 row\n{screen}"
+			);
+			let old_y =
+				find_row(&lines, "1111111").ok_or_else(|| {
+					anyhow::anyhow!("h={height}: missing old title")
+				})?;
+			let new_y =
+				find_row(&lines, "2222222").ok_or_else(|| {
+					anyhow::anyhow!("h={height}: missing new title")
+				})?;
+			let files_y =
+				find_row(&lines, "Files").ok_or_else(|| {
+					anyhow::anyhow!("h={height}: missing Files title")
+				})?;
+			let old_h = new_y - old_y;
+			let new_h = files_y - new_y;
+			assert!(
+				old_h.abs_diff(new_h) <= 1,
+				"h={height}: compare infos should shrink evenly (old={old_h}, new={new_h})"
+			);
+			assert_eq!(
+				old_h + new_h,
+				expected_old_h + expected_new_h,
+				"h={height}: compare total height"
+			);
+			assert_eq!(
+				usize::from(height) - files_y,
+				3,
+				"h={height}: files should keep 3 rows (1 content + 2 borders)"
+			);
+		}
+		Ok(())
+	}
+
+	#[test]
+	fn t8m_tiny_no_panic() -> Result<()> {
+		let mut single = make_single_component(true, true)?;
+		let compare = make_compare_component()?;
+		let mut empty =
+			CommitDetailsComponent::new(&Environment::test_env());
+		empty.show()?;
+
+		for height in 0..=6 {
+			for width in [0, 1, 2, 4, 40] {
+				single.focus(false);
+				let _ = render_lines(&single, width, height)?;
+				single.focus(true);
+				let _ = render_lines(&single, width, height)?;
+				single.file_tree.focus(false);
+				single.set_details_focus(true);
+				let _ = render_lines(&single, width, height)?;
+
+				let _ = render_lines(&compare, width, height)?;
+				let _ = render_lines(&empty, width, height)?;
+			}
+		}
+		Ok(())
 	}
 }

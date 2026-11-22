@@ -251,6 +251,53 @@ impl DetailsComponent {
 			false
 		}
 	}
+
+	pub(super) const fn info_line_count(&self) -> u16 {
+		match &self.data {
+			None => 0,
+			Some(data) => {
+				let mut lines: u16 = 3;
+				if data.committer.is_some() {
+					lines += 2;
+				}
+				if !self.tags.is_empty() {
+					lines += 2;
+				}
+				lines
+			}
+		}
+	}
+
+	const fn split_heights(total: u16, info_rows: u16) -> (u16, u16) {
+		const BORDER_HEIGHT: u16 = 2;
+		const MIN_MESSAGE_HEIGHT: u16 = 1 + BORDER_HEIGHT;
+
+		if total <= MIN_MESSAGE_HEIGHT {
+			return (0, total);
+		}
+
+		let info_ideal = info_rows.saturating_add(BORDER_HEIGHT);
+		let max_info = total.saturating_sub(MIN_MESSAGE_HEIGHT);
+		let info_height = if info_ideal < max_info {
+			info_ideal
+		} else {
+			max_info
+		};
+		let message_height = total.saturating_sub(info_height);
+
+		(info_height, message_height)
+	}
+
+	#[cfg(test)]
+	pub(super) fn set_test_data(
+		&mut self,
+		data: Option<CommitDetails>,
+		tags: Vec<Tag>,
+	) {
+		self.data = data;
+		self.tags = tags;
+		self.scroll.reset();
+	}
 }
 
 impl DrawableComponent for DetailsComponent {
@@ -258,24 +305,33 @@ impl DrawableComponent for DetailsComponent {
 		const CANSCROLL_STRING: &str = "[\u{2026}]";
 		const EMPTY_STRING: &str = "";
 
+		let (info_height, message_height) =
+			Self::split_heights(rect.height, self.info_line_count());
+
 		let chunks = Layout::default()
 			.direction(Direction::Vertical)
 			.constraints(
-				[Constraint::Length(8), Constraint::Min(10)].as_ref(),
+				[
+					Constraint::Length(info_height),
+					Constraint::Length(message_height),
+				]
+				.as_ref(),
 			)
 			.split(rect);
 
-		f.render_widget(
-			dialog_paragraph(
-				&strings::commit::details_info_title(
-					&self.key_config,
+		if chunks[0].height > 0 {
+			f.render_widget(
+				dialog_paragraph(
+					&strings::commit::details_info_title(
+						&self.key_config,
+					),
+					Text::from(self.get_text_info()),
+					&self.theme,
+					false,
 				),
-				Text::from(self.get_text_info()),
-				&self.theme,
-				false,
-			),
-			chunks[0],
-		);
+				chunks[0],
+			);
+		}
 
 		// We have to take the border into account which is one character on
 		// each side.
