@@ -13,4 +13,13 @@ impl PopupStack {
 	pub fn pop(&mut self) -> Option<StackablePopupOpen> {
 		self.stack.pop()
 	}
+
+	pub fn clear(&mut self) {
+		self.stack.clear();
+	}
+
+	#[cfg(test)]
+	pub const fn is_empty(&self) -> bool {
+		self.stack.is_empty()
+	}
 }

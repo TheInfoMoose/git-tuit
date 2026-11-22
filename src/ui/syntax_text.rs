@@ -31,6 +31,7 @@ pub struct SyntaxText {
 	text: String,
 	lines: Vec<SyntaxLine>,
 	path: PathBuf,
+	generation: u64,
 }
 
 static SYNTAX_SET: Lazy<SyntaxSet> =
@@ -164,12 +165,23 @@ impl SyntaxText {
 			text,
 			lines: syntax_lines,
 			path: file_path.into(),
+			generation: 0,
 		})
 	}
 
 	///
 	pub fn path(&self) -> &Path {
 		&self.path
+	}
+
+	///
+	pub const fn is_empty(&self) -> bool {
+		self.lines.is_empty()
+	}
+
+	///
+	pub const fn generation(&self) -> u64 {
+		self.generation
 	}
 }
 
@@ -231,6 +243,7 @@ enum JobState {
 pub struct AsyncSyntaxJob {
 	state: Arc<Mutex<Option<JobState>>>,
 	syntax: String,
+	generation: u64,
 }
 
 impl AsyncSyntaxJob {
@@ -239,11 +252,21 @@ impl AsyncSyntaxJob {
 		path: String,
 		syntax: String,
 	) -> Self {
+		Self::with_generation(content, path, syntax, 0)
+	}
+
+	pub fn with_generation(
+		content: String,
+		path: String,
+		syntax: String,
+		generation: u64,
+	) -> Self {
 		Self {
 			state: Arc::new(Mutex::new(Some(JobState::Request((
 				content, path,
 			))))),
 			syntax,
+			generation,
 		}
 	}
 
@@ -275,12 +298,13 @@ impl AsyncJob for AsyncSyntaxJob {
 		if let Some(state) = state_mutex.take() {
 			*state_mutex = Some(match state {
 				JobState::Request((content, path)) => {
-					let syntax = SyntaxText::new(
+					let mut syntax = SyntaxText::new(
 						content,
 						Path::new(&path),
 						&params,
 						&self.syntax,
 					)?;
+					syntax.generation = self.generation;
 					JobState::Response(syntax)
 				}
 				JobState::Response(res) => JobState::Response(res),

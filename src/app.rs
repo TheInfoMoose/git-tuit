@@ -416,7 +416,7 @@ impl App {
 		self.commit_popup.update();
 		self.status_tab.update()?;
 		self.revlog.update()?;
-		self.files_tab.update()?;
+		self.files_tab.update();
 		self.stashing_tab.update()?;
 		self.stashlist_tab.update()?;
 		self.reset_popup.update()?;
@@ -1034,6 +1034,11 @@ impl App {
 			}
 			InternalEvent::PopupStackPush(popup) => {
 				self.popup_stack.push(popup);
+				flags
+					.insert(NeedsUpdate::ALL | NeedsUpdate::COMMANDS);
+			}
+			InternalEvent::PopupStackClear => {
+				self.popup_stack.clear();
 				flags
 					.insert(NeedsUpdate::ALL | NeedsUpdate::COMMANDS);
 			}
@@ -3106,5 +3111,767 @@ mod tests {
 			msg.contains("upstream"),
 			"force-push prompt must name remote, got: {msg}"
 		);
+	}
+
+	fn make_files_test_app(
+		repo_path: &Path,
+		select_file: Option<PathBuf>,
+	) -> (
+		App,
+		KeyConfig,
+		crossbeam_channel::Receiver<AsyncGitNotification>,
+		crossbeam_channel::Receiver<AsyncAppNotification>,
+	) {
+		type RxPair = (
+			crossbeam_channel::Receiver<AsyncGitNotification>,
+			crossbeam_channel::Receiver<AsyncAppNotification>,
+		);
+		static LIVE_RX: std::sync::OnceLock<
+			std::sync::Mutex<Vec<RxPair>>,
+		> = std::sync::OnceLock::new();
+
+		let (tx_git, rx_git) = crossbeam_channel::unbounded();
+		let (tx_app, rx_app) = crossbeam_channel::unbounded();
+		LIVE_RX
+			.get_or_init(|| std::sync::Mutex::new(Vec::new()))
+			.lock()
+			.unwrap()
+			.push((rx_git.clone(), rx_app.clone()));
+		let key_config = KeyConfig::default();
+		let app = App::new(
+			CliArgs {
+				theme: PathBuf::default(),
+				select_file,
+				repo_path: RepoPath::Path(repo_path.to_path_buf()),
+				notify_watcher: false,
+				key_bindings_path: None,
+				key_symbols_path: None,
+			},
+			tx_git,
+			tx_app,
+			Input::new(),
+			Theme::default(),
+			key_config.clone(),
+		)
+		.unwrap();
+		(app, key_config, rx_git, rx_app)
+	}
+
+	fn wait_git(
+		rx: &crossbeam_channel::Receiver<AsyncGitNotification>,
+		expected: AsyncGitNotification,
+	) {
+		let deadline = std::time::Instant::now()
+			+ std::time::Duration::from_secs(5);
+		loop {
+			assert!(
+				std::time::Instant::now() < deadline,
+				"timed out waiting for {expected:?}"
+			);
+			if let Ok(ev) =
+				rx.recv_timeout(std::time::Duration::from_millis(50))
+			{
+				if ev == expected {
+					return;
+				}
+			}
+		}
+	}
+
+	fn wait_syntax_done(
+		rx: &crossbeam_channel::Receiver<AsyncAppNotification>,
+	) {
+		let deadline = std::time::Instant::now()
+			+ std::time::Duration::from_secs(5);
+		loop {
+			assert!(
+				std::time::Instant::now() < deadline,
+				"timed out waiting for SyntaxHighlighting::Done"
+			);
+			if rx.recv_timeout(std::time::Duration::from_millis(50))
+				== Ok(AsyncAppNotification::SyntaxHighlighting(
+					crate::SyntaxHighlightProgress::Done,
+				)) {
+				return;
+			}
+		}
+	}
+
+	fn render_app(app: &App, width: u16, height: u16) -> String {
+		use ratatui::{backend::TestBackend, Terminal};
+		let mut term =
+			Terminal::new(TestBackend::new(width, height)).unwrap();
+		term.draw(|f| app.draw(f).unwrap()).unwrap();
+		let buf = term.backend().buffer();
+		let mut out = String::new();
+		for y in 0..buf.area.height {
+			for x in 0..buf.area.width {
+				out.push_str(buf[(x, y)].symbol());
+			}
+			out.push('\n');
+		}
+		out
+	}
+
+	fn is_viewer_focused(
+		comp: &impl Component,
+		kc: &KeyConfig,
+	) -> bool {
+		let mut cmds = Vec::new();
+		comp.commands(&mut cmds, false);
+		let scroll_name =
+			strings::commands::scroll(&Rc::new(kc.clone())).name;
+		cmds.iter().any(|c| c.text.name == scroll_name)
+	}
+
+	fn commit_file_nested(
+		repo_path: &Path,
+		file: &str,
+		content: &[u8],
+		msg: &str,
+	) -> CommitId {
+		let full = repo_path.join(file);
+		if let Some(parent) = full.parent() {
+			std::fs::create_dir_all(parent).unwrap();
+		}
+		std::fs::write(full, content).unwrap();
+		let rp = RepoPath::Path(repo_path.to_path_buf());
+		sync::stage_add_file(&rp, Path::new(file)).unwrap();
+		sync::commit(&rp, msg).unwrap()
+	}
+
+	fn remove_and_commit(
+		repo_path: &Path,
+		file: &str,
+		msg: &str,
+	) -> CommitId {
+		std::fs::remove_file(repo_path.join(file)).unwrap();
+		let rp = RepoPath::Path(repo_path.to_path_buf());
+		sync::stage_addremoved(&rp, Path::new(file)).unwrap();
+		sync::commit(&rp, msg).unwrap()
+	}
+
+	#[test]
+	fn t8p_unborn_not_loading() {
+		let (td, _repo) = git2_testing::repo_init_empty();
+		let (mut app, _kc, _rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		app.update().unwrap();
+		app.process_queue(NeedsUpdate::empty()).unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			screen.contains("Files at"),
+			"unborn Files tab must render empty tree, got:\n{screen}"
+		);
+		assert!(
+			!screen.contains("Loading"),
+			"unborn Files tab must not show Loading, got:\n{screen}"
+		);
+		assert!(
+			!app.msg_popup.is_visible(),
+			"unborn Files tab must not show an error popup"
+		);
+	}
+
+	#[test]
+	fn t8p_first_commit_loads() {
+		let (td, _repo) = git2_testing::repo_init_empty();
+		let (mut app, _kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		app.update().unwrap();
+
+		let _c1 =
+			commit_file(td.path(), "first.txt", "hello", "init");
+		app.update().unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			screen.contains("first.txt"),
+			"first commit must load files, got:\n{screen}"
+		);
+	}
+
+	#[test]
+	fn t8p_becomes_unborn_clears() {
+		let (td, repo) = git2_testing::repo_init();
+		let _c1 =
+			commit_file(td.path(), "born.txt", "born-body", "c1");
+		let (mut app, _kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+		app.files_tab.file_finder_update(Path::new("./born.txt"));
+
+		let screen = render_app(&app, 80, 24);
+		assert!(screen.contains("born-body"));
+
+		// Trigger a new commit load, then make HEAD unborn while it's in flight.
+		let _c2 =
+			commit_file(td.path(), "born.txt", "second-body", "c2");
+		app.update().unwrap();
+		repo.set_head("refs/heads/orphan-unborn").unwrap();
+		app.update().unwrap();
+
+		// Now deliver the late TreeFiles result from c2.
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			!screen.contains("born.txt"),
+			"tree must clear when HEAD becomes unborn, got:\n{screen}"
+		);
+		assert!(
+			!screen.contains("born-body")
+				&& !screen.contains("second-body"),
+			"viewer must clear when HEAD becomes unborn, got:\n{screen}"
+		);
+		assert!(
+			!screen.contains("Loading"),
+			"unborn must not show Loading, got:\n{screen}"
+		);
+	}
+
+	#[test]
+	fn t8p_head_move_follows_path() {
+		let (td, _repo) = git2_testing::repo_init();
+		let v1 = (0..25)
+			.map(|i| format!("v1-line-{i:02}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		let v2 = (0..25)
+			.map(|i| format!("v2-line-{i:02}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		let _c1 = commit_file_nested(
+			td.path(),
+			"sub/a.txt",
+			v1.as_bytes(),
+			"c1",
+		);
+		let _c1b =
+			commit_file(td.path(), "other.txt", "other", "c1b");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.files_tab.file_finder_update(Path::new("./sub/a.txt"));
+		let _ = render_app(&app, 80, 12);
+		// Focus viewer and scroll to bottom.
+		send_key!(&mut app, kc.keys.move_right);
+		send_key!(&mut app, kc.keys.end);
+		let scrolled = render_app(&app, 80, 12);
+		assert!(scrolled.contains("v1-line-24"));
+
+		// Move HEAD with new content for sub/a.txt.
+		let _c2 = commit_file_nested(
+			td.path(),
+			"sub/a.txt",
+			v2.as_bytes(),
+			"c2",
+		);
+		app.update().unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 12);
+		assert!(
+			screen.contains("a.txt"),
+			"ancestor dir must stay open and file visible, got:\n{screen}"
+		);
+		assert!(
+			screen.contains("v2-line-00"),
+			"viewer must show new content scrolled to top, got:\n{screen}"
+		);
+		assert!(!screen.contains("v1-line-"));
+	}
+
+	#[test]
+	fn t8p_head_move_path_gone() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file_nested(
+			td.path(),
+			"sub/gone.txt",
+			b"gone-body",
+			"c1",
+		);
+		let _c1b =
+			commit_file(td.path(), "keep.txt", "keep-body", "c1b");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+		app.files_tab
+			.file_finder_update(Path::new("./sub/gone.txt"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(is_viewer_focused(&app.files_tab, &kc));
+
+		let _c2 = remove_and_commit(td.path(), "sub/gone.txt", "c2");
+		app.update().unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			!screen.contains("gone-body"),
+			"viewer must clear when path is gone, got:\n{screen}"
+		);
+		assert!(
+			!is_viewer_focused(&app.files_tab, &kc),
+			"focus must return to tree when path is gone"
+		);
+	}
+
+	#[test]
+	fn t8p_user_choice_during_load_wins() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "a.txt", "a-v1", "c1");
+		let _c1b = commit_file(td.path(), "b.txt", "b-v1", "c1b");
+
+		let (mut app, _kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+		app.files_tab.file_finder_update(Path::new("./a.txt"));
+
+		// Move HEAD and start loading c2, without delivering TreeFiles yet.
+		let _c2 = commit_file(td.path(), "b.txt", "b-v2", "c2");
+		app.update().unwrap();
+
+		// User picks b.txt during loading.
+		app.files_tab.file_finder_update(Path::new("./b.txt"));
+
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			screen.contains("b-v2"),
+			"user choice during load must win, got:\n{screen}"
+		);
+		assert!(!screen.contains("a-v1"));
+	}
+
+	#[test]
+	fn t8p_select_file_first_load() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file_nested(
+			td.path(),
+			"dir/target.txt",
+			b"target-body",
+			"c1",
+		);
+		let _c1b =
+			commit_file(td.path(), "other.txt", "other-body", "c1b");
+
+		let (mut app, _kc, rx_git, _rx_app) = make_files_test_app(
+			td.path(),
+			Some(td.path().join("dir/target.txt")),
+		);
+
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let screen = render_app(&app, 80, 24);
+		assert!(
+			screen.contains("target-body"),
+			"--select-file must select and show target on first load, got:\n{screen}"
+		);
+	}
+
+	#[test]
+	fn t8p_same_head_is_stable() {
+		let (td, _repo) = git2_testing::repo_init();
+		let lines = (0..25)
+			.map(|i| format!("stable-{i:02}"))
+			.collect::<Vec<_>>()
+			.join("\n");
+		let _c1 = commit_file(td.path(), "s.txt", &lines, "c1");
+
+		let (mut app, kc, rx_git, rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.files_tab.file_finder_update(Path::new("./s.txt"));
+		wait_syntax_done(&rx_app);
+		app.update_async(AsyncNotification::App(
+			AsyncAppNotification::SyntaxHighlighting(
+				crate::SyntaxHighlightProgress::Done,
+			),
+		))
+		.unwrap();
+		let _ = render_app(&app, 80, 12);
+		send_key!(&mut app, kc.keys.move_right);
+		send_key!(&mut app, kc.keys.end);
+		let before = render_app(&app, 80, 12);
+		assert!(before.contains("stable-24"));
+
+		// Drain any prior git notifications before checking same-HEAD stability.
+		while rx_git.try_recv().is_ok() {}
+
+		// Same HEAD again: no reload, selection and scroll stay.
+		app.update().unwrap();
+		assert!(
+			!app.files_tab.anything_pending(),
+			"same HEAD must not trigger a reload"
+		);
+		while let Ok(ev) =
+			rx_git.recv_timeout(std::time::Duration::from_millis(50))
+		{
+			assert_ne!(
+				ev,
+				AsyncGitNotification::TreeFiles,
+				"same HEAD must not spawn a TreeFiles job"
+			);
+		}
+		let after = render_app(&app, 80, 12);
+		assert!(
+			after.contains("stable-24"),
+			"scroll must stay on same HEAD, got:\n{after}"
+		);
+	}
+
+	#[test]
+	fn t8p_popup_new_commit_resets() {
+		let (td, _repo) = git2_testing::repo_init();
+		let c1 = commit_file(td.path(), "a.txt", "pop-v1", "c1");
+		let c2 = commit_file(td.path(), "a.txt", "pop-v2", "c2");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.revision_files_popup
+			.open(crate::popups::FileTreeOpen::new(c1))
+			.unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+		app.revision_files_popup
+			.file_finder_update(Path::new("./a.txt"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(is_viewer_focused(&app.revision_files_popup, &kc));
+
+		// Close and reopen on SAME commit: state stays.
+		send_key!(&mut app, kc.keys.exit_popup);
+		app.revision_files_popup
+			.open(crate::popups::FileTreeOpen::new(c1))
+			.unwrap();
+		let same_screen = render_app(&app, 80, 24);
+		assert!(same_screen.contains("pop-v1"));
+		assert!(is_viewer_focused(&app.revision_files_popup, &kc));
+
+		// Close and reopen on DIFFERENT commit: top entry, clear viewer, tree focus.
+		send_key!(&mut app, kc.keys.exit_popup);
+		app.revision_files_popup
+			.open(crate::popups::FileTreeOpen::new(c2))
+			.unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		let new_screen = render_app(&app, 80, 24);
+		assert!(
+			!new_screen.contains("pop-v1")
+				&& !new_screen.contains("pop-v2"),
+			"new commit in popup must clear viewer, got:\n{new_screen}"
+		);
+		assert!(
+			!is_viewer_focused(&app.revision_files_popup, &kc),
+			"new commit in popup must focus tree"
+		);
+	}
+
+	#[test]
+	fn t8p_empty_viewer_not_focusable() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 =
+			commit_file_nested(td.path(), "dir/zero.txt", b"", "c1");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		// Before loading (nothing loaded): Right must not focus viewer.
+		app.set_tab(2).unwrap();
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			!is_viewer_focused(&app.files_tab, &kc),
+			"nothing loaded must not be focusable"
+		);
+
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		// Root directory selected: Right must not focus viewer.
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			!is_viewer_focused(&app.files_tab, &kc),
+			"directory selection must not focus viewer"
+		);
+
+		// Zero-line file selected: Right must not focus viewer.
+		app.files_tab
+			.file_finder_update(Path::new("./dir/zero.txt"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			!is_viewer_focused(&app.files_tab, &kc),
+			"zero-line file must not be focusable"
+		);
+	}
+
+	#[test]
+	fn t8p_content_focusable() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 =
+			commit_file(td.path(), "text.txt", "hello\nworld", "c1");
+		let _c2 = commit_file_nested(
+			td.path(),
+			"bin.dat",
+			&[0, 1, 2, 0, 255],
+			"c2",
+		);
+
+		let (mut app, kc, rx_git, rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		// Content still being highlighted: focusable.
+		app.files_tab.file_finder_update(Path::new("./text.txt"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			is_viewer_focused(&app.files_tab, &kc),
+			"content still being highlighted must be focusable"
+		);
+		send_key!(&mut app, kc.keys.move_left);
+
+		// Highlighted content: focusable.
+		wait_syntax_done(&rx_app);
+		app.update_async(AsyncNotification::App(
+			AsyncAppNotification::SyntaxHighlighting(
+				crate::SyntaxHighlightProgress::Done,
+			),
+		))
+		.unwrap();
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			is_viewer_focused(&app.files_tab, &kc),
+			"highlighted content must be focusable"
+		);
+		send_key!(&mut app, kc.keys.move_left);
+
+		// Error text (binary file): focusable.
+		app.files_tab.file_finder_update(Path::new("./bin.dat"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(
+			is_viewer_focused(&app.files_tab, &kc),
+			"error text must be focusable"
+		);
+	}
+
+	#[test]
+	fn t8p_emptied_viewer_returns_focus() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "f.txt", "non-empty", "c1");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.files_tab.file_finder_update(Path::new("./f.txt"));
+		send_key!(&mut app, kc.keys.move_right);
+		assert!(is_viewer_focused(&app.files_tab, &kc));
+
+		// Replace f.txt with a zero-line file on next commit: viewer becomes empty.
+		let _c2 = commit_file(td.path(), "f.txt", "", "c2");
+		app.update().unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		assert!(
+			!is_viewer_focused(&app.files_tab, &kc),
+			"focused viewer becoming empty must return focus to tree"
+		);
+	}
+
+	#[test]
+	fn t8p_edit_closes_stack() {
+		let (td, _repo) = git2_testing::repo_init();
+		let c1 = commit_file(td.path(), "edit.txt", "body", "c1");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(1).unwrap();
+		app.popup_stack.push(StackablePopupOpen::InspectCommit(
+			crate::popups::InspectCommitOpen::new(c1),
+		));
+		app.revision_files_popup
+			.open(crate::popups::FileTreeOpen::new(c1))
+			.unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.revision_files_popup
+			.file_finder_update(Path::new("./edit.txt"));
+		send_key!(&mut app, kc.keys.edit_file);
+
+		assert!(
+			!app.revision_files_popup.is_visible(),
+			"revision files popup must close on edit"
+		);
+		assert!(
+			app.popup_stack.is_empty(),
+			"popup stack must be cleared on edit"
+		);
+		assert_eq!(app.current_tab(), 0, "must switch to Status tab");
+		assert!(
+			app.external_editor_popup.is_visible(),
+			"editor popup must open"
+		);
+		assert_eq!(app.file_to_open.as_deref(), Some("./edit.txt"));
+		assert!(!app.msg_popup.is_visible());
+	}
+
+	#[test]
+	fn t8p_edit_missing_keeps_popup() {
+		let (td, _repo) = git2_testing::repo_init();
+		let c1 = commit_file(td.path(), "gone.txt", "body", "c1");
+		std::fs::remove_file(td.path().join("gone.txt")).unwrap();
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(1).unwrap();
+		app.popup_stack.push(StackablePopupOpen::InspectCommit(
+			crate::popups::InspectCommitOpen::new(c1),
+		));
+		app.revision_files_popup
+			.open(crate::popups::FileTreeOpen::new(c1))
+			.unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.revision_files_popup
+			.file_finder_update(Path::new("./gone.txt"));
+		send_key!(&mut app, kc.keys.edit_file);
+
+		assert!(
+			app.msg_popup.is_visible(),
+			"missing worktree file must show error"
+		);
+		assert!(
+			app.revision_files_popup.is_visible(),
+			"popup must stay open when worktree file is missing"
+		);
+		assert!(
+			!app.popup_stack.is_empty(),
+			"popup stack must stay unchanged"
+		);
+		assert_eq!(app.current_tab(), 1, "tab must stay unchanged");
+		assert!(!app.external_editor_popup.is_visible());
+	}
+
+	#[test]
+	fn t8p_edit_from_tab() {
+		let (td, _repo) = git2_testing::repo_init();
+		let _c1 = commit_file(td.path(), "tab.txt", "body", "c1");
+
+		let (mut app, kc, rx_git, _rx_app) =
+			make_files_test_app(td.path(), None);
+
+		app.set_tab(2).unwrap();
+		wait_git(&rx_git, AsyncGitNotification::TreeFiles);
+		app.update_async(AsyncNotification::Git(
+			AsyncGitNotification::TreeFiles,
+		))
+		.unwrap();
+
+		app.files_tab.file_finder_update(Path::new("./tab.txt"));
+		send_key!(&mut app, kc.keys.edit_file);
+
+		assert_eq!(app.current_tab(), 0);
+		assert!(app.external_editor_popup.is_visible());
+		assert_eq!(app.file_to_open.as_deref(), Some("./tab.txt"));
 	}
 }

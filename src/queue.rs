@@ -183,6 +183,8 @@ pub enum InternalEvent {
 	///
 	PopupStackPush(StackablePopupOpen),
 	///
+	PopupStackClear,
+	///
 	ViewSubmodules,
 	///
 	ViewRemotes,

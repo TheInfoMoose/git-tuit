@@ -86,21 +86,78 @@ impl RevisionFilesComponent {
 
 	///
 	pub fn set_commit(&mut self, commit: CommitId) -> Result<()> {
+		self.set_commit_inner(commit, true)
+	}
+
+	///
+	pub fn set_commit_reset(
+		&mut self,
+		commit: CommitId,
+	) -> Result<()> {
+		self.set_commit_inner(commit, false)
+	}
+
+	fn set_commit_inner(
+		&mut self,
+		commit: CommitId,
+		follow_selection: bool,
+	) -> Result<()> {
 		self.show()?;
 
 		let same_id =
 			self.revision.as_ref().is_some_and(|c| c.id == commit);
 
 		if !same_id {
+			let info = get_commit_info(&self.repo.borrow(), &commit)?;
+
+			if follow_selection {
+				if self.select_file.is_none() {
+					self.select_file = self
+						.tree
+						.selected_item()
+						.map(|item| item.full_path().to_path_buf());
+				}
+			} else {
+				self.select_file = None;
+				self.tree = FileTree::default();
+				self.scroll.reset();
+			}
+
 			self.files = None;
-
+			self.current_file.clear();
+			self.focus_tree();
+			self.revision = Some(info);
 			self.request_files(commit);
-
-			self.revision =
-				Some(get_commit_info(&self.repo.borrow(), &commit)?);
 		}
 
 		Ok(())
+	}
+
+	///
+	pub fn clear_revision(&mut self) {
+		self.visible = true;
+		self.revision = None;
+		self.files = Some(Vec::new());
+		self.tree = FileTree::default();
+		self.scroll.reset();
+		self.select_file = None;
+		self.current_file.clear();
+		self.focus_tree();
+		let _ = self.async_treefiles.take_last();
+	}
+
+	fn focus_tree(&mut self) {
+		self.focus = Focus::Tree;
+		self.current_file.focus(false);
+		self.focus(false);
+	}
+
+	fn enforce_focus(&mut self) {
+		if matches!(self.focus, Focus::File)
+			&& !self.current_file.has_lines()
+		{
+			self.focus_tree();
+		}
 	}
 
 	///
@@ -111,6 +168,7 @@ impl RevisionFilesComponent {
 	///
 	pub fn update(&mut self, ev: AsyncNotification) -> Result<()> {
 		self.current_file.update(ev);
+		self.enforce_focus();
 
 		if matches!(
 			ev,
@@ -144,11 +202,20 @@ impl RevisionFilesComponent {
 
 							self.files = Some(last);
 
-							let select_file =
-								self.select_file.clone();
-							self.select_file = None;
+							let select_file = self.select_file.take();
 							if let Some(file) = select_file {
-								self.find_file(file.as_path());
+								if self
+									.tree
+									.select_path(file.as_path())
+								{
+									self.selection_changed();
+								} else {
+									self.current_file.clear();
+									self.focus_tree();
+								}
+							} else {
+								self.current_file.clear();
+								self.focus_tree();
 							}
 						}
 						Err(e) => {
@@ -156,6 +223,7 @@ impl RevisionFilesComponent {
 							self.tree = FileTree::default();
 							self.files = Some(Vec::new());
 							self.current_file.clear();
+							self.focus_tree();
 							self.select_file = None;
 							self.queue.push(
 								InternalEvent::ShowErrorMsg(format!(
@@ -165,7 +233,11 @@ impl RevisionFilesComponent {
 						}
 					}
 				} else if let Some(rev) = &self.revision {
-					self.request_files(rev.id);
+					if self.files.is_none()
+						&& !self.async_treefiles.is_pending()
+					{
+						self.request_files(rev.id);
+					}
 				}
 			}
 		}
@@ -259,13 +331,19 @@ impl RevisionFilesComponent {
 	}
 
 	pub fn find_file(&mut self, file: &Path) {
+		if self.files.is_none() {
+			self.select_file = Some(file.to_path_buf());
+			return;
+		}
 		self.tree.collapse_but_root();
-		if self.tree.select_file(file) {
+		if self.tree.select_path(file) {
 			self.selection_changed();
 		}
 	}
 
-	fn selected_file_path_with_prefix(&self) -> Option<String> {
+	pub(crate) fn selected_file_path_with_prefix(
+		&self,
+	) -> Option<String> {
 		self.tree
 			.selected_file()
 			.map(|file| file.full_path_str().to_string())
@@ -289,15 +367,18 @@ impl RevisionFilesComponent {
 					files.iter().find(|f| f.path == path)
 				{
 					if let Ok(path) = path.strip_prefix("./") {
-						return self.current_file.load_file(
+						self.current_file.load_file(
 							path.to_string_lossy().to_string(),
 							item,
 						);
+						self.enforce_focus();
+						return;
 					}
 				}
-				self.current_file.clear();
 			}
 		}
+		self.current_file.clear();
+		self.enforce_focus();
 	}
 
 	fn draw_tree(&self, f: &mut Frame, area: Rect) -> Result<()> {
@@ -496,6 +577,12 @@ impl Component for RevisionFilesComponent {
 			if is_tree_focused
 				&& tree_nav(&mut self.tree, &self.key_config, key)
 			{
+				if self.files.is_none() {
+					self.select_file = self
+						.tree
+						.selected_item()
+						.map(|item| item.full_path().to_path_buf());
+				}
 				self.selection_changed();
 				return Ok(EventState::Consumed);
 			} else if key_match(key, self.key_config.keys.blame) {
@@ -513,7 +600,7 @@ impl Component for RevisionFilesComponent {
 				}
 			} else if key_match(key, self.key_config.keys.move_right)
 			{
-				if is_tree_focused {
+				if is_tree_focused && self.current_file.has_lines() {
 					self.focus = Focus::File;
 					self.current_file.focus(true);
 					self.focus(true);
@@ -521,9 +608,7 @@ impl Component for RevisionFilesComponent {
 				}
 			} else if key_match(key, self.key_config.keys.move_left) {
 				if !is_tree_focused {
-					self.focus = Focus::Tree;
-					self.current_file.focus(false);
-					self.focus(false);
+					self.focus_tree();
 					return Ok(EventState::Consumed);
 				}
 			} else if key_match(key, self.key_config.keys.file_find) {

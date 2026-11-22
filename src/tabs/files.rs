@@ -6,14 +6,27 @@ use crate::{
 		visibility_blocking, CommandBlocking, CommandInfo, Component,
 		DrawableComponent, EventState, RevisionFilesComponent,
 	},
+	queue::{InternalEvent, Queue},
 	AsyncNotification,
 };
 use anyhow::Result;
 use asyncgit::sync::{self, RepoPathRef};
 
+fn is_unborn_head_error(err: &asyncgit::Error) -> bool {
+	match err {
+		asyncgit::Error::NoHead => true,
+		asyncgit::Error::Git(e) => {
+			format!("{:?}", e.code()) == "UnbornBranch"
+		}
+		_ => false,
+	}
+}
+
 pub struct FilesTab {
 	repo: RepoPathRef,
+	queue: Queue,
 	visible: bool,
+	head_error_shown: bool,
 	files: RevisionFilesComponent,
 }
 
@@ -25,20 +38,45 @@ impl FilesTab {
 	) -> Self {
 		Self {
 			visible: false,
+			head_error_shown: false,
 			files: RevisionFilesComponent::new(env, select_file),
 			repo: env.repo.clone(),
+			queue: env.queue.clone(),
 		}
 	}
 
 	///
-	pub fn update(&mut self) -> Result<()> {
+	pub fn update(&mut self) {
 		if self.is_visible() {
-			if let Ok(head) = sync::get_head(&self.repo.borrow()) {
-				self.files.set_commit(head)?;
+			let head = sync::get_head(&self.repo.borrow());
+			match head {
+				Ok(head) => {
+					if let Err(err) = self.files.set_commit(head) {
+						self.files.clear_revision();
+						self.report_head_error(&err);
+					} else {
+						self.head_error_shown = false;
+					}
+				}
+				Err(err) if is_unborn_head_error(&err) => {
+					self.head_error_shown = false;
+					self.files.clear_revision();
+				}
+				Err(err) => {
+					self.files.clear_revision();
+					self.report_head_error(&err);
+				}
 			}
 		}
+	}
 
-		Ok(())
+	fn report_head_error(&mut self, err: &impl std::fmt::Display) {
+		if !self.head_error_shown {
+			self.head_error_shown = true;
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"failed to read HEAD:\n{err}"
+			)));
+		}
 	}
 
 	///
@@ -114,7 +152,7 @@ impl Component for FilesTab {
 
 	fn show(&mut self) -> Result<()> {
 		self.visible = true;
-		self.update()?;
+		self.update();
 		Ok(())
 	}
 }

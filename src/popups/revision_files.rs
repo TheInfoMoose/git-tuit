@@ -10,7 +10,7 @@ use crate::{
 	AsyncNotification,
 };
 use anyhow::Result;
-use asyncgit::sync::CommitId;
+use asyncgit::sync::{utils::repo_work_dir, CommitId, RepoPathRef};
 use crossterm::event::Event;
 use ratatui::{layout::Rect, widgets::Clear, Frame};
 use std::path::Path;
@@ -32,6 +32,7 @@ pub struct RevisionFilesPopup {
 	key_config: SharedKeyConfig,
 	files: RevisionFilesComponent,
 	queue: Queue,
+	repo: RepoPathRef,
 }
 
 impl RevisionFilesPopup {
@@ -43,12 +44,13 @@ impl RevisionFilesPopup {
 			key_config: env.key_config.clone(),
 			open_request: None,
 			queue: env.queue.clone(),
+			repo: env.repo.clone(),
 		}
 	}
 
 	///
 	pub fn open(&mut self, request: FileTreeOpen) -> Result<()> {
-		self.files.set_commit(request.commit_id)?;
+		self.files.set_commit_reset(request.commit_id)?;
 		self.open_request = Some(request);
 		self.show()?;
 
@@ -128,6 +130,56 @@ impl Component for RevisionFilesPopup {
 			if let Event::Key(key) = event {
 				if key_match(key, self.key_config.keys.exit_popup) {
 					self.hide_stacked(false);
+					return Ok(EventState::Consumed);
+				}
+				if key_match(key, self.key_config.keys.edit_file) {
+					if let Some(file) =
+						self.files.selected_file_path_with_prefix()
+					{
+						let work_dir =
+							repo_work_dir(&self.repo.borrow());
+						match work_dir {
+							Ok(work_dir) => {
+								let p = Path::new(&file);
+								let full = if p.is_relative() {
+									Path::new(&work_dir).join(p)
+								} else {
+									p.to_path_buf()
+								};
+								if full.exists() {
+									self.hide();
+									self.queue.push(
+										InternalEvent::PopupStackClear,
+									);
+									self.queue.push(
+										InternalEvent::TabSwitchStatus,
+									);
+									self.queue.push(
+										InternalEvent::OpenExternalEditor(
+											Some(file),
+										),
+									);
+								} else {
+									self.queue.push(
+										InternalEvent::ShowErrorMsg(
+											format!(
+												"file not found: {full:?}"
+											),
+										),
+									);
+								}
+							}
+							Err(e) => {
+								self.queue.push(
+									InternalEvent::ShowErrorMsg(
+										format!(
+											"failed to launch editor:\n{e}"
+										),
+									),
+								);
+							}
+						}
+					}
 					return Ok(EventState::Consumed);
 				}
 			}

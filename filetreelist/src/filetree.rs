@@ -108,6 +108,12 @@ impl FileTree {
 	}
 
 	///
+	pub fn selected_item(&self) -> Option<&TreeItemInfo> {
+		self.selection
+			.map(|index| self.items.tree_items[index].info())
+	}
+
+	///
 	pub fn collapse_recursive(&mut self) {
 		if let Some(selection) = self.selection {
 			self.items.collapse(selection, true);
@@ -195,6 +201,24 @@ impl FileTree {
 		self.items.show_element(idx);
 		self.visual_selection = self.calc_visual_selection();
 		changed
+	}
+
+	/// Selects `path` (file or directory) and expands its ancestors,
+	/// returning `true` whenever `path` exists in the tree.
+	pub fn select_path(&mut self, path: &Path) -> bool {
+		let Some(idx) = self
+			.items
+			.tree_items
+			.iter()
+			.position(|item| item.info().full_path() == path)
+		else {
+			return false;
+		};
+
+		self.selection = Some(idx);
+		self.items.show_element(idx);
+		self.visual_selection = self.calc_visual_selection();
+		true
 	}
 
 	fn visual_index_to_absolute(
