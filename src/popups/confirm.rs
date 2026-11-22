@@ -9,7 +9,10 @@ use crate::{
 	strings, ui,
 };
 use anyhow::Result;
-use asyncgit::sync::{self, RepoPathRef, RepoSnapshot};
+use asyncgit::sync::{
+	self, BranchType, CommitId, RepoPathRef, RepoSnapshot,
+	SubmoduleSnapshot,
+};
 use crossterm::event::Event;
 use ratatui::{layout::Rect, text::Text, widgets::Clear, Frame};
 use std::borrow::Cow;
@@ -62,11 +65,25 @@ fn wrapped_line_count(msg: &str, inner_width: usize) -> usize {
 	total.max(1)
 }
 
+enum ConfirmGuard {
+	Repo(RepoSnapshot),
+	Branch {
+		repo: RepoSnapshot,
+		name: String,
+		branch_type: BranchType,
+		id: CommitId,
+	},
+	Submodule {
+		name: String,
+		snapshot: SubmoduleSnapshot,
+	},
+}
+
 ///
 pub struct ConfirmPopup {
 	repo: RepoPathRef,
 	target: Option<Action>,
-	snapshot: Option<RepoSnapshot>,
+	guard: Option<ConfirmGuard>,
 	visible: bool,
 	queue: Queue,
 	theme: SharedTheme,
@@ -159,7 +176,7 @@ impl Component for ConfirmPopup {
 	fn hide(&mut self) {
 		self.visible = false;
 		self.target = None;
-		self.snapshot = None;
+		self.guard = None;
 	}
 
 	fn show(&mut self) -> Result<()> {
@@ -175,7 +192,7 @@ impl ConfirmPopup {
 		Self {
 			repo: env.repo.clone(),
 			target: None,
-			snapshot: None,
+			guard: None,
 			visible: false,
 			queue: env.queue.clone(),
 			theme: env.theme.clone(),
@@ -184,12 +201,44 @@ impl ConfirmPopup {
 	}
 	///
 	pub fn open(&mut self, a: Action) -> Result<()> {
-		let snapshot = if a.guards_repo() {
-			Some(sync::repo_snapshot(&self.repo.borrow())?)
-		} else {
-			None
+		let guard = match &a {
+			Action::RevertCommit { .. }
+			| Action::CheckoutCommit { .. } => Some(ConfirmGuard::Repo(
+				sync::repo_snapshot(&self.repo.borrow())?,
+			)),
+			Action::MergeBranch {
+				name,
+				branch_type,
+				id,
+			}
+			| Action::RebaseBranch {
+				name,
+				branch_type,
+				id,
+			} => Some(ConfirmGuard::Branch {
+				repo: sync::repo_snapshot(&self.repo.borrow())?,
+				name: name.clone(),
+				branch_type: *branch_type,
+				id: *id,
+			}),
+			Action::UpdateSubmodule { name, .. } => {
+				let snapshot = sync::submodule_snapshot(
+					&self.repo.borrow(),
+					name,
+				)?
+				.ok_or_else(|| {
+					anyhow::anyhow!(
+						strings::confirm_err_repo_changed()
+					)
+				})?;
+				Some(ConfirmGuard::Submodule {
+					name: name.clone(),
+					snapshot,
+				})
+			}
+			_ => None,
 		};
-		self.snapshot = snapshot;
+		self.guard = guard;
 		self.target = Some(a);
 		self.show()?;
 
@@ -198,18 +247,50 @@ impl ConfirmPopup {
 	///
 	pub fn confirm(&mut self) {
 		let action = self.target.take();
-		let snapshot = self.snapshot.take();
+		let guard = self.guard.take();
 		self.hide();
 
 		if let Some(a) = action {
-			if let Some(expected) = snapshot {
-				match sync::repo_snapshot(&self.repo.borrow()) {
-					Ok(current) if current == expected => {}
+			if let Some(guard) = guard {
+				if !self.verify_guard(&guard) {
+					return;
+				}
+			}
+			self.queue.push(InternalEvent::ConfirmedAction(a));
+		}
+	}
+
+	fn verify_guard(&self, guard: &ConfirmGuard) -> bool {
+		match guard {
+			ConfirmGuard::Repo(expected) => {
+				self.verify_repo_snapshot(expected)
+			}
+			ConfirmGuard::Branch {
+				repo: expected_repo,
+				name,
+				branch_type,
+				id,
+			} => {
+				if !self.verify_repo_snapshot(expected_repo) {
+					return false;
+				}
+				let local = matches!(branch_type, BranchType::Local);
+				match sync::get_branches_info(
+					&self.repo.borrow(),
+					local,
+				) {
+					Ok(branches)
+						if branches.iter().any(|b| {
+							b.name == *name && b.top_commit == *id
+						}) =>
+					{
+						true
+					}
 					Ok(_) => {
 						self.queue.push(InternalEvent::ShowErrorMsg(
 							strings::confirm_err_repo_changed(),
 						));
-						return;
+						false
 					}
 					Err(e) => {
 						self.queue.push(InternalEvent::ShowErrorMsg(
@@ -217,16 +298,58 @@ impl ConfirmPopup {
 								"failed to verify repository state:\n{e}"
 							),
 						));
-						return;
+						false
 					}
 				}
 			}
-			self.queue.push(InternalEvent::ConfirmedAction(a));
+			ConfirmGuard::Submodule {
+				name,
+				snapshot: expected,
+			} => match sync::submodule_snapshot(
+				&self.repo.borrow(),
+				name,
+			) {
+				Ok(Some(ref current)) if current == expected => true,
+				Ok(_) => {
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						strings::confirm_err_repo_changed(),
+					));
+					false
+				}
+				Err(e) => {
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!(
+							"failed to verify repository state:\n{e}"
+						),
+					));
+					false
+				}
+			},
+		}
+	}
+
+	fn verify_repo_snapshot(&self, expected: &RepoSnapshot) -> bool {
+		match sync::repo_snapshot(&self.repo.borrow()) {
+			Ok(ref current) if current == expected => true,
+			Ok(_) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					strings::confirm_err_repo_changed(),
+				));
+				false
+			}
+			Err(e) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!(
+						"failed to verify repository state:\n{e}"
+					),
+				));
+				false
+			}
 		}
 	}
 
 	#[cfg(test)]
-	fn get_text(&self) -> (String, String) {
+	pub(crate) fn get_text(&self) -> (String, String) {
 		self.get_text_with_limit(38)
 	}
 
@@ -301,6 +424,22 @@ impl ConfirmPopup {
 				strings::confirm_title_undo_commit(),
 				strings::confirm_msg_undo_commit(),
 			),
+			Action::RevertCommit { .. }
+			| Action::CheckoutCommit { .. }
+			| Action::MergeBranch { .. }
+			| Action::RebaseBranch { .. }
+			| Action::UpdateSubmodule { .. } => {
+				self.guarded_confirm_text(a, max_name_width)
+			}
+		}
+	}
+
+	fn guarded_confirm_text(
+		&self,
+		action: &Action,
+		max_name_width: usize,
+	) -> (String, String) {
+		match action {
 			Action::RevertCommit { id, subject } => self
 				.commit_confirm_text(
 					*id,
@@ -315,6 +454,39 @@ impl ConfirmPopup {
 					true,
 					max_name_width,
 				),
+			Action::MergeBranch {
+				name,
+				branch_type,
+				id,
+			} => self.branch_confirm_text(
+				name,
+				*branch_type,
+				*id,
+				false,
+				max_name_width,
+			),
+			Action::RebaseBranch {
+				name,
+				branch_type,
+				id,
+			} => self.branch_confirm_text(
+				name,
+				*branch_type,
+				*id,
+				true,
+				max_name_width,
+			),
+			Action::UpdateSubmodule {
+				name,
+				commit,
+				uninitialized,
+			} => self.submodule_confirm_text(
+				name,
+				*commit,
+				*uninitialized,
+				max_name_width,
+			),
+			_ => (String::new(), String::new()),
 		}
 	}
 
@@ -362,18 +534,24 @@ impl ConfirmPopup {
 		}
 	}
 
+	fn head_info(&self) -> (String, bool) {
+		match self.guard.as_ref() {
+			Some(
+				ConfirmGuard::Repo(s)
+				| ConfirmGuard::Branch { repo: s, .. },
+			) => (s.head_label(), s.detached),
+			_ => (String::from("HEAD"), true),
+		}
+	}
+
 	fn commit_confirm_text(
 		&self,
-		id: asyncgit::sync::CommitId,
+		id: CommitId,
 		subject: &str,
 		is_checkout: bool,
 		max_name_width: usize,
 	) -> (String, String) {
-		let (head_label, detached) =
-			self.snapshot.as_ref().map_or_else(
-				|| (String::from("HEAD"), true),
-				|s| (s.head_label(), s.detached),
-			);
+		let (head_label, detached) = self.head_info();
 		let short_id = id.get_short_string();
 		if is_checkout {
 			(
@@ -399,6 +577,70 @@ impl ConfirmPopup {
 			)
 		}
 	}
+
+	fn branch_confirm_text(
+		&self,
+		name: &str,
+		branch_type: BranchType,
+		id: CommitId,
+		is_rebase: bool,
+		max_name_width: usize,
+	) -> (String, String) {
+		let (head_label, detached) = self.head_info();
+		let local = matches!(branch_type, BranchType::Local);
+		let short_id = id.get_short_string();
+		if is_rebase {
+			(
+				strings::confirm_title_rebase_branch(),
+				strings::confirm_msg_rebase_branch(
+					name,
+					local,
+					&short_id,
+					&head_label,
+					detached,
+					max_name_width,
+				),
+			)
+		} else {
+			(
+				strings::confirm_title_merge_branch(),
+				strings::confirm_msg_merge_branch(
+					name,
+					local,
+					&short_id,
+					&head_label,
+					detached,
+					max_name_width,
+				),
+			)
+		}
+	}
+
+	fn submodule_confirm_text(
+		&self,
+		name: &str,
+		fallback_commit: Option<CommitId>,
+		fallback_uninitialized: bool,
+		max_name_width: usize,
+	) -> (String, String) {
+		let (commit, uninitialized) = match self.guard.as_ref() {
+			Some(ConfirmGuard::Submodule { snapshot, .. }) => (
+				snapshot.target_commit().or(fallback_commit),
+				snapshot.uninitialized,
+			),
+			_ => (fallback_commit, fallback_uninitialized),
+		};
+		let short_id = commit.map(|id| id.get_short_string());
+		(
+			strings::confirm_title_update_submodule(),
+			strings::confirm_msg_update_submodule(
+				name,
+				short_id.as_deref(),
+				uninitialized,
+				max_name_width,
+			),
+		)
+	}
 }
 
 #[cfg(test)]
@@ -411,7 +653,7 @@ mod tests {
 				std::path::PathBuf::default(),
 			)),
 			target: Some(action),
-			snapshot: None,
+			guard: None,
 			visible: true,
 			queue: Queue::new(),
 			theme: SharedTheme::default(),

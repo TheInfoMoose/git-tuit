@@ -155,21 +155,15 @@ impl Component for BranchListPopup {
 			} else if key_match(e, self.key_config.keys.merge_branch)
 				&& !selection_is_cur_branch
 				&& self.valid_selection()
+				&& self.is_repo_clean()
 			{
-				try_or_popup!(
-					self,
-					"merge branch error:",
-					self.merge_branch()
-				);
+				self.request_merge_branch();
 			} else if key_match(e, self.key_config.keys.rebase_branch)
 				&& !selection_is_cur_branch
 				&& self.valid_selection()
+				&& self.is_repo_clean()
 			{
-				try_or_popup!(
-					self,
-					"rebase error:",
-					self.rebase_branch()
-				);
+				self.request_rebase_branch();
 			} else if key_match(e, self.key_config.keys.move_right)
 				&& self.valid_selection()
 			{
@@ -347,34 +341,59 @@ impl BranchListPopup {
 		!self.branches.is_empty()
 	}
 
-	fn merge_branch(&mut self) -> Result<()> {
+	fn is_repo_clean(&self) -> bool {
+		sync::repo_state(&self.repo.borrow())
+			.is_ok_and(|state| state == RepoState::Clean)
+	}
+
+	fn request_merge_branch(&self) {
 		if let Some(branch) =
 			self.branches.get(usize::from(self.selection))
 		{
-			sync::merge_branch(
-				&self.repo.borrow(),
-				&branch.name,
-				self.get_branch_type(),
-			)?;
-
-			self.hide_and_switch_tab()?;
+			self.queue.push(InternalEvent::ConfirmAction(
+				Action::MergeBranch {
+					name: branch.name.clone(),
+					branch_type: self.get_branch_type(),
+					id: branch.top_commit,
+				},
+			));
 		}
+	}
+
+	fn request_rebase_branch(&self) {
+		if let Some(branch) =
+			self.branches.get(usize::from(self.selection))
+		{
+			self.queue.push(InternalEvent::ConfirmAction(
+				Action::RebaseBranch {
+					name: branch.name.clone(),
+					branch_type: self.get_branch_type(),
+					id: branch.top_commit,
+				},
+			));
+		}
+	}
+
+	pub fn merge_branch(
+		&mut self,
+		name: &str,
+		branch_type: BranchType,
+	) -> Result<()> {
+		sync::merge_branch(&self.repo.borrow(), name, branch_type)?;
+
+		self.hide_and_switch_tab()?;
 
 		Ok(())
 	}
 
-	fn rebase_branch(&mut self) -> Result<()> {
-		if let Some(branch) =
-			self.branches.get(usize::from(self.selection))
-		{
-			sync::rebase_branch(
-				&self.repo.borrow(),
-				&branch.name,
-				self.get_branch_type(),
-			)?;
+	pub fn rebase_branch(
+		&mut self,
+		name: &str,
+		branch_type: BranchType,
+	) -> Result<()> {
+		sync::rebase_branch(&self.repo.borrow(), name, branch_type)?;
 
-			self.hide_and_switch_tab()?;
-		}
+		self.hide_and_switch_tab()?;
 
 		Ok(())
 	}
@@ -421,6 +440,13 @@ impl BranchListPopup {
 				})
 			})
 			.count() > 0
+	}
+
+	#[cfg(test)]
+	pub(crate) fn selected_branch_name(&self) -> Option<&str> {
+		self.branches
+			.get(usize::from(self.selection))
+			.map(|b| b.name.as_str())
 	}
 
 	// top commit of selected branch
@@ -699,6 +725,9 @@ impl BranchListPopup {
 
 	fn add_commands_internal(&self, out: &mut Vec<CommandInfo>) {
 		let selection_is_cur_branch = self.selection_is_cur_branch();
+		let can_merge_or_rebase = !selection_is_cur_branch
+			&& self.valid_selection()
+			&& self.is_repo_clean();
 
 		out.push(CommandInfo::new(
 			strings::commands::scroll(&self.key_config),
@@ -755,13 +784,13 @@ impl BranchListPopup {
 
 		out.push(CommandInfo::new(
 			strings::commands::merge_branch_popup(&self.key_config),
-			!selection_is_cur_branch,
+			can_merge_or_rebase,
 			true,
 		));
 
 		out.push(CommandInfo::new(
 			strings::commands::branch_popup_rebase(&self.key_config),
-			!selection_is_cur_branch,
+			can_merge_or_rebase,
 			true,
 		));
 

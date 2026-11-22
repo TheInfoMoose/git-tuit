@@ -1089,9 +1089,56 @@ impl App {
 					sync::checkout_commit(&self.repo.borrow(), id)
 				);
 			}
+			Action::MergeBranch { .. }
+			| Action::RebaseBranch { .. }
+			| Action::UpdateSubmodule { .. } => {
+				self.process_confirmed_repo_action(action)?;
+			}
 		}
 
 		flags.insert(NeedsUpdate::ALL);
+
+		Ok(())
+	}
+
+	fn process_confirmed_repo_action(
+		&mut self,
+		action: Action,
+	) -> Result<()> {
+		match action {
+			Action::MergeBranch {
+				name, branch_type, ..
+			} => {
+				try_or_popup!(
+					self,
+					"merge branch error:",
+					self.select_branch_popup
+						.merge_branch(&name, branch_type)
+				);
+			}
+			Action::RebaseBranch {
+				name, branch_type, ..
+			} => {
+				try_or_popup!(
+					self,
+					"rebase error:",
+					self.select_branch_popup
+						.rebase_branch(&name, branch_type)
+				);
+			}
+			Action::UpdateSubmodule { name, .. } => {
+				try_or_popup!(
+					self,
+					"update submodule:",
+					sync::update_submodule(
+						&self.repo.borrow(),
+						&name
+					)
+				);
+				self.submodule_popup.update_submodules()?;
+			}
+			_ => {}
+		}
 
 		Ok(())
 	}
@@ -1322,7 +1369,8 @@ fn split_remote_branch_ref<'a>(
 
 #[cfg(test)]
 mod tests {
-	use super::split_remote_branch_ref;
+	use super::*;
+	use asyncgit::sync::{CommitId, RepoState};
 
 	#[test]
 	fn test_split_remote_branch_ref() {
@@ -1367,5 +1415,557 @@ mod tests {
 			split_remote_branch_ref("refs/remotes/origin/", &remotes),
 			None
 		);
+	}
+
+	fn make_test_app(repo_path: &Path) -> (App, KeyConfig) {
+		let (tx_git, _rx_git) = crossbeam_channel::unbounded();
+		let (tx_app, _rx_app) = crossbeam_channel::unbounded();
+		let key_config = KeyConfig::default();
+		let app = App::new(
+			CliArgs {
+				theme: PathBuf::default(),
+				select_file: None,
+				repo_path: RepoPath::Path(repo_path.to_path_buf()),
+				notify_watcher: false,
+				key_bindings_path: None,
+				key_symbols_path: None,
+			},
+			tx_git,
+			tx_app,
+			Input::new(),
+			Theme::default(),
+			key_config.clone(),
+		)
+		.unwrap();
+		(app, key_config)
+	}
+
+	macro_rules! send_key {
+		($app:expr, $ev:expr) => {{
+			let ev = $ev;
+			$app.event(InputEvent::Input(Event::Key(KeyEvent::new(
+				ev.code,
+				ev.modifiers,
+			))))
+			.unwrap();
+		}};
+	}
+
+	fn commit_file(
+		repo_path: &Path,
+		file: &str,
+		content: &str,
+		msg: &str,
+	) -> CommitId {
+		std::fs::write(repo_path.join(file), content).unwrap();
+		let rp = RepoPath::Path(repo_path.to_path_buf());
+		sync::stage_add_file(&rp, Path::new(file)).unwrap();
+		sync::commit(&rp, msg).unwrap()
+	}
+
+	fn create_diverged_branch(
+		repo_path: &Path,
+		orig_branch: &str,
+		branch_name: &str,
+		file: &str,
+		content: &str,
+	) -> CommitId {
+		let rp = RepoPath::Path(repo_path.to_path_buf());
+		sync::create_branch(&rp, branch_name).unwrap();
+		let cid = commit_file(repo_path, file, content, branch_name);
+		sync::checkout_branch(&rp, orig_branch).unwrap();
+		cid
+	}
+
+	fn open_branch_popup_on(
+		app: &mut App,
+		kc: &KeyConfig,
+		target_name: &str,
+	) {
+		app.select_branch_popup.open().unwrap();
+		for _ in 0..10 {
+			if app.select_branch_popup.selected_branch_name()
+				== Some(target_name)
+			{
+				return;
+			}
+			send_key!(app, kc.keys.move_down);
+		}
+		panic!("branch {target_name} not found in popup");
+	}
+
+	#[test]
+	fn t8d_merge_asks_first() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let base = commit_file(td.path(), "base.txt", "base", "base");
+		let feat = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"feat",
+			"feat.txt",
+			"feat",
+		);
+		let main_head =
+			commit_file(td.path(), "main.txt", "main", "main");
+		assert_ne!(base, main_head);
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "feat");
+
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"merge must open confirm popup"
+		);
+		let (title, msg) = app.confirm_popup.get_text();
+		assert!(title.contains("Merge"));
+		assert!(msg.contains("feat"));
+		assert!(msg.contains(&feat.get_short_string()));
+		assert!(msg.contains(&orig_branch));
+		assert!(
+			app.select_branch_popup.is_visible(),
+			"branch list must stay open under confirm popup"
+		);
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Clean);
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.select_branch_popup.is_visible(),
+			"Esc must leave branch list open"
+		);
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Clean);
+		assert_eq!(sync::get_head(&rp).unwrap(), main_head);
+
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.select_branch_popup.is_visible());
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Merge);
+	}
+
+	#[test]
+	fn t8d_rebase_asks_first() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _base =
+			commit_file(td.path(), "base.txt", "base", "base");
+		let feat = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"feat",
+			"feat.txt",
+			"feat",
+		);
+		let main_head =
+			commit_file(td.path(), "main.txt", "main", "main");
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "feat");
+
+		send_key!(&mut app, kc.keys.rebase_branch);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"rebase must open confirm popup"
+		);
+		let (title, msg) = app.confirm_popup.get_text();
+		assert!(title.contains("Rebase"));
+		assert!(msg.contains("feat"));
+		assert!(msg.contains(&feat.get_short_string()));
+		assert!(msg.contains(&orig_branch));
+		assert!(
+			app.select_branch_popup.is_visible(),
+			"branch list must stay open under confirm popup"
+		);
+		assert_eq!(sync::get_head(&rp).unwrap(), main_head);
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.select_branch_popup.is_visible(),
+			"Esc must leave branch list open"
+		);
+		assert_eq!(sync::get_head(&rp).unwrap(), main_head);
+
+		send_key!(&mut app, kc.keys.rebase_branch);
+		assert!(app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.select_branch_popup.is_visible());
+		assert_ne!(sync::get_head(&rp).unwrap(), main_head);
+	}
+
+	#[test]
+	fn t8d_prompt_pins_branch() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _base =
+			commit_file(td.path(), "base.txt", "base", "base");
+		let _beta = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"beta",
+			"beta.txt",
+			"beta",
+		);
+		let _main_head =
+			commit_file(td.path(), "main.txt", "main", "main");
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "beta");
+
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"merge must open confirm popup"
+		);
+
+		// Add a branch that sorts before `beta` and refresh the list
+		// while the confirmation prompt is open.
+		let _alpha = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"alpha",
+			"alpha.txt",
+			"alpha",
+		);
+		app.select_branch_popup.update_branches().unwrap();
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Merge);
+		assert!(
+			td.path().join("beta.txt").exists(),
+			"pinned branch `beta` must be merged"
+		);
+		assert!(
+			!td.path().join("alpha.txt").exists(),
+			"newly sorted branch `alpha` must not be merged"
+		);
+	}
+
+	#[test]
+	fn t8d_moved_branch_refuses() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _base =
+			commit_file(td.path(), "base.txt", "base", "base");
+		let _feat = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"feat",
+			"feat.txt",
+			"feat",
+		);
+		let main_head =
+			commit_file(td.path(), "main.txt", "main", "main");
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "feat");
+
+		// 1. Target branch moves while prompt is open.
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"merge must open confirm popup"
+		);
+		let new_feat = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"feat-extra",
+			"extra.txt",
+			"extra",
+		);
+		repo.reference(
+			"refs/heads/feat",
+			new_feat.into(),
+			true,
+			"move feat",
+		)
+		.unwrap();
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"moved branch must show repo-changed error"
+		);
+		assert!(app.select_branch_popup.is_visible());
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Clean);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 2. Target branch deleted while prompt is open.
+		app.select_branch_popup.update_branches().unwrap();
+		open_branch_popup_on(&mut app, &kc, "feat");
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(app.confirm_popup.is_visible());
+		sync::delete_branch(&rp, "refs/heads/feat").unwrap();
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(
+			app.msg_popup.is_visible(),
+			"deleted branch must show repo-changed error"
+		);
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Clean);
+		assert_eq!(sync::get_head(&rp).unwrap(), main_head);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 3. HEAD advances while prompt is open.
+		app.select_branch_popup.update_branches().unwrap();
+		open_branch_popup_on(&mut app, &kc, "feat-extra");
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(app.confirm_popup.is_visible());
+		let advanced_head =
+			commit_file(td.path(), "adv.txt", "adv", "advance");
+		send_key!(&mut app, kc.keys.enter);
+		assert!(
+			app.msg_popup.is_visible(),
+			"HEAD change must show repo-changed error"
+		);
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Clean);
+		assert_eq!(sync::get_head(&rp).unwrap(), advanced_head);
+	}
+
+	#[test]
+	fn t8d_invalid_branch_no_prompt() {
+		let (td, repo) = git2_testing::repo_init();
+		let _base =
+			commit_file(td.path(), "base.txt", "base", "base");
+		let cur_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, &cur_branch);
+
+		// Current branch selected: no prompt.
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(!app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.rebase_branch);
+		assert!(!app.confirm_popup.is_visible());
+
+		// Switch to empty remote list: no prompt.
+		send_key!(&mut app, kc.keys.tab_toggle);
+		send_key!(&mut app, kc.keys.merge_branch);
+		assert!(!app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.rebase_branch);
+		assert!(!app.confirm_popup.is_visible());
+	}
+
+	fn set_pending_state(git_dir: &Path, kind: &str, oid: &str) {
+		let _ = std::fs::remove_file(git_dir.join("MERGE_HEAD"));
+		let _ = std::fs::remove_file(git_dir.join("REVERT_HEAD"));
+		let _ =
+			std::fs::remove_file(git_dir.join("CHERRY_PICK_HEAD"));
+		let _ = std::fs::remove_dir_all(git_dir.join("rebase-merge"));
+		match kind {
+			"merge" => std::fs::write(
+				git_dir.join("MERGE_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			"revert" => std::fs::write(
+				git_dir.join("REVERT_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			"rebase" => {
+				std::fs::create_dir_all(git_dir.join("rebase-merge"))
+					.unwrap();
+			}
+			"cherry-pick" => std::fs::write(
+				git_dir.join("CHERRY_PICK_HEAD"),
+				format!("{oid}\n"),
+			)
+			.unwrap(),
+			_ => unreachable!(),
+		}
+	}
+
+	#[test]
+	fn t8d_pending_state_blocks() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let _base =
+			commit_file(td.path(), "base.txt", "base", "base");
+		let _feat = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"feat",
+			"feat.txt",
+			"feat",
+		);
+		let main_head =
+			commit_file(td.path(), "main.txt", "main", "main");
+		let oid_str = main_head.to_string();
+		let git_dir = repo.path().to_path_buf();
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "feat");
+
+		let merge_hint =
+			strings::commands::merge_branch_popup(&app.key_config)
+				.name;
+		let rebase_hint =
+			strings::commands::branch_popup_rebase(&app.key_config)
+				.name;
+
+		for kind in ["merge", "revert", "rebase", "cherry-pick"] {
+			set_pending_state(&git_dir, kind, &oid_str);
+
+			let mut cmds = Vec::new();
+			app.select_branch_popup.commands(&mut cmds, false);
+			assert!(
+				!cmds
+					.iter()
+					.find(|c| c.text.name == merge_hint)
+					.is_some_and(|c| c.enabled),
+				"merge hint must be disabled during {kind}"
+			);
+			assert!(
+				!cmds
+					.iter()
+					.find(|c| c.text.name == rebase_hint)
+					.is_some_and(|c| c.enabled),
+				"rebase hint must be disabled during {kind}"
+			);
+
+			send_key!(&mut app, kc.keys.merge_branch);
+			assert!(!app.confirm_popup.is_visible());
+			assert!(!app.msg_popup.is_visible());
+
+			send_key!(&mut app, kc.keys.rebase_branch);
+			assert!(!app.confirm_popup.is_visible());
+			assert!(!app.msg_popup.is_visible());
+		}
+	}
+
+	fn init_repo_with_submodule(
+	) -> (tempfile::TempDir, tempfile::TempDir, CommitId, CommitId) {
+		let (sub_td, _sub_repo) = git2_testing::repo_init();
+		let sub_c1 =
+			commit_file(sub_td.path(), "sub.txt", "v1", "sub v1");
+		let sub_c2 =
+			commit_file(sub_td.path(), "sub.txt", "v2", "sub v2");
+
+		let (parent_td, parent_repo) = git2_testing::repo_init();
+		let sub_url = sub_td.path().to_str().unwrap();
+		{
+			let mut s = parent_repo
+				.submodule(sub_url, Path::new("sub"), false)
+				.unwrap();
+			let sub_clone = s.clone(None).unwrap();
+			{
+				let mut cfg = sub_clone.config().unwrap();
+				cfg.set_str("user.name", "testuser").unwrap();
+				cfg.set_str("user.email", "testuser@example.com")
+					.unwrap();
+			}
+			let sub_rp = RepoPath::Path(parent_td.path().join("sub"));
+			sync::checkout_commit(&sub_rp, sub_c1).unwrap();
+			s.add_finalize().unwrap();
+		}
+		commit_file(
+			parent_td.path(),
+			"README",
+			"hi",
+			"add submodule",
+		);
+
+		// Move submodule workdir to sub_c2 so update has work to do
+		// (bringing workdir back to recorded sub_c1).
+		let sub_rp = RepoPath::Path(parent_td.path().join("sub"));
+		sync::checkout_commit(&sub_rp, sub_c2).unwrap();
+
+		(parent_td, sub_td, sub_c1, sub_c2)
+	}
+
+	#[test]
+	fn t8d_submodule_asks_first() {
+		let (parent_td, _sub_td, sub_c1, sub_c2) =
+			init_repo_with_submodule();
+		let sub_rp = RepoPath::Path(parent_td.path().join("sub"));
+		let (mut app, kc) = make_test_app(parent_td.path());
+		app.submodule_popup.open().unwrap();
+
+		send_key!(&mut app, kc.keys.update_submodule);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"submodule update must open confirm popup"
+		);
+		let (title, msg) = app.confirm_popup.get_text();
+		assert!(title.contains("Submodule"));
+		assert!(msg.contains("sub"));
+		assert!(msg.contains(&sub_c1.get_short_string()));
+		assert_eq!(
+			sync::get_head(&sub_rp).unwrap(),
+			sub_c2,
+			"submodule must not update before confirmation"
+		);
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert_eq!(
+			sync::get_head(&sub_rp).unwrap(),
+			sub_c2,
+			"Esc must leave submodule unchanged"
+		);
+
+		send_key!(&mut app, kc.keys.update_submodule);
+		assert!(app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert_eq!(
+			sync::get_head(&sub_rp).unwrap(),
+			sub_c1,
+			"confirmed update must check out recorded commit"
+		);
+	}
+
+	#[test]
+	fn t8d_moved_submodule_refuses() {
+		let (parent_td, _sub_td, sub_c1, _sub_c2) =
+			init_repo_with_submodule();
+		let sub_wd = parent_td.path().join("sub");
+		let sub_rp = RepoPath::Path(sub_wd.clone());
+		let (mut app, kc) = make_test_app(parent_td.path());
+		app.submodule_popup.open().unwrap();
+
+		send_key!(&mut app, kc.keys.update_submodule);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"submodule update must open confirm popup"
+		);
+		let (title, msg) = app.confirm_popup.get_text();
+		assert!(title.contains("Submodule"));
+		assert!(msg.contains("sub"));
+		assert!(msg.contains(&sub_c1.get_short_string()));
+
+		// Externally change the submodule's checked-out commit while prompt is open.
+		let external =
+			commit_file(&sub_wd, "ext.txt", "ext", "external");
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"moved submodule must show repo-changed error"
+		);
+		assert_eq!(
+			sync::get_head(&sub_rp).unwrap(),
+			external,
+			"refused update must not change submodule checkout"
+		);
+		assert_ne!(external, sub_c1);
 	}
 }

@@ -8,7 +8,7 @@ use crate::{
 };
 use asyncgit::{
 	sync::{
-		diff::DiffLinePosition, BranchInfo, CommitId,
+		diff::DiffLinePosition, BranchInfo, BranchType, CommitId,
 		LogFilterSearchOptions,
 	},
 	PushType,
@@ -53,24 +53,37 @@ pub enum Action {
 	DeleteRemoteTag(String, String),
 	DeleteRemote(String),
 	ForcePush(String, bool),
-	PullMerge { incoming: usize, rebase: bool },
+	PullMerge {
+		incoming: usize,
+		rebase: bool,
+	},
 	AbortMerge,
 	AbortRebase,
 	AbortRevert,
 	UndoCommit,
-	RevertCommit { id: CommitId, subject: String },
-	CheckoutCommit { id: CommitId, subject: String },
-}
-
-impl Action {
-	/// Whether this confirmation must refuse if HEAD or repo state
-	/// changed while the prompt was open.
-	pub const fn guards_repo(&self) -> bool {
-		matches!(
-			self,
-			Self::RevertCommit { .. } | Self::CheckoutCommit { .. }
-		)
-	}
+	RevertCommit {
+		id: CommitId,
+		subject: String,
+	},
+	CheckoutCommit {
+		id: CommitId,
+		subject: String,
+	},
+	MergeBranch {
+		name: String,
+		branch_type: BranchType,
+		id: CommitId,
+	},
+	RebaseBranch {
+		name: String,
+		branch_type: BranchType,
+		id: CommitId,
+	},
+	UpdateSubmodule {
+		name: String,
+		commit: Option<CommitId>,
+		uninitialized: bool,
+	},
 }
 
 #[derive(Debug)]

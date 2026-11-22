@@ -5,15 +5,14 @@ use crate::{
 		DrawableComponent, EventState, ScrollType, VerticalScroll,
 	},
 	keys::{key_match, SharedKeyConfig},
-	queue::{InternalEvent, NeedsUpdate, Queue},
-	strings, try_or_popup,
+	queue::{Action, InternalEvent, Queue},
+	strings,
 	ui::{self, Size},
 };
 use anyhow::Result;
 use asyncgit::sync::{
-	get_submodules, repo_dir, submodule_parent_info,
-	update_submodule, RepoPathRef, SubmoduleInfo,
-	SubmoduleParentInfo,
+	get_submodules, repo_dir, submodule_parent_info, RepoPathRef,
+	SubmoduleInfo, SubmoduleParentInfo,
 };
 use crossterm::event::Event;
 use ratatui::{
@@ -188,19 +187,15 @@ impl Component for SubmodulesListPopup {
 				self.key_config.keys.update_submodule,
 			) {
 				if let Some(submodule) = self.selected_entry() {
-					try_or_popup!(
-						self,
-						"update submodule:",
-						update_submodule(
-							&self.repo.borrow(),
-							&submodule.name,
-						)
-					);
-
-					self.update_submodules()?;
-
-					self.queue.push(InternalEvent::Update(
-						NeedsUpdate::ALL,
+					self.queue.push(InternalEvent::ConfirmAction(
+						Action::UpdateSubmodule {
+							name: submodule.name.clone(),
+							commit: submodule.head_id,
+							uninitialized: submodule
+								.status
+								.is_wd_uninitialized()
+								|| submodule.id.is_none(),
+						},
 					));
 				}
 			} else if key_match(

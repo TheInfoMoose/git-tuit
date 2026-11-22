@@ -351,6 +351,73 @@ pub fn confirm_err_repo_changed() -> String {
 	"Repository changed while confirmation was open; action cancelled."
 		.to_string()
 }
+pub fn confirm_title_merge_branch() -> String {
+	"Merge Branch".to_string()
+}
+pub fn confirm_msg_merge_branch(
+	branch: &str,
+	local: bool,
+	short_id: &str,
+	head_label: &str,
+	detached: bool,
+	max_name_width: usize,
+) -> String {
+	let kind = if local { "local" } else { "remote" };
+	let branch = ellipsis_trim_middle(branch, max_name_width);
+	let head = ellipsis_trim_middle(head_label, max_name_width);
+	if detached {
+		format!(
+			"Merge {kind} branch '{branch}' ({short_id})\ninto detached HEAD {head}?"
+		)
+	} else {
+		format!(
+			"Merge {kind} branch '{branch}' ({short_id})\ninto '{head}'?"
+		)
+	}
+}
+pub fn confirm_title_rebase_branch() -> String {
+	"Rebase Branch".to_string()
+}
+pub fn confirm_msg_rebase_branch(
+	branch: &str,
+	local: bool,
+	short_id: &str,
+	head_label: &str,
+	detached: bool,
+	max_name_width: usize,
+) -> String {
+	let kind = if local { "local" } else { "remote" };
+	let branch = ellipsis_trim_middle(branch, max_name_width);
+	let head = ellipsis_trim_middle(head_label, max_name_width);
+	if detached {
+		format!(
+			"Rebase detached HEAD {head}\nonto {kind} branch '{branch}' ({short_id})?"
+		)
+	} else {
+		format!(
+			"Rebase '{head}'\nonto {kind} branch '{branch}' ({short_id})?"
+		)
+	}
+}
+pub fn confirm_title_update_submodule() -> String {
+	"Update Submodule".to_string()
+}
+pub fn confirm_msg_update_submodule(
+	name: &str,
+	short_id: Option<&str>,
+	uninitialized: bool,
+	max_name_width: usize,
+) -> String {
+	let name = ellipsis_trim_middle(name, max_name_width);
+	let target = short_id.unwrap_or("recorded commit");
+	if uninitialized {
+		format!(
+			"Initialize and update submodule '{name}'\nto commit {target}?"
+		)
+	} else {
+		format!("Update submodule '{name}'\nto commit {target}?")
+	}
+}
 pub fn log_title(_key_config: &SharedKeyConfig) -> String {
 	"Commit".to_string()
 }

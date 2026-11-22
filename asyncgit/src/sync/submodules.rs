@@ -39,6 +39,57 @@ pub struct SubmoduleParentInfo {
 	pub submodule_info: SubmoduleInfo,
 }
 
+/// Snapshot of a submodule's recorded and checked-out commits
+/// for stale-confirmation checks.
+#[derive(PartialEq, Eq, Debug, Clone)]
+pub struct SubmoduleSnapshot {
+	/// Commit recorded for the submodule in the parent repo's index
+	pub index_id: Option<CommitId>,
+	/// Commit recorded for the submodule in the parent repo's HEAD
+	pub head_id: Option<CommitId>,
+	/// Commit currently checked out in the submodule workdir
+	pub workdir_id: Option<CommitId>,
+	/// Whether the submodule is currently uninitialized
+	pub uninitialized: bool,
+}
+
+impl SubmoduleSnapshot {
+	/// Commit `update_submodule` will check out.
+	pub fn target_commit(&self) -> Option<CommitId> {
+		self.index_id.or(self.head_id)
+	}
+}
+
+/// Capture a submodule's recorded and checked-out commits for
+/// stale-confirmation checks. Returns `Ok(None)` if the submodule
+/// no longer exists.
+pub fn submodule_snapshot(
+	repo_path: &RepoPath,
+	name: &str,
+) -> Result<Option<SubmoduleSnapshot>> {
+	scope_time!("submodule_snapshot");
+
+	let repo = repo(repo_path)?;
+	let submodule = match repo.find_submodule(name) {
+		Ok(s) => s,
+		Err(e) if e.code() == git2::ErrorCode::NotFound => {
+			return Ok(None);
+		}
+		Err(e) => return Err(e.into()),
+	};
+	let status = repo
+		.submodule_status(name, git2::SubmoduleIgnore::None)
+		.unwrap_or(SubmoduleStatus::empty());
+
+	Ok(Some(SubmoduleSnapshot {
+		index_id: submodule.index_id().map(CommitId::from),
+		head_id: submodule.head_id().map(CommitId::from),
+		workdir_id: submodule.workdir_id().map(CommitId::from),
+		uninitialized: status.is_wd_uninitialized()
+			|| submodule.workdir_id().is_none(),
+	}))
+}
+
 impl SubmoduleInfo {
 	///
 	pub fn get_repo_path(
