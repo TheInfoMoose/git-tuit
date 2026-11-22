@@ -134,6 +134,12 @@ pub fn commit_first_line_warning(count: usize) -> String {
 pub const fn branch_name_invalid() -> &'static str {
 	"[invalid name]"
 }
+pub const fn tag_name_invalid() -> &'static str {
+	"[invalid name]"
+}
+pub const fn tag_annotation_invalid() -> &'static str {
+	"[empty annotation]"
+}
 pub fn commit_editor_msg(_key_config: &SharedKeyConfig) -> String {
 	r"
 # Edit your commit message

@@ -102,8 +102,8 @@ pub use submodules::{
 	SubmoduleSnapshot, SubmoduleStatus,
 };
 pub use tags::{
-	delete_tag, get_tags, get_tags_with_metadata, CommitTags, Tag,
-	TagWithMetadata, Tags,
+	delete_tag, get_tags, get_tags_with_metadata, tag_exists,
+	validate_tag_name, CommitTags, Tag, TagWithMetadata, Tags,
 };
 pub use tree::{tree_file_content, tree_files, TreeFile};
 pub use utils::{

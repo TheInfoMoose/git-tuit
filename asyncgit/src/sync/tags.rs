@@ -147,6 +147,39 @@ pub fn get_tags_with_metadata(
 }
 
 ///
+pub fn validate_tag_name(name: &str) -> bool {
+	if name.is_empty()
+		|| name.contains('\0')
+		|| name.chars().any(char::is_whitespace)
+	{
+		return false;
+	}
+
+	git2::Reference::is_valid_name(&format!("refs/tags/{name}"))
+}
+
+///
+pub fn tag_exists(
+	repo_path: &RepoPath,
+	tag_name: &str,
+) -> Result<bool> {
+	scope_time!("tag_exists");
+
+	if !validate_tag_name(tag_name) {
+		return Ok(false);
+	}
+
+	let repo = repo(repo_path)?;
+	let ref_name = format!("refs/tags/{tag_name}");
+	let res = match repo.find_reference(&ref_name) {
+		Ok(_) => Ok(true),
+		Err(e) if e.code() == git2::ErrorCode::NotFound => Ok(false),
+		Err(e) => Err(e.into()),
+	};
+	res
+}
+
+///
 pub fn delete_tag(
 	repo_path: &RepoPath,
 	tag_name: &str,
