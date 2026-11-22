@@ -542,6 +542,13 @@ status = "open"
 severity = "medium"
 created_at = "2026-11-22T05:16:48Z"
 
+[[items.bugs]]
+id = "BUG-0076"
+title = "Flaky test t7j_focus_leaves_only_loaded_empty_diff due to async diff-loading race"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-22T05:55:58Z"
+
 [[items.features]]
 id = "FEAT-0002"
 title = "Ship amber-on-black CRT default theme"
