@@ -1126,7 +1126,7 @@ created_at = "2026-11-22T05:34:48Z"
 [[items.tasks]]
 id = "TASK-0102"
 title = "Popup Hints Match Their Keys"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-22T05:34:48Z"
 
