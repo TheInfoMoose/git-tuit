@@ -26,8 +26,6 @@
 
     edit_file: Some(( code: Char('I'), modifiers: "SHIFT")),
 
-    status_reset_item: Some(( code: Char('U'), modifiers: "SHIFT")),
-
     diff_reset_lines: Some(( code: Char('u'), modifiers: "")),
     diff_stage_lines: Some(( code: Char('s'), modifiers: "")),
 

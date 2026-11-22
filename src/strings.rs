@@ -756,11 +756,9 @@ pub mod commands {
 	) -> CommandText {
 		CommandText::new(
 			format!(
-				"Jump up/down [{},{},{},{}]",
+				"Jump up/down [{},{}]",
 				key_config.get_hint(key_config.keys.home),
 				key_config.get_hint(key_config.keys.end),
-				key_config.get_hint(key_config.keys.move_up),
-				key_config.get_hint(key_config.keys.move_down)
 			),
 			"scroll to top or bottom of diff",
 			CMD_GROUP_DIFF,
@@ -1324,7 +1322,8 @@ pub mod commands {
 	pub fn quit(key_config: &SharedKeyConfig) -> CommandText {
 		CommandText::new(
 			format!(
-				"Quit [{}]",
+				"Quit [{},{}]",
+				key_config.get_hint(key_config.keys.quit),
 				key_config.get_hint(key_config.keys.exit),
 			),
 			"quit gitui application",
@@ -1962,5 +1961,68 @@ mod tests {
 		let msg = confirm_msg_reset("src/main.rs");
 		assert!(msg.contains("'src/main.rs'"));
 		assert!(msg.contains("deleted permanently"));
+	}
+
+	#[test]
+	fn t7k_vim_keymap_no_collision() {
+		use crate::keys::KeyConfig;
+		use std::path::PathBuf;
+
+		let vim_path = PathBuf::from("vim_style_key_config.ron");
+		let cfg = KeyConfig::init(Some(&vim_path), None).unwrap();
+		// Ensure the vim config actually loaded and overrode defaults
+		assert_ne!(
+			cfg.keys.move_up,
+			KeyConfig::default().keys.move_up
+		);
+		assert_ne!(
+			cfg.keys.status_reset_item, cfg.keys.undo_commit,
+			"vim keymap must not collide status_reset_item with undo_commit"
+		);
+	}
+
+	#[test]
+	fn t7k_quit_hint_shows_quit_key() {
+		let key_config = SharedKeyConfig::default();
+		let cmd = commands::quit(&key_config);
+		let quit_hint = key_config.get_hint(key_config.keys.quit);
+		let exit_hint = key_config.get_hint(key_config.keys.exit);
+		assert!(
+			cmd.name.contains(&quit_hint),
+			"quit hint '{}' must include quit key '{}'",
+			cmd.name,
+			quit_hint
+		);
+		assert!(
+			cmd.name.contains(&exit_hint),
+			"quit hint '{}' must include exit key '{}'",
+			cmd.name,
+			exit_hint
+		);
+	}
+
+	#[test]
+	fn t7k_jump_hint_home_end_only() {
+		let key_config = SharedKeyConfig::default();
+		let cmd = commands::diff_home_end(&key_config);
+		let home_hint = key_config.get_hint(key_config.keys.home);
+		let end_hint = key_config.get_hint(key_config.keys.end);
+		let up_hint = key_config.get_hint(key_config.keys.move_up);
+		let down_hint =
+			key_config.get_hint(key_config.keys.move_down);
+		assert!(cmd.name.contains(&home_hint));
+		assert!(cmd.name.contains(&end_hint));
+		assert!(
+			!cmd.name.contains(&up_hint),
+			"diff_home_end '{}' must not include move_up '{}'",
+			cmd.name,
+			up_hint
+		);
+		assert!(
+			!cmd.name.contains(&down_hint),
+			"diff_home_end '{}' must not include move_down '{}'",
+			cmd.name,
+			down_hint
+		);
 	}
 }

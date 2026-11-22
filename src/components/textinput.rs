@@ -203,7 +203,7 @@ impl TextInputComponent {
 	}
 
 	fn draw_char_count(&self, f: &mut Frame, r: Rect) {
-		let count = self.get_text().len();
+		let count = self.get_text().chars().count();
 		if count > 0 {
 			let w = Paragraph::new(format!("[{count} chars]"))
 				.alignment(Alignment::Right);
@@ -260,7 +260,11 @@ impl TextInputComponent {
 	}
 
 	#[allow(clippy::too_many_lines, clippy::unnested_or_patterns)]
-	fn process_inputs(ta: &mut TextArea<'_>, input: &Input) -> bool {
+	fn process_inputs(
+		ta: &mut TextArea<'_>,
+		input: &Input,
+		is_multiline: bool,
+	) -> bool {
 		match input {
 			Input {
 				key: Key::Char(c),
@@ -276,7 +280,7 @@ impl TextInputComponent {
 				ctrl: false,
 				alt: false,
 				..
-			} => {
+			} if is_multiline => {
 				ta.insert_tab();
 				true
 			}
@@ -375,7 +379,7 @@ impl TextInputComponent {
 				ctrl: false,
 				alt: false,
 				..
-			} => {
+			} if is_multiline => {
 				ta.move_cursor(CursorMove::Down);
 				true
 			}
@@ -390,7 +394,7 @@ impl TextInputComponent {
 				ctrl: false,
 				alt: false,
 				..
-			} => {
+			} if is_multiline => {
 				ta.move_cursor(CursorMove::Up);
 				true
 			}
@@ -689,7 +693,11 @@ impl Component for TextInputComponent {
 					ta.insert_newline();
 					true
 				} else {
-					Self::process_inputs(ta, &input)
+					Self::process_inputs(
+						ta,
+						&input,
+						self.input_type == InputType::Multiline,
+					)
 				}
 			} else {
 				false
@@ -886,5 +894,81 @@ mod tests {
 			ta.move_cursor(CursorMove::WordBack);
 			assert_eq!(ta.cursor(), save_cursor);
 		}
+	}
+
+	#[test]
+	fn t7k_single_line_passes_keys_through() {
+		use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+		let env = Environment::test_env();
+		let keys = [
+			(KeyCode::Tab, KeyModifiers::NONE),
+			(KeyCode::Up, KeyModifiers::NONE),
+			(KeyCode::Down, KeyModifiers::NONE),
+			(KeyCode::Char('n'), KeyModifiers::CONTROL),
+			(KeyCode::Char('p'), KeyModifiers::CONTROL),
+		];
+
+		for input_type in [InputType::Singleline, InputType::Password]
+		{
+			let mut comp =
+				TextInputComponent::new(&env, "", "", false)
+					.with_input_type(input_type);
+			comp.show().unwrap();
+			comp.set_text(String::from("hello"));
+
+			for (code, mods) in keys {
+				let ev = Event::Key(KeyEvent::new(code, mods));
+				let state = comp.event(&ev).unwrap();
+				assert!(
+					!state.is_consumed(),
+					"key ({code:?}, {mods:?}) should not be consumed"
+				);
+			}
+		}
+
+		let mut multi = TextInputComponent::new(&env, "", "", false)
+			.with_input_type(InputType::Multiline);
+		multi.show().unwrap();
+		multi.set_text(String::from("line1\nline2"));
+		for (code, mods) in keys {
+			let ev = Event::Key(KeyEvent::new(code, mods));
+			let state = multi.event(&ev).unwrap();
+			assert!(
+				state.is_consumed(),
+				"multiline should still consume ({code:?}, {mods:?})"
+			);
+		}
+	}
+
+	#[test]
+	fn t7k_counter_counts_chars() {
+		use ratatui::{backend::TestBackend, Terminal};
+
+		let env = Environment::test_env();
+		let mut comp = TextInputComponent::new(&env, "", "", true)
+			.with_input_type(InputType::Singleline);
+		comp.show().unwrap();
+		// 7 chars, 12 UTF-8 bytes
+		comp.set_text(String::from("café 日本"));
+
+		let backend = TestBackend::new(40, 10);
+		let mut terminal = Terminal::new(backend).unwrap();
+		terminal
+			.draw(|f| {
+				comp.draw(f, f.area()).unwrap();
+			})
+			.unwrap();
+
+		let buf = terminal.backend().buffer();
+		let rendered: String = buf
+			.content()
+			.iter()
+			.map(ratatui::buffer::Cell::symbol)
+			.collect();
+		assert!(
+			rendered.contains("[7 chars]"),
+			"expected '[7 chars]' in rendered buffer, got: {rendered}"
+		);
 	}
 }

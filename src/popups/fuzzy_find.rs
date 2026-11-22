@@ -108,22 +108,20 @@ impl FuzzyFindPopup {
 	}
 
 	fn refresh_selection(&mut self) {
-		let selection =
+		self.selected_index =
 			self.filtered.get(self.selection).map(|a| a.0);
+	}
 
-		if self.selected_index != selection {
-			self.selected_index = selection;
-
-			if let Some(idx) = self.selected_index {
-				if let Some(target) = self.target {
-					self.queue.push(
-						InternalEvent::FuzzyFinderChanged(
-							idx,
-							self.contents[idx].clone(),
-							target,
-						),
-					);
-				}
+	fn apply_selection(&self) {
+		if let (Some(idx), Some(target)) =
+			(self.selected_index, self.target)
+		{
+			if let Some(content) = self.contents.get(idx) {
+				self.queue.push(InternalEvent::FuzzyFinderChanged(
+					idx,
+					content.clone(),
+					target,
+				));
 			}
 		}
 	}
@@ -339,9 +337,12 @@ impl Component for FuzzyFindPopup {
 	) -> Result<EventState> {
 		if self.is_visible() {
 			if let Event::Key(key) = event {
-				if key_match(key, self.key_config.keys.exit_popup)
-					|| key_match(key, self.key_config.keys.enter)
-				{
+				if key_match(key, self.key_config.keys.exit_popup) {
+					self.hide();
+					return Ok(EventState::Consumed);
+				}
+				if key_match(key, self.key_config.keys.enter) {
+					self.apply_selection();
 					self.hide();
 					return Ok(EventState::Consumed);
 				}
@@ -377,5 +378,105 @@ impl Component for FuzzyFindPopup {
 	fn show(&mut self) -> Result<()> {
 		self.visible = true;
 		Ok(())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+	#[test]
+	fn t7k_fuzzy_applies_only_on_enter() {
+		let env = Environment::test_env();
+		let mut popup = FuzzyFindPopup::new(&env);
+		let items = vec![
+			String::from("alpha"),
+			String::from("ab"),
+			String::from("beta"),
+		];
+
+		popup
+			.open(items.clone(), FuzzyFinderTarget::Branches)
+			.unwrap();
+
+		// Typing a query must not emit FuzzyFinderChanged
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Char('a'),
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		assert!(
+			env.queue.pop().is_none(),
+			"typing a query should not apply a match"
+		);
+
+		// Moving the highlight must not emit FuzzyFinderChanged
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Down,
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		assert!(
+			env.queue.pop().is_none(),
+			"moving highlight should not apply a match"
+		);
+
+		// Pressing Esc must hide and not emit FuzzyFinderChanged
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Esc,
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		assert!(!popup.is_visible());
+		assert!(
+			env.queue.pop().is_none(),
+			"Esc should not apply a match"
+		);
+
+		// Re-open, filter, move highlight, and press Enter: must apply highlighted match
+		popup.open(items, FuzzyFinderTarget::Branches).unwrap();
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Char('a'),
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Down,
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		assert!(env.queue.pop().is_none());
+
+		let expected_idx = popup.selected_index.unwrap();
+		let expected_name = popup.contents[expected_idx].clone();
+
+		popup
+			.event(&Event::Key(KeyEvent::new(
+				KeyCode::Enter,
+				KeyModifiers::NONE,
+			)))
+			.unwrap();
+		assert!(!popup.is_visible());
+
+		match env.queue.pop() {
+			Some(InternalEvent::FuzzyFinderChanged(
+				idx,
+				name,
+				FuzzyFinderTarget::Branches,
+			)) => {
+				assert_eq!(idx, expected_idx);
+				assert_eq!(name, expected_name);
+			}
+			_ => panic!(
+				"Enter should emit FuzzyFinderChanged for highlighted match"
+			),
+		}
+		assert!(env.queue.pop().is_none());
 	}
 }

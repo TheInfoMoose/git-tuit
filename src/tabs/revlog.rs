@@ -473,6 +473,8 @@ impl Component for Revlog {
 					} else if self.can_close_search() {
 						self.list.set_highlighting(None);
 						self.search = LogSearch::Off;
+					} else if self.commit_details.is_visible() {
+						self.commit_details.hide();
 					}
 					return Ok(EventState::Consumed);
 				} else if key_match(k, self.key_config.keys.copy) {
