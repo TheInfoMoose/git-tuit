@@ -603,8 +603,25 @@ impl Status {
 	}
 
 	fn undo_last_commit(&self) {
-		self.queue
-			.push(InternalEvent::ConfirmAction(Action::UndoCommit));
+		match sync::undo_last_commit_target(&self.repo.borrow()) {
+			Ok((id, subject)) => {
+				self.queue.push(InternalEvent::ConfirmAction(
+					Action::UndoCommit { id, subject },
+				));
+			}
+			Err(e) => {
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("cannot undo commit:\n{e}"),
+				));
+			}
+		}
+	}
+
+	fn can_undo_commit(&self) -> bool {
+		!self.is_focus_on_diff()
+			&& !self.repo_state_unclean()
+			&& sync::repo_state(&self.repo.borrow())
+				.is_ok_and(|s| s == RepoState::Clean)
 	}
 
 	fn branch_compare(&mut self) {
@@ -785,11 +802,11 @@ impl Component for Status {
 				!focus_on_diff,
 			));
 
+			let can_undo = self.can_undo_commit();
 			out.push(CommandInfo::new(
 				strings::commands::undo_commit(&self.key_config),
-				true,
-				(!self.pending_rebase() && !focus_on_diff)
-					|| force_all,
+				can_undo,
+				can_undo || force_all,
 			));
 
 			out.push(CommandInfo::new(
@@ -916,12 +933,9 @@ impl Component for Status {
 				} else if key_match(
 					k,
 					self.key_config.keys.undo_commit,
-				) && !self.is_focus_on_diff()
+				) && self.can_undo_commit()
 				{
 					self.undo_last_commit();
-					self.queue.push(InternalEvent::Update(
-						NeedsUpdate::ALL,
-					));
 					Ok(EventState::Consumed)
 				} else if key_match(
 					k,

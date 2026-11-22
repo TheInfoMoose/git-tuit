@@ -203,7 +203,9 @@ impl ConfirmPopup {
 	pub fn open(&mut self, a: Action) -> Result<()> {
 		let guard = match &a {
 			Action::RevertCommit { .. }
-			| Action::CheckoutCommit { .. } => Some(ConfirmGuard::Repo(
+			| Action::CheckoutCommit { .. }
+			| Action::HardReset { .. }
+			| Action::UndoCommit { .. } => Some(ConfirmGuard::Repo(
 				sync::repo_snapshot(&self.repo.borrow())?,
 			)),
 			Action::MergeBranch {
@@ -221,6 +223,18 @@ impl ConfirmPopup {
 				branch_type: *branch_type,
 				id: *id,
 			}),
+			Action::CheckoutBranchDiscard(branch) => {
+				Some(ConfirmGuard::Branch {
+					repo: sync::repo_snapshot(&self.repo.borrow())?,
+					name: branch.name.clone(),
+					branch_type: if branch.is_local() {
+						BranchType::Local
+					} else {
+						BranchType::Remote
+					},
+					id: branch.top_commit,
+				})
+			}
 			Action::UpdateSubmodule { name, .. } => {
 				let snapshot = sync::submodule_snapshot(
 					&self.repo.borrow(),
@@ -420,11 +434,17 @@ impl ConfirmPopup {
 				strings::confirm_title_abortrevert(),
 				strings::confirm_msg_revertchanges(),
 			),
-			Action::UndoCommit => (
+			Action::UndoCommit { id, subject } => (
 				strings::confirm_title_undo_commit(),
-				strings::confirm_msg_undo_commit(),
+				strings::confirm_msg_undo_commit(
+					&id.get_short_string(),
+					subject,
+					max_name_width,
+				),
 			),
-			Action::RevertCommit { .. }
+			Action::HardReset { .. }
+			| Action::CheckoutBranchDiscard(_)
+			| Action::RevertCommit { .. }
 			| Action::CheckoutCommit { .. }
 			| Action::MergeBranch { .. }
 			| Action::RebaseBranch { .. }
@@ -440,6 +460,28 @@ impl ConfirmPopup {
 		max_name_width: usize,
 	) -> (String, String) {
 		match action {
+			Action::HardReset { id, subject } => {
+				let (head_label, detached) = self.head_info();
+				(
+					strings::confirm_title_hard_reset(),
+					strings::confirm_msg_hard_reset(
+						&id.get_short_string(),
+						subject,
+						&head_label,
+						detached,
+						max_name_width,
+					),
+				)
+			}
+			Action::CheckoutBranchDiscard(branch) => (
+				strings::confirm_title_checkout_discard(),
+				strings::confirm_msg_checkout_discard(
+					&branch.name,
+					branch.is_local(),
+					&branch.top_commit.get_short_string(),
+					max_name_width,
+				),
+			),
 			Action::RevertCommit { id, subject } => self
 				.commit_confirm_text(
 					*id,

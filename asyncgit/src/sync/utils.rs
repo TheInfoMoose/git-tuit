@@ -185,6 +185,28 @@ pub fn stage_add_all(
 	Ok(())
 }
 
+/// Return the current HEAD commit's id and subject if it can be undone
+/// (i.e. HEAD exists and has at least one parent commit).
+pub fn undo_last_commit_target(
+	repo_path: &RepoPath,
+) -> Result<(CommitId, String)> {
+	let repo = repo(repo_path)?;
+	let head_id = get_head_repo(&repo)?;
+	let commit = repo.find_commit(head_id.into())?;
+	if commit.parent_count() == 0 {
+		return Err(Error::Generic(String::from(
+			"cannot undo initial commit (no parent)",
+		)));
+	}
+	let subject = commit
+		.summary()
+		.ok()
+		.flatten()
+		.unwrap_or_default()
+		.to_string();
+	Ok((head_id, subject))
+}
+
 /// Undo last commit in repo
 pub fn undo_last_commit(repo_path: &RepoPath) -> Result<()> {
 	let repo = repo(repo_path)?;

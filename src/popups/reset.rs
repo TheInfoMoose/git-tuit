@@ -5,7 +5,7 @@ use crate::components::{
 use crate::{
 	app::Environment,
 	keys::{key_match, SharedKeyConfig},
-	queue::Queue,
+	queue::{Action, InternalEvent, NeedsUpdate, Queue},
 	strings, try_or_popup,
 	ui::{self, style::SharedTheme},
 };
@@ -127,28 +127,61 @@ impl ResetPopup {
 	}
 
 	fn reset(&mut self) {
-		if let Some(id) = self.commit {
-			try_or_popup!(
-				self,
-				"reset:",
-				asyncgit::sync::reset_repo(&self.repo, id, self.kind)
-			);
+		let Some(id) = self.commit else {
+			self.hide();
+			return;
+		};
+
+		if self.kind == ResetType::Hard {
+			let subject =
+				asyncgit::sync::get_commit_info(&self.repo, &id)
+					.map(|c| c.message)
+					.unwrap_or_default();
+			self.queue.push(InternalEvent::ConfirmAction(
+				Action::HardReset { id, subject },
+			));
+			return;
 		}
 
+		try_or_popup!(
+			self,
+			"reset:",
+			asyncgit::sync::reset_repo(&self.repo, id, self.kind)
+		);
+
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
 		self.hide();
+	}
+
+	pub fn confirm_hard_reset(&mut self, id: CommitId) {
+		try_or_popup!(
+			self,
+			"reset:",
+			asyncgit::sync::reset_repo(
+				&self.repo,
+				id,
+				ResetType::Hard
+			)
+		);
+
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		self.hide();
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn kind(&self) -> ResetType {
+		self.kind
 	}
 
 	const fn change_kind(&mut self, incr: bool) {
 		self.kind = if incr {
 			match self.kind {
 				ResetType::Soft => ResetType::Mixed,
-				ResetType::Mixed => ResetType::Hard,
-				ResetType::Hard => ResetType::Soft,
+				ResetType::Mixed | ResetType::Hard => ResetType::Hard,
 			}
 		} else {
 			match self.kind {
-				ResetType::Soft => ResetType::Hard,
-				ResetType::Mixed => ResetType::Soft,
+				ResetType::Soft | ResetType::Mixed => ResetType::Soft,
 				ResetType::Hard => ResetType::Mixed,
 			}
 		};

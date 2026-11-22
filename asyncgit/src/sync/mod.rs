@@ -109,7 +109,7 @@ pub use tree::{tree_file_content, tree_files, TreeFile};
 pub use utils::{
 	get_head, get_head_tuple, repo_dir, repo_open_error,
 	repo_snapshot, stage_add_all, stage_add_file, stage_addremoved,
-	Head, RepoSnapshot,
+	undo_last_commit_target, Head, RepoSnapshot,
 };
 
 pub use git2::ResetType;

@@ -60,7 +60,15 @@ pub enum Action {
 	AbortMerge,
 	AbortRebase,
 	AbortRevert,
-	UndoCommit,
+	UndoCommit {
+		id: CommitId,
+		subject: String,
+	},
+	HardReset {
+		id: CommitId,
+		subject: String,
+	},
+	CheckoutBranchDiscard(BranchInfo),
 	RevertCommit {
 		id: CommitId,
 		subject: String,

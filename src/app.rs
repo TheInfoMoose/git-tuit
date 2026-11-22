@@ -1072,13 +1072,6 @@ impl App {
 			Action::AbortRebase => {
 				self.status_tab.abort_rebase();
 			}
-			Action::UndoCommit => {
-				try_or_popup!(
-					self,
-					"undo commit failed:",
-					undo_last_commit(&self.repo.borrow())
-				);
-			}
 			Action::RevertCommit { id, .. } => {
 				self.revert_commit(id);
 			}
@@ -1089,7 +1082,10 @@ impl App {
 					sync::checkout_commit(&self.repo.borrow(), id)
 				);
 			}
-			Action::MergeBranch { .. }
+			Action::UndoCommit { .. }
+			| Action::HardReset { .. }
+			| Action::CheckoutBranchDiscard(_)
+			| Action::MergeBranch { .. }
 			| Action::RebaseBranch { .. }
 			| Action::UpdateSubmodule { .. } => {
 				self.process_confirmed_repo_action(action)?;
@@ -1106,6 +1102,22 @@ impl App {
 		action: Action,
 	) -> Result<()> {
 		match action {
+			Action::UndoCommit { .. } => {
+				try_or_popup!(
+					self,
+					"undo commit failed:",
+					undo_last_commit(&self.repo.borrow())
+				);
+			}
+			Action::HardReset { id, .. } => {
+				self.reset_popup.confirm_hard_reset(id);
+			}
+			Action::CheckoutBranchDiscard(branch) => {
+				self.checkout_option_popup.confirm_discard(&branch);
+				if self.select_branch_popup.is_visible() {
+					self.select_branch_popup.update_branches()?;
+				}
+			}
 			Action::MergeBranch {
 				name, branch_type, ..
 			} => {
@@ -1967,5 +1979,543 @@ mod tests {
 			"refused update must not change submodule checkout"
 		);
 		assert_ne!(external, sub_c1);
+	}
+
+	#[test]
+	fn t8e_hard_reset_asks_first() {
+		let (td, _repo) = git2_testing::repo_init();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let c2 = commit_file(td.path(), "a.txt", "v2", "second");
+		std::fs::write(td.path().join("a.txt"), "dirty").unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		app.reset_popup.open(c1).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.move_down);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Hard);
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"hard reset must open confirm popup"
+		);
+		assert!(
+			app.reset_popup.is_visible(),
+			"reset picker must stay open under confirm popup"
+		);
+		let (_title, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains(&c1.get_short_string()),
+			"confirm msg must name target commit: {msg}"
+		);
+		assert!(
+			msg.to_lowercase().contains("uncommitted")
+				&& msg.to_lowercase().contains("lost"),
+			"confirm msg must warn uncommitted changes will be lost: {msg}"
+		);
+		assert_eq!(
+			sync::get_head(&rp).unwrap(),
+			c2,
+			"HEAD must not change before confirmation"
+		);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"dirty"
+		);
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.reset_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c1);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"v1"
+		);
+	}
+
+	#[test]
+	fn t8e_discard_asks_first() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _base = commit_file(td.path(), "a.txt", "base", "base");
+		let other_id = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other",
+			"a.txt",
+			"other_val",
+		);
+		std::fs::write(td.path().join("a.txt"), "dirty").unwrap();
+
+		let target = sync::get_branches_info(&rp, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "other")
+			.unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		app.checkout_option_popup.open(target).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::DiscardAllLocalChagnes
+		);
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(
+			app.confirm_popup.is_visible(),
+			"discard checkout must open confirm popup"
+		);
+		assert!(
+			app.checkout_option_popup.is_visible(),
+			"checkout picker must stay open under confirm popup"
+		);
+		let (_title, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains("other"),
+			"confirm msg must name target branch: {msg}"
+		);
+		assert!(
+			msg.to_lowercase().contains("uncommitted")
+				&& msg.to_lowercase().contains("lost"),
+			"confirm msg must warn uncommitted changes will be lost: {msg}"
+		);
+		assert_ne!(
+			sync::get_head(&rp).unwrap(),
+			other_id,
+			"HEAD must not switch before confirmation"
+		);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"dirty"
+		);
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.checkout_option_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), other_id);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"other_val"
+		);
+	}
+
+	#[test]
+	fn t8e_cancel_returns_to_picker() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let _other = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other",
+			"b.txt",
+			"other",
+		);
+		let c2 = commit_file(td.path(), "a.txt", "v2", "second");
+		std::fs::write(td.path().join("a.txt"), "dirty").unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+
+		// 1. ResetPopup on Hard -> Enter -> Esc returns to picker with Hard selected
+		app.reset_popup.open(c1).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(app.reset_popup.is_visible());
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Hard);
+		assert_eq!(sync::get_head(&rp).unwrap(), c2);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"dirty"
+		);
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.reset_popup.is_visible());
+
+		// 2. CheckoutOptionPopup on Discard -> Enter -> Esc returns to picker with Discard selected
+		let target = sync::get_branches_info(&rp, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "other")
+			.unwrap();
+		app.checkout_option_popup.open(target).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		send_key!(&mut app, kc.keys.exit_popup);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(app.checkout_option_popup.is_visible());
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::DiscardAllLocalChagnes
+		);
+		assert_eq!(sync::get_head(&rp).unwrap(), c2);
+		assert_eq!(
+			std::fs::read_to_string(td.path().join("a.txt")).unwrap(),
+			"dirty"
+		);
+	}
+
+	#[test]
+	fn t8e_stale_pick_refuses() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let _other1 = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other",
+			"other.txt",
+			"v1",
+		);
+		let _c2 = commit_file(td.path(), "a.txt", "v2", "second");
+
+		let (mut app, kc) = make_test_app(td.path());
+
+		// 1. Hard reset: HEAD changes while confirm is open -> refuse, picker stays open, next Enter works
+		app.reset_popup.open(c1).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		let c3 = commit_file(td.path(), "a.txt", "v3", "third");
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(app.msg_popup.is_visible());
+		assert!(app.reset_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c3);
+
+		send_key!(&mut app, kc.keys.exit_popup); // dismiss error
+		assert!(!app.msg_popup.is_visible());
+		assert!(app.reset_popup.is_visible());
+
+		send_key!(&mut app, kc.keys.enter); // re-confirm against current HEAD
+		assert!(app.confirm_popup.is_visible());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.reset_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c1);
+
+		// 2. Discard checkout: target branch moves while confirm is open -> refuse, picker stays open, next Enter confirms against moved branch
+		std::fs::write(td.path().join("a.txt"), "dirty").unwrap();
+		let target = sync::get_branches_info(&rp, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "other")
+			.unwrap();
+		app.checkout_option_popup.open(target).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		let other2 = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other-new",
+			"other2.txt",
+			"v2",
+		);
+		repo.reference(
+			"refs/heads/other",
+			other2.into(),
+			true,
+			"move other",
+		)
+		.unwrap();
+
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(app.msg_popup.is_visible());
+		assert!(app.checkout_option_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c1);
+
+		send_key!(&mut app, kc.keys.exit_popup); // dismiss error
+		assert!(!app.msg_popup.is_visible());
+		assert!(app.checkout_option_popup.is_visible());
+
+		// Next Enter confirms against `other` as it is now (`other2`)
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+		let (_title, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains(&other2.get_short_string()),
+			"re-opened confirm must show updated target commit: {msg}"
+		);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(!app.checkout_option_popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), other2);
+	}
+
+	#[test]
+	fn t8e_pickers_do_not_wrap() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let _other = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other",
+			"b.txt",
+			"other",
+		);
+
+		let (mut app, kc) = make_test_app(td.path());
+
+		// ResetPopup: Soft -> Up stays Soft; Down -> Mixed -> Hard -> Down stays Hard
+		app.reset_popup.open(c1).unwrap();
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Soft);
+		send_key!(&mut app, kc.keys.move_up);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Soft);
+		send_key!(&mut app, kc.keys.move_down);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Mixed);
+		send_key!(&mut app, kc.keys.move_down);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Hard);
+		send_key!(&mut app, kc.keys.move_down);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Hard);
+		send_key!(&mut app, kc.keys.move_up);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Mixed);
+		send_key!(&mut app, kc.keys.move_up);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Soft);
+		send_key!(&mut app, kc.keys.move_up);
+		assert_eq!(app.reset_popup.kind(), sync::ResetType::Soft);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// CheckoutOptionPopup: KeepLocalChanges -> Up stays Keep; Down -> Discard -> Down stays Discard
+		let target = sync::get_branches_info(&rp, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "other")
+			.unwrap();
+		app.checkout_option_popup.open(target).unwrap();
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::KeepLocalChanges
+		);
+		send_key!(&mut app, kc.keys.move_up);
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::KeepLocalChanges
+		);
+		send_key!(&mut app, kc.keys.move_down);
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::DiscardAllLocalChagnes
+		);
+		send_key!(&mut app, kc.keys.move_down);
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::DiscardAllLocalChagnes
+		);
+		send_key!(&mut app, kc.keys.move_up);
+		assert!(
+			app.checkout_option_popup.option()
+				== strings::CheckoutOptions::KeepLocalChanges
+		);
+	}
+
+	#[test]
+	fn t8e_reset_requests_refresh() {
+		let (td, _repo) = git2_testing::repo_init();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let _c2 = commit_file(td.path(), "a.txt", "v2", "second");
+
+		let mut env = Environment::test_env();
+		env.repo = RefCell::new(rp.clone());
+		let enter_ev = Event::Key(KeyEvent::new(
+			env.key_config.keys.enter.code,
+			env.key_config.keys.enter.modifiers,
+		));
+		let down_ev = Event::Key(KeyEvent::new(
+			env.key_config.keys.move_down.code,
+			env.key_config.keys.move_down.modifiers,
+		));
+
+		let mut popup = ResetPopup::new(&env);
+
+		// Soft reset requests NeedsUpdate::ALL
+		popup.open(c1).unwrap();
+		popup.event(&enter_ev).unwrap();
+		assert!(!popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c1);
+		let mut saw_update = false;
+		while let Some(ev) = env.queue.pop() {
+			if matches!(
+				ev,
+				InternalEvent::Update(u) if u.contains(NeedsUpdate::ALL)
+			) {
+				saw_update = true;
+			}
+		}
+		assert!(
+			saw_update,
+			"soft reset must request NeedsUpdate::ALL"
+		);
+
+		// Mixed reset requests NeedsUpdate::ALL
+		let _c3 = commit_file(td.path(), "a.txt", "v3", "third");
+		popup.open(c1).unwrap();
+		popup.event(&down_ev).unwrap();
+		assert_eq!(popup.kind(), sync::ResetType::Mixed);
+		popup.event(&enter_ev).unwrap();
+		assert!(!popup.is_visible());
+		assert_eq!(sync::get_head(&rp).unwrap(), c1);
+		let mut saw_update = false;
+		while let Some(ev) = env.queue.pop() {
+			if matches!(
+				ev,
+				InternalEvent::Update(u) if u.contains(NeedsUpdate::ALL)
+			) {
+				saw_update = true;
+			}
+		}
+		assert!(
+			saw_update,
+			"mixed reset must request NeedsUpdate::ALL"
+		);
+	}
+
+	#[test]
+	fn t8e_undo_blocked_when_pending() {
+		let (td, repo) = git2_testing::repo_init();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let c2 = commit_file(td.path(), "a.txt", "v2", "second");
+		let oid_str = c2.to_string();
+		let git_dir = repo.path().to_path_buf();
+
+		let (mut app, kc) = make_test_app(td.path());
+		let undo_hint =
+			strings::commands::undo_commit(&app.key_config).name;
+
+		for kind in ["merge", "revert", "rebase", "cherry-pick"] {
+			set_pending_state(&git_dir, kind, &oid_str);
+
+			let mut cmds = Vec::new();
+			app.status_tab.commands(&mut cmds, false);
+			assert!(
+				!cmds
+					.iter()
+					.find(|c| c.text.name == undo_hint)
+					.is_some_and(|c| c.enabled),
+				"undo hint must be disabled during {kind}"
+			);
+
+			send_key!(&mut app, kc.keys.undo_commit);
+			assert!(
+				!app.confirm_popup.is_visible(),
+				"undo key must not open confirm during {kind}"
+			);
+			assert!(!app.msg_popup.is_visible());
+			assert_eq!(sync::get_head(&rp).unwrap(), c2);
+		}
+	}
+
+	#[test]
+	fn t8e_stale_undo_refuses() {
+		let (td, repo) = git2_testing::repo_init();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _c1 = commit_file(td.path(), "a.txt", "v1", "first");
+		let c2 =
+			commit_file(td.path(), "a.txt", "v2", "second commit");
+		let git_dir = repo.path().to_path_buf();
+
+		let (mut app, kc) = make_test_app(td.path());
+
+		// 1. HEAD changes while undo prompt is open
+		send_key!(&mut app, kc.keys.undo_commit);
+		assert!(app.confirm_popup.is_visible());
+		let (_title, msg) = app.confirm_popup.get_text();
+		assert!(
+			msg.contains(&c2.get_short_string()),
+			"undo confirm must name short id: {msg}"
+		);
+		assert!(
+			msg.contains("second commit"),
+			"undo confirm must name subject: {msg}"
+		);
+		assert!(
+			msg.to_lowercase().contains("staged"),
+			"undo confirm must say changes stay staged: {msg}"
+		);
+
+		let c3 = commit_file(td.path(), "a.txt", "v3", "third");
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"HEAD change must show repo-changed error"
+		);
+		assert_eq!(sync::get_head(&rp).unwrap(), c3);
+		send_key!(&mut app, kc.keys.exit_popup);
+
+		// 2. Repo state changes while undo prompt is open
+		send_key!(&mut app, kc.keys.undo_commit);
+		assert!(app.confirm_popup.is_visible());
+		set_pending_state(&git_dir, "merge", &c3.to_string());
+		send_key!(&mut app, kc.keys.enter);
+		assert!(!app.confirm_popup.is_visible());
+		assert!(
+			app.msg_popup.is_visible(),
+			"state change must show repo-changed error"
+		);
+		assert_eq!(sync::get_head(&rp).unwrap(), c3);
+	}
+
+	#[test]
+	fn t8e_undo_without_parent() {
+		// 1. Initial commit (no parent)
+		{
+			let (td, _repo) = git2_testing::repo_init();
+			let (mut app, kc) = make_test_app(td.path());
+
+			send_key!(&mut app, kc.keys.undo_commit);
+			assert!(
+				!app.confirm_popup.is_visible(),
+				"undo without parent must not open confirm popup"
+			);
+			assert!(
+				app.msg_popup.is_visible(),
+				"undo without parent must show error"
+			);
+		}
+
+		// 2. Unborn HEAD (empty repo)
+		{
+			let td = tempfile::TempDir::new().unwrap();
+			let status = std::process::Command::new("git")
+				.arg("init")
+				.current_dir(td.path())
+				.status()
+				.unwrap();
+			assert!(status.success());
+			let (mut app, kc) = make_test_app(td.path());
+
+			send_key!(&mut app, kc.keys.undo_commit);
+			assert!(
+				!app.confirm_popup.is_visible(),
+				"undo on unborn HEAD must not open confirm popup"
+			);
+			assert!(
+				app.msg_popup.is_visible(),
+				"undo on unborn HEAD must show error"
+			);
+		}
 	}
 }

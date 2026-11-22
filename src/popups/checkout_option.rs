@@ -2,7 +2,7 @@ use crate::components::{
 	visibility_blocking, CommandBlocking, CommandInfo, Component,
 	DrawableComponent, EventState,
 };
-use crate::queue::{InternalEvent, NeedsUpdate};
+use crate::queue::{Action, InternalEvent, NeedsUpdate};
 use crate::strings::CheckoutOptions;
 use crate::try_or_popup;
 use crate::{
@@ -15,7 +15,8 @@ use crate::{
 use anyhow::{Ok, Result};
 use asyncgit::sync::branch::checkout_remote_branch;
 use asyncgit::sync::{
-	checkout_branch, checkout_branch_discard, BranchInfo, RepoPath,
+	checkout_branch, checkout_branch_discard, get_branches_info,
+	BranchInfo, RepoPath,
 };
 use crossterm::event::Event;
 use ratatui::{
@@ -118,6 +119,57 @@ impl CheckoutOptionPopup {
 		Ok(())
 	}
 
+	pub fn confirm_discard(&mut self, branch: &BranchInfo) {
+		try_or_popup!(
+			self,
+			"checkout error:",
+			checkout_branch_discard(&self.repo, branch).map(|()| {
+				self.queue
+					.push(InternalEvent::Update(NeedsUpdate::ALL));
+				self.hide();
+			})
+		);
+	}
+
+	fn open_discard_confirm(&mut self) {
+		let Some(branch) = self.branch.clone() else {
+			self.hide();
+			return;
+		};
+
+		let branches =
+			match get_branches_info(&self.repo, branch.is_local()) {
+				std::result::Result::Ok(b) => b,
+				Err(e) => {
+					self.queue.push(InternalEvent::ShowErrorMsg(
+						format!("checkout error:\n{e}"),
+					));
+					return;
+				}
+			};
+
+		let Some(fresh) = branches
+			.into_iter()
+			.find(|b| b.reference == branch.reference)
+		else {
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"checkout error:\nbranch '{}' no longer exists",
+				branch.name
+			)));
+			return;
+		};
+
+		self.branch = Some(fresh.clone());
+		self.queue.push(InternalEvent::ConfirmAction(
+			Action::CheckoutBranchDiscard(fresh),
+		));
+	}
+
+	#[cfg(test)]
+	pub(crate) const fn option(&self) -> CheckoutOptions {
+		self.option
+	}
+
 	const fn change_kind(&mut self, incr: bool) {
 		self.option = if incr {
 			self.option.next()
@@ -212,11 +264,17 @@ impl Component for CheckoutOptionPopup {
 				{
 					self.change_kind(false);
 				} else if key_match(key, self.key_config.keys.enter) {
-					try_or_popup!(
-						self,
-						"checkout error:",
-						self.handle_event()
-					);
+					if self.option
+						== CheckoutOptions::DiscardAllLocalChagnes
+					{
+						self.open_discard_confirm();
+					} else {
+						try_or_popup!(
+							self,
+							"checkout error:",
+							self.handle_event()
+						);
+					}
 				}
 			}
 

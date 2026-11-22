@@ -210,8 +210,57 @@ pub fn confirm_msg_reset_lines(lines: usize) -> String {
 		"are you sure you want to discard {lines} selected lines?"
 	)
 }
-pub fn confirm_msg_undo_commit() -> String {
-	"confirm undo last commit?".to_string()
+pub fn confirm_msg_undo_commit(
+	short_id: &str,
+	subject: &str,
+	max_name_width: usize,
+) -> String {
+	let subject = ellipsis_trim_middle(subject, max_name_width);
+	format!(
+		"Undo commit {short_id} ({subject})?\nChanges will remain staged."
+	)
+}
+pub fn confirm_title_hard_reset() -> String {
+	"Hard Reset".to_string()
+}
+pub fn confirm_msg_hard_reset(
+	short_id: &str,
+	subject: &str,
+	head_label: &str,
+	detached: bool,
+	max_name_width: usize,
+) -> String {
+	let head = ellipsis_trim_middle(head_label, max_name_width);
+	let target = if subject.is_empty() {
+		short_id.to_string()
+	} else {
+		let subject = ellipsis_trim_middle(subject, max_name_width);
+		format!("{short_id} ({subject})")
+	};
+	if detached {
+		format!(
+			"Hard reset detached HEAD {head} to {target}?\nAll uncommitted changes will be lost."
+		)
+	} else {
+		format!(
+			"Hard reset '{head}' to {target}?\nAll uncommitted changes will be lost."
+		)
+	}
+}
+pub fn confirm_title_checkout_discard() -> String {
+	"Discard Local Changes".to_string()
+}
+pub fn confirm_msg_checkout_discard(
+	branch: &str,
+	local: bool,
+	short_id: &str,
+	max_name_width: usize,
+) -> String {
+	let kind = if local { "local" } else { "remote" };
+	let branch = ellipsis_trim_middle(branch, max_name_width);
+	format!(
+		"Switch to {kind} branch '{branch}' ({short_id})?\nAll uncommitted changes will be lost."
+	)
 }
 pub fn confirm_msg_stashdrop(
 	_key_config: &SharedKeyConfig,
@@ -593,15 +642,17 @@ pub enum CheckoutOptions {
 impl CheckoutOptions {
 	pub const fn previous(self) -> Self {
 		match self {
-			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
-			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+			Self::KeepLocalChanges | Self::DiscardAllLocalChagnes => {
+				Self::KeepLocalChanges
+			}
 		}
 	}
 
 	pub const fn next(self) -> Self {
 		match self {
-			Self::KeepLocalChanges => Self::DiscardAllLocalChagnes,
-			Self::DiscardAllLocalChagnes => Self::KeepLocalChanges,
+			Self::KeepLocalChanges | Self::DiscardAllLocalChagnes => {
+				Self::DiscardAllLocalChagnes
+			}
 		}
 	}
 
