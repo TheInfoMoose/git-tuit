@@ -126,97 +126,150 @@ impl ConfirmPopup {
 	}
 
 	fn get_text(&self) -> (String, String) {
+		let kc = &self.key_config;
 		if let Some(ref a) = self.target {
 			return match a {
-                Action::Reset(item) => (
-                    strings::confirm_title_reset(),
-                    strings::confirm_msg_reset(&item.path),
-                ),
-                Action::StashDrop(ids) => (
-                    strings::confirm_title_stashdrop(
-                        &self.key_config,ids.len()>1
-                    ),
-                    strings::confirm_msg_stashdrop(&self.key_config,ids),
-                ),
-                Action::StashPop(_) => (
-                    strings::confirm_title_stashpop(&self.key_config),
-                    strings::confirm_msg_stashpop(&self.key_config),
-                ),
-                Action::ResetHunk(_, _) => (
-                    strings::confirm_title_reset(),
-                    strings::confirm_msg_resethunk(&self.key_config),
-                ),
-                Action::ResetLines(_, lines) => (
-                    strings::confirm_title_reset(),
-                    strings::confirm_msg_reset_lines(lines.len()),
-                ),
-                Action::DeleteLocalBranch(branch_ref) => (
-                    strings::confirm_title_delete_branch(
-                        &self.key_config,
-                    ),
-                    strings::confirm_msg_delete_branch(
-                        &self.key_config,
-                        branch_ref,
-                    ),
-                ),
-                Action::DeleteRemoteBranch(branch_ref) => (
-                    strings::confirm_title_delete_remote_branch(
-                        &self.key_config,
-                    ),
-                    strings::confirm_msg_delete_remote_branch(
-                        &self.key_config,
-                        branch_ref,
-                    ),
-                ),
-		Action::DeleteRemote(remote_name)=>(
-			strings::confirm_title_delete_remote(&self.key_config),
-			strings::confirm_msg_delete_remote(&self.key_config,remote_name),
-		),
-                Action::DeleteTag(tag_name) => (
-                    strings::confirm_title_delete_tag(
-                        &self.key_config,
-                    ),
-                    strings::confirm_msg_delete_tag(
-                        &self.key_config,
-                        tag_name,
-                    ),
-                ),
-				Action::DeleteRemoteTag(_tag_name,remote) => (
-                    strings::confirm_title_delete_tag_remote(),
-                    strings::confirm_msg_delete_tag_remote(remote),
-                ),
-                Action::ForcePush(branch, _force) => (
-                    strings::confirm_title_force_push(
-                        &self.key_config,
-                    ),
-                    strings::confirm_msg_force_push(
-                        &self.key_config,
-                        branch.rsplit('/').next().expect("There was no / in the head reference which is impossible in git"),
-                    ),
-                ),
-                Action::PullMerge{incoming,rebase} => (
-                    strings::confirm_title_merge(&self.key_config,*rebase),
-                    strings::confirm_msg_merge(&self.key_config,*incoming,*rebase),
-                ),
-                Action::AbortMerge => (
-                    strings::confirm_title_abortmerge(),
-                    strings::confirm_msg_revertchanges(),
-                ),
+				Action::Reset(item) => (
+					strings::confirm_title_reset(),
+					strings::confirm_msg_reset(&item.path),
+				),
+				Action::StashDrop(ids) => (
+					strings::confirm_title_stashdrop(
+						kc,
+						ids.len() > 1,
+					),
+					strings::confirm_msg_stashdrop(kc, ids),
+				),
+				Action::StashPop(_) => (
+					strings::confirm_title_stashpop(kc),
+					strings::confirm_msg_stashpop(kc),
+				),
+				Action::ResetHunk(_, _) => (
+					strings::confirm_title_reset(),
+					strings::confirm_msg_resethunk(kc),
+				),
+				Action::ResetLines(_, lines) => (
+					strings::confirm_title_reset(),
+					strings::confirm_msg_reset_lines(lines.len()),
+				),
+				Action::DeleteLocalBranch(branch_ref) => (
+					strings::confirm_title_delete_branch(kc),
+					strings::confirm_msg_delete_branch(
+						kc, branch_ref,
+					),
+				),
+				Action::DeleteRemoteBranch(branch_ref) => (
+					strings::confirm_title_delete_remote_branch(kc),
+					strings::confirm_msg_delete_remote_branch(
+						kc, branch_ref,
+					),
+				),
+				Action::DeleteRemote(remote_name) => (
+					strings::confirm_title_delete_remote(kc),
+					strings::confirm_msg_delete_remote(
+						kc,
+						remote_name,
+					),
+				),
+				Action::DeleteTag(tag_name) => (
+					strings::confirm_title_delete_tag(kc),
+					strings::confirm_msg_delete_tag(kc, tag_name),
+				),
+				Action::DeleteRemoteTag(_tag_name, remote) => (
+					strings::confirm_title_delete_tag_remote(),
+					strings::confirm_msg_delete_tag_remote(remote),
+				),
+				Action::ForcePush(branch, _force) => (
+					strings::confirm_title_force_push(kc),
+					strings::confirm_msg_force_push(
+						kc,
+						branch
+							.strip_prefix("refs/heads/")
+							.unwrap_or(branch),
+					),
+				),
+				Action::PullMerge { incoming, rebase } => (
+					strings::confirm_title_merge(kc, *rebase),
+					strings::confirm_msg_merge(
+						kc, *incoming, *rebase,
+					),
+				),
+				Action::AbortMerge => (
+					strings::confirm_title_abortmerge(),
+					strings::confirm_msg_revertchanges(),
+				),
 				Action::AbortRebase => (
-                    strings::confirm_title_abortrebase(),
-                    strings::confirm_msg_abortrebase(),
-                ),
+					strings::confirm_title_abortrebase(),
+					strings::confirm_msg_abortrebase(),
+				),
 				Action::AbortRevert => (
-                    strings::confirm_title_abortrevert(),
-                    strings::confirm_msg_revertchanges(),
-                ),
-                Action::UndoCommit => (
-                    strings::confirm_title_undo_commit(),
-                    strings::confirm_msg_undo_commit(),
-                ),
-            };
+					strings::confirm_title_abortrevert(),
+					strings::confirm_msg_revertchanges(),
+				),
+				Action::UndoCommit => (
+					strings::confirm_title_undo_commit(),
+					strings::confirm_msg_undo_commit(),
+				),
+			};
 		}
 
 		(String::new(), String::new())
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+
+	fn popup_with(action: Action) -> ConfirmPopup {
+		ConfirmPopup {
+			target: Some(action),
+			visible: true,
+			queue: Queue::new(),
+			theme: SharedTheme::default(),
+			key_config: SharedKeyConfig::default(),
+		}
+	}
+
+	#[test]
+	fn t7l_force_push_full_branch() {
+		let key_config = SharedKeyConfig::default();
+
+		let (_, msg_with_prefix) = popup_with(Action::ForcePush(
+			"refs/heads/feat/login".to_string(),
+			true,
+		))
+		.get_text();
+		assert_eq!(
+			msg_with_prefix,
+			strings::confirm_msg_force_push(
+				&key_config,
+				"feat/login",
+			)
+		);
+		assert!(!msg_with_prefix.contains("refs/heads/"));
+
+		let (_, msg_without_prefix) = popup_with(Action::ForcePush(
+			"feat/login".to_string(),
+			true,
+		))
+		.get_text();
+		assert_eq!(
+			msg_without_prefix,
+			strings::confirm_msg_force_push(
+				&key_config,
+				"feat/login",
+			)
+		);
+
+		let (_, msg_simple) = popup_with(Action::ForcePush(
+			"refs/heads/main".to_string(),
+			true,
+		))
+		.get_text();
+		assert_eq!(
+			msg_simple,
+			strings::confirm_msg_force_push(&key_config, "main")
+		);
 	}
 }

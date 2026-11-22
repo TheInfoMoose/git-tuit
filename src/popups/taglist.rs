@@ -346,9 +346,18 @@ impl TagListPopup {
 			AsyncNotification::Git(AsyncGitNotification::RemoteTags)
 		) {
 			if let Some(job) = self.async_remote_tags.take_last() {
-				if let Some(Ok(missing_remote_tags)) = job.result() {
-					self.missing_remote_tags =
-						Some(missing_remote_tags);
+				match job.result() {
+					Some(Ok(missing_remote_tags)) => {
+						self.missing_remote_tags =
+							Some(missing_remote_tags);
+					}
+					Some(Err(e)) => {
+						log::error!("remote tags error: {e}");
+						self.queue.push(InternalEvent::ShowErrorMsg(
+							format!("remote tags error:\n{e}"),
+						));
+					}
+					None => {}
 				}
 			}
 		} else if matches!(

@@ -462,11 +462,25 @@ impl RemoteListPopup {
 			self.remote_names[self.selection as usize].clone();
 		let remote_url =
 			get_remote_url(&self.repo.borrow(), &remote_name);
-		if let Ok(Some(url)) = remote_url {
-			self.queue.push(InternalEvent::UpdateRemoteUrl(
-				remote_name,
-				url,
-			));
+		match remote_url {
+			Ok(Some(url)) => {
+				self.queue.push(InternalEvent::UpdateRemoteUrl(
+					remote_name,
+					url,
+				));
+			}
+			Ok(None) => {
+				log::error!("remote '{remote_name}' has no url");
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("remote '{remote_name}' has no url"),
+				));
+			}
+			Err(e) => {
+				log::error!("get remote url: {e}");
+				self.queue.push(InternalEvent::ShowErrorMsg(
+					format!("failed to read remote url:\n{e}"),
+				));
+			}
 		}
 	}
 }

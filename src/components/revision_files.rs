@@ -130,23 +130,38 @@ impl RevisionFilesComponent {
 					.as_ref()
 					.is_some_and(|commit| commit.id == result.commit)
 				{
-					if let Ok(last) = result.result {
-						let filenames: Vec<&Path> = last
-							.iter()
-							.map(|f| f.path.as_path())
-							.collect();
-						self.tree = FileTree::new(
-							&filenames,
-							&BTreeSet::new(),
-						)?;
-						self.tree.collapse_but_root();
+					match result.result {
+						Ok(last) => {
+							let filenames: Vec<&Path> = last
+								.iter()
+								.map(|f| f.path.as_path())
+								.collect();
+							self.tree = FileTree::new(
+								&filenames,
+								&BTreeSet::new(),
+							)?;
+							self.tree.collapse_but_root();
 
-						self.files = Some(last);
+							self.files = Some(last);
 
-						let select_file = self.select_file.clone();
-						self.select_file = None;
-						if let Some(file) = select_file {
-							self.find_file(file.as_path());
+							let select_file =
+								self.select_file.clone();
+							self.select_file = None;
+							if let Some(file) = select_file {
+								self.find_file(file.as_path());
+							}
+						}
+						Err(e) => {
+							log::error!("tree files error: {e}");
+							self.tree = FileTree::default();
+							self.files = Some(Vec::new());
+							self.current_file.clear();
+							self.select_file = None;
+							self.queue.push(
+								InternalEvent::ShowErrorMsg(format!(
+									"failed to load files:\n{e}"
+								)),
+							);
 						}
 					}
 				} else if let Some(rev) = &self.revision {
