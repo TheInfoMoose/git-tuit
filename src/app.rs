@@ -4072,4 +4072,112 @@ mod tests {
 			"origin branch must equal local tip after force-push"
 		);
 	}
+
+	#[test]
+	fn t12e_discard_refreshes_open_branch_list() {
+		let (td, repo) = git2_testing::repo_init();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(td.path().to_path_buf());
+		let _base = commit_file(td.path(), "a.txt", "base", "base");
+		let other_id = create_diverged_branch(
+			td.path(),
+			&orig_branch,
+			"other",
+			"a.txt",
+			"other_val",
+		);
+		std::fs::write(td.path().join("a.txt"), "dirty").unwrap();
+
+		let (mut app, kc) = make_test_app(td.path());
+		open_branch_popup_on(&mut app, &kc, "other");
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.checkout_option_popup.is_visible());
+
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		let head_commit =
+			repo.head().unwrap().peel_to_commit().unwrap();
+		repo.branch("zz-late-branch", &head_commit, false).unwrap();
+		assert!(
+			!render_app(&app, 80, 24).contains("zz-late-branch"),
+			"branch list must not contain late branch before confirm"
+		);
+
+		send_key!(&mut app, kc.keys.enter);
+		assert_eq!(sync::get_head(&rp).unwrap(), other_id);
+		assert!(!app.checkout_option_popup.is_visible());
+		assert!(app.select_branch_popup.is_visible());
+		assert!(
+			render_app(&app, 80, 24).contains("zz-late-branch"),
+			"open branch list must refresh to show late branch"
+		);
+	}
+
+	#[test]
+	fn t12e_discard_warning_through_app() {
+		struct FailCleanupGuard;
+		impl Drop for FailCleanupGuard {
+			fn drop(&mut self) {
+				asyncgit::sync::branch::set_fail_cleanup_state(false);
+			}
+		}
+
+		let (td, repo) = git2_testing::repo_init();
+		let root = td.path();
+		let orig_branch =
+			repo.head().unwrap().shorthand().unwrap().to_string();
+		let rp = RepoPath::Path(root.to_path_buf());
+
+		commit_file(root, "a.txt", "base", "c1");
+		sync::create_branch(&rp, "side").unwrap();
+		let target_id = commit_file(root, "a.txt", "side", "c2");
+		sync::create_branch(&rp, "target").unwrap();
+		sync::checkout_branch(&rp, &orig_branch).unwrap();
+		commit_file(root, "a.txt", "master", "c3");
+
+		let merge_out = std::process::Command::new("git")
+			.current_dir(root)
+			.args(["merge", "side"])
+			.output()
+			.unwrap();
+		assert!(
+			!merge_out.status.success(),
+			"merge should stop on conflict"
+		);
+		assert_eq!(sync::repo_state(&rp).unwrap(), RepoState::Merge);
+		assert!(root.join(".git/MERGE_HEAD").exists());
+
+		let target = sync::get_branches_info(&rp, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "target")
+			.unwrap();
+
+		let (mut app, kc) = make_test_app(root);
+		app.checkout_option_popup.open(target).unwrap();
+		send_key!(&mut app, kc.keys.move_down);
+		send_key!(&mut app, kc.keys.enter);
+		assert!(app.confirm_popup.is_visible());
+
+		asyncgit::sync::branch::set_fail_cleanup_state(true);
+		let _guard = FailCleanupGuard;
+
+		send_key!(&mut app, kc.keys.enter);
+
+		assert_eq!(sync::get_head(&rp).unwrap(), target_id);
+		assert_eq!(
+			repo.head().unwrap().shorthand().unwrap(),
+			"target"
+		);
+		assert!(root.join(".git/MERGE_HEAD").exists());
+		assert!(!app.checkout_option_popup.is_visible());
+		assert!(app.msg_popup.is_visible());
+		assert_eq!(
+			app.msg_popup.message(),
+			"checkout warning:\nswitched to 'target', but could not clear the merge state: `simulated cleanup_state failure`"
+		);
+	}
 }

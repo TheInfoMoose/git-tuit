@@ -209,6 +209,11 @@ impl MsgPopup {
 			strings::msg_title_info(&self.key_config),
 		)
 	}
+
+	#[cfg(test)]
+	pub(crate) fn message(&self) -> &str {
+		&self.msg
+	}
 }
 
 #[cfg(test)]
