@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0122"
 type = "task"
 title = "Abort With a Missing Submodule Dir Is Tested"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-23T03:11:21Z"
-updated_at = "2026-11-23T03:11:21Z"
+updated_at = "2026-11-23T03:24:58Z"
 source_ref = "STEP 11D"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 2
 iteration_count = 1
+last_timer_session = "TASK-0122@2026-11-23T03:22:44Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "a390ed45"
+summary = "STEP 11D: Abort With a Missing Submodule Dir Is Tested (phased check PASS)"
