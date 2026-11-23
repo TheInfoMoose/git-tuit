@@ -2,11 +2,11 @@
 id = "BUG-0091"
 type = "bug"
 title = "Hash untracked-in-HEAD files without loading them whole"
-status = "pending"
+status = "closed"
 severity = "low"
 scope_ref = "asyncgit"
 created_at = "2026-11-23T02:41:09Z"
-updated_at = "2026-11-23T02:41:09Z"
+updated_at = "2026-11-23T03:44:27Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "fe4e007"
+summary = "STEP 11C: worktree_matches_tree_entry hashes with Oid::hash_file (streamed, unfiltered); t11c tests pin large/last-byte/empty cases. Revert guard tracked in TASK-0124."

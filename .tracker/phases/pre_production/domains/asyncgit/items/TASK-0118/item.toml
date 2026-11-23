@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0118"
 type = "task"
 title = "Test abort with a missing merge-added submodule dir"
-status = "pending"
+status = "closed"
 severity = "low"
 scope_ref = "asyncgit"
 created_at = "2026-11-23T02:41:09Z"
-updated_at = "2026-11-23T02:41:09Z"
+updated_at = "2026-11-23T03:44:27Z"
 
 [effort]
 logged_time_minutes = 0
@@ -16,4 +16,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "a390ed4"
+summary = "STEP 11D: t11d tests pin abort with a missing merge-added gitlink dir (aborts) and a deleted merge-added file (refuses)."

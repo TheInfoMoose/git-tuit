@@ -1,0 +1,19 @@
+schema_version = 2
+
+[item]
+id = "TASK-0124"
+type = "task"
+title = "Guard the streamed hash in discard-and-switch against a read-all revert"
+status = "pending"
+severity = "low"
+scope_ref = "asyncgit"
+created_at = "2026-11-23T03:42:11Z"
+updated_at = "2026-11-23T03:42:11Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []

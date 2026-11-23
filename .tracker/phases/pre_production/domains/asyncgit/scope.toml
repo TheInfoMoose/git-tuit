@@ -194,7 +194,7 @@ created_at = "2026-11-22T22:56:20Z"
 [[items.bugs]]
 id = "BUG-0091"
 title = "Hash untracked-in-HEAD files without loading them whole"
-status = "pending"
+status = "closed"
 severity = "low"
 created_at = "2026-11-23T02:41:09Z"
 
@@ -348,7 +348,7 @@ created_at = "2026-11-23T02:20:05Z"
 [[items.tasks]]
 id = "TASK-0118"
 title = "Test abort with a missing merge-added submodule dir"
-status = "pending"
+status = "closed"
 severity = "low"
 created_at = "2026-11-23T02:41:09Z"
 
@@ -365,3 +365,10 @@ title = "Abort With a Missing Submodule Dir Is Tested"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-23T03:11:21Z"
+
+[[items.tasks]]
+id = "TASK-0124"
+title = "Guard the streamed hash in discard-and-switch against a read-all revert"
+status = "pending"
+severity = "low"
+created_at = "2026-11-23T03:42:11Z"
