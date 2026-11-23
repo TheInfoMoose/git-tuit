@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0115"
 type = "task"
 title = "A Switch That Moved HEAD Is Reported as Done"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-23T02:20:05Z"
-updated_at = "2026-11-23T02:20:05Z"
+updated_at = "2026-11-23T02:33:10Z"
 source_ref = "STEP 10C"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 5
 iteration_count = 1
+last_timer_session = "TASK-0115@2026-11-23T02:27:56Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "0eda2eb3"
+summary = "STEP 10C: A Switch That Moved HEAD Is Reported as Done (phased check PASS)"
