@@ -1322,7 +1322,7 @@ created_at = "2026-11-23T16:12:19Z"
 [[items.tasks]]
 id = "TASK-0133"
 title = "Existing Theme Files Keep Their Look"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 
@@ -1332,3 +1332,10 @@ title = "Amber Only on Truecolor Terminals"
 status = "open"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
+
+[[items.tasks]]
+id = "TASK-0135"
+title = "Update t13a_thumb_color_from_patch in src/ui/scrollbar.rs for STEP 13B classic base"
+status = "pending"
+severity = "high"
+created_at = "2026-11-23T16:28:12Z"

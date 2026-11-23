@@ -1,0 +1,19 @@
+schema_version = 2
+
+[item]
+id = "TASK-0135"
+type = "task"
+title = "Update t13a_thumb_color_from_patch in src/ui/scrollbar.rs for STEP 13B classic base"
+status = "pending"
+severity = "high"
+scope_ref = "git_tuit"
+created_at = "2026-11-23T16:28:12Z"
+updated_at = "2026-11-23T16:28:22Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []
