@@ -2,11 +2,11 @@
 id = "BUG-0087"
 type = "bug"
 title = "Allow discard-and-switch from a linked worktree of a bare repo"
-status = "pending"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-22T22:56:20Z"
-updated_at = "2026-11-22T22:56:20Z"
+updated_at = "2026-11-23T02:46:49Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "7705f35"
+summary = "STEP 10A: discard-and-switch from a linked worktree ignores a bare main repo HEAD"

@@ -2,11 +2,11 @@
 id = "BUG-0089"
 type = "bug"
 title = "Let discard-and-switch proceed when a staged-deleted file still matches HEAD"
-status = "pending"
+status = "closed"
 severity = "low"
 scope_ref = "asyncgit"
 created_at = "2026-11-22T22:56:20Z"
-updated_at = "2026-11-22T22:56:20Z"
+updated_at = "2026-11-23T02:46:49Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "a497462"
+summary = "STEP 10B: staged-deleted file matching HEAD no longer blocks discard-and-switch"
