@@ -1311,3 +1311,24 @@ title = "Cover all theme fields in assert_theme_eq and the default test"
 status = "pending"
 severity = "low"
 created_at = "2026-11-23T15:26:13Z"
+
+[[items.tasks]]
+id = "TASK-0132"
+title = "The Scrollbar Thumb Has Its Own Color"
+status = "open"
+severity = "medium"
+created_at = "2026-11-23T16:12:19Z"
+
+[[items.tasks]]
+id = "TASK-0133"
+title = "Existing Theme Files Keep Their Look"
+status = "open"
+severity = "medium"
+created_at = "2026-11-23T16:12:19Z"
+
+[[items.tasks]]
+id = "TASK-0134"
+title = "Amber Only on Truecolor Terminals"
+status = "open"
+severity = "medium"
+created_at = "2026-11-23T16:12:19Z"

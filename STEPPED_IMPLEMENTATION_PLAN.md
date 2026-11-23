@@ -42,7 +42,16 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 12):** the default theme is the amber CRT palette with `theme.ron` overrides and old theme files still loading; focused borders, scrollbar tracks, attention blocks and the shared list/dialog/popup blocks take their colors from the theme with plain borders and padded titles; the discard confirmation is tested through the app's own dispatch.
+**Phase goal (Phase 13):** existing `theme.ron` files render as they did before the amber default; with no theme file, amber is the default only on truecolor terminals and the classic gitui colors everywhere else; the scrollbar thumb is visible against its track; theme tests compare every field.
+
+**Phase 13 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes the Phase 12 review findings BUG-0092, BUG-0093, BUG-0094 and TASK-0130. The chrome migrations (TASK-0008, TASK-0009, FEAT-0004, FEAT-0005, TASK-0010) move to the Phase 14 outline. "Classic" means the launch `Theme::default()` at `389ae89b` (the Phase 12 base), read with `git show 389ae89b:src/ui/style.rs`.
+
+**Phase 13 decisions (user, 2026-11-23):**
+- **D21 Default:** with no theme file, amber when `COLORTERM` is `truecolor` or `24bit`; the classic colors otherwise. Light-background truecolor terminals still get amber; THEMES.md says how to switch.
+- **D22 Existing files:** a `theme.ron` that exists resolves against the classic colors unless it says `base: Some("amber")`. Nothing writes to the user's file except the existing old-format conversion.
+- **D23 Thumb:** a new `scroll_thumb_fg` field. Amber default `#FFD866`; classic default is the classic `selection_bg`.
+
+_Phase 12 goal (done, reviewed 2026-11-23):_ the default theme is the amber CRT palette with `theme.ron` overrides and old theme files still loading; focused borders, scrollbar tracks, attention blocks and the shared list/dialog/popup blocks take their colors from the theme with plain borders and padded titles; the discard confirmation is tested through the app's own dispatch.
 
 **Phase 12 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes theme part 1 (P3-01 FEAT-0002, P3-02 FEAT-0003 in part, P3-03 TASK-0007) and the Phase 11 review follow-up TASK-0123. `dead_code` is denied crate-wide (`src/main.rs`), so every new theme field and helper lands with a production caller; FEAT-0003 helpers whose callers are later migrations (`commandbar_key`, `commandbar_splitter`, `section_header`, `info_title`) wait for those steps. TASK-0124 is to be closed won't-fix by the user (not a step).
 
@@ -113,11 +122,9 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 12A** | `/goal` | The Default Theme Is Amber | `src/ui/style.rs`, `THEMES.md` | — |
-| 2 | **STEP 12B** | `/goal` | Focused Borders and Scrollbar Tracks Use Theme Colors | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` | STEP 12A |
-| 3 | **STEP 12C** | `/goal` | Shared Plain Blocks With Padded Titles | `src/ui/mod.rs`, `src/ui/style.rs`, `src/ui/scrolllist.rs`, `src/components/mod.rs`, `src/popups/mod.rs` +3 | STEP 12B |
-| 4 | **STEP 12D** | `/goal` | Attention Blocks Come From the Theme | `src/ui/mod.rs`, `src/ui/style.rs`, `src/tabs/status.rs`, `src/tabs/revlog.rs`, `THEMES.md` | STEP 12C |
-| 5 | **STEP 12E** | `/goal` | Discard Confirm Is Tested Through the App | `src/app.rs`, `src/popups/msg.rs` | — |
+| 1 | **STEP 13A** | `/goal` | The Scrollbar Thumb Has Its Own Color | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` | — |
+| 2 | **STEP 13B** | `/boost` | Existing Theme Files Keep Their Look | `src/ui/style.rs`, `THEMES.md` | STEP 13A |
+| 3 | **STEP 13C** | `/goal` | Amber Only on Truecolor Terminals | `src/ui/style.rs`, `THEMES.md`, `README.md` | STEP 13B |
 
 ### Completed
 
@@ -223,6 +230,11 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 11B** | ✅ | `/boost` | The Merge-State Warning Is Tested on the Real Path (follow-up TASK-0123 in 12E) | `asyncgit/Cargo.toml`, `Cargo.toml`, `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` |
 | **STEP 11C** | ✅ fe4e0072 | `/goal` | Unchanged-File Check Streams the Hash | `asyncgit/src/sync/branch/mod.rs` |
 | **STEP 11D** | ✅ a390ed45 | `/goal` | Abort With a Missing Submodule Dir Is Tested | `asyncgit/src/sync/merge.rs` |
+| **STEP 12A** | ✅ | `/goal` | The Default Theme Is Amber (follow-ups BUG-0092, BUG-0093 in 13B, 13C) | `src/ui/style.rs`, `THEMES.md` |
+| **STEP 12B** | ✅ | `/goal` | Focused Borders and Scrollbar Tracks Use Theme Colors (follow-up BUG-0094 in 13A) | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` |
+| **STEP 12C** | ✅ | `/goal` | Shared Plain Blocks With Padded Titles | `src/ui/mod.rs`, `src/ui/style.rs`, `src/ui/scrolllist.rs`, `src/components/mod.rs`, `src/popups/mod.rs` +3 |
+| **STEP 12D** | ✅ 3692ac08 | `/goal` | Attention Blocks Come From the Theme | `src/ui/mod.rs`, `src/ui/style.rs`, `src/tabs/status.rs`, `src/tabs/revlog.rs`, `THEMES.md` |
+| **STEP 12E** | ✅ a5936b4c | `/goal` | Discard Confirm Is Tested Through the App | `src/app.rs`, `src/popups/msg.rs` |
 
 ### User Step: IMAGE
 
@@ -256,7 +268,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 13 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
+- **Phase 14 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
   - Frame paint (`BG_BLACK`), tab bar, spinner (P3-04)
   - Command bar layout and styling, with the `commandbar_key` and `commandbar_splitter` helpers (P3-05, P2-24, rest of P3-02)
   - Pane and popup migrations, with `section_header` and `info_title` (P3-06, P3-07, rest of P3-02; ~5 steps)
@@ -6011,6 +6023,227 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn message' src/popups/msg.rs && grep -q 'fn t12e_discard_refreshes_open_branch_list' src/app.rs && grep -q 'fn t12e_discard_warning_through_app' src/app.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+---
+
+## Phase 13: Theme compatibility
+
+### STEP 13A: The Scrollbar Thumb Has Its Own Color
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 13A: a new scroll_thumb_fg theme field colors the scrollbar position marker (amber default #FFD866, brighter than the #5C3A00 track), and the theme-equality test helper compares every Theme field.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - src/ui/scrollbar.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:21-53 (Theme struct, Patch derive), 55-66 (popup, scroll_bar_pos, scroll_bar_track), 302-349 (load_patch, load_old_theme, save_patch, init), 352-387 (Default), 428-468 (assert_theme_eq), 470-501 (t12a_default_is_amber), 503-521 (t12a_partial_old_theme_loads)
+  - src/ui/scrollbar.rs:131-189 (draw_scrollbar, t12b_scrollbar_track_styled)
+  - neb: BUG-0094, TASK-0130. Decision D23
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No other Theme field changes value. Theme::init's load order and save_patch's diff base stay as they are (13B changes them). The Scrollbar widget's symbols and layout don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: on the default theme the scrollbar position marker (█) is drawn in #FFD866 over a #5C3A00 track, a theme.ron can set it with scroll_thumb_fg, and a Theme field that assert_theme_eq doesn't compare fails to compile.
+
+Contract & Behavior:
+State changed: Theme.scroll_thumb_fg (new). Writers: Theme::default, a patch-format theme.ron (Theme::apply), an old full-format theme.ron (load_old_theme, #[serde(default)]), and save_patch (the old-format conversion).
+
+1. src/ui/style.rs:
+   - New field `scroll_thumb_fg: Color`. In theme.ron it is written `scroll_thumb_fg: Some("<color>")` like every other patch field.
+   - Theme::default() sets it to Color::Rgb(255, 216, 102). Every other default stays as it is.
+   - `scroll_bar_pos()` returns `Style::default().fg(self.scroll_thumb_fg)`. selection_bg no longer affects the thumb.
+   - assert_theme_eq compares every Theme field (29), and is written so that adding a field to Theme without comparing it is a compile error (for example: destructure both Themes with no `..`).
+   - t12a_default_is_amber also asserts border_focused_fg Rgb(255, 176, 0), scroll_track_fg Rgb(92, 58, 0), panel_bg Rgb(12, 8, 0), attention_fg Rgb(255, 85, 0) and scroll_thumb_fg Rgb(255, 216, 102).
+   Edge cases:
+   a. No theme file: thumb is Rgb(255, 216, 102).
+   b. Patch file sets scroll_thumb_fg: that color wins, whatever selection_bg is.
+   c. Patch file sets only selection_bg: thumb stays Rgb(255, 216, 102).
+   d. Old full-format file without scroll_thumb_fg: thumb is the default; the converted patch file loads back to the same theme on every field (t12a_partial_old_theme_loads, now through the full assert_theme_eq).
+2. src/ui/scrollbar.rs: draw_scrollbar code doesn't change; t12b_scrollbar_track_styled now expects the █ cell at Rgb(255, 216, 102).
+3. THEMES.md: list scroll_thumb_fg next to scroll_track_fg with its default and one example line.
+
+Must still work:
+- Vertical and horizontal scrollbars in every list, diff and text view (draw_scrollbar is their only styling path).
+- Every existing theme test in src/ui/style.rs (t12a_, t12b_, t12c_, t12d_, test_smoke) and diff.rs test_line_break.
+- dead_code is denied crate-wide: scroll_thumb_fg is read by scroll_bar_pos.
+
+Drops:
+- The scrollbar thumb no longer follows selection_bg; it uses scroll_thumb_fg (13B restores the follow for theme files that resolve against the classic colors).
+
+Tests:
+  In src/ui/scrollbar.rs `mod tests` (TestBackend 3x10, draw_scrollbar max 10, pos 0, Vertical) and src/ui/style.rs `mod tests`.
+  - `t12b_scrollbar_track_styled` (changed): Theme::default() -> every ║ cell fg Rgb(92, 58, 0); exactly one █ cell, fg Rgb(255, 216, 102).
+  - `t13a_thumb_color_from_patch`: Theme::init on a temp patch file `(scroll_thumb_fg: Some("Cyan"))` -> the █ cell fg is Cyan and ║ cells stay Rgb(92, 58, 0); Theme::init on `(selection_bg: Some("Black"))` -> █ cell fg Rgb(255, 216, 102).
+  - `t12a_default_is_amber` (extended): the five assertions in item 1.
+  - `t12a_partial_old_theme_loads`, `t12a_bad_file_gives_default`: unchanged code, now comparing all 29 fields through assert_theme_eq; both pass.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'scroll_thumb_fg: Color' src/ui/style.rs && grep -q 'fn t13a_thumb_color_from_patch' src/ui/scrollbar.rs && grep -q 'scroll_thumb_fg' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 13B: Existing Theme Files Keep Their Look
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 13B: a theme.ron that exists fills the fields it leaves unset from the classic gitui colors (launch defaults) unless it says base: Some("amber"), so existing patch and old-format files render as they did before Phase 12.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:21-53 (Theme struct), 302-349 (load_patch, load_old_theme, save_patch, init), 352-387 (Default), 389-627 (tests)
+  - `git show 389ae89b:src/ui/style.rs` (launch Default impl, block(), attention_block()) and `git show 389ae89b:src/ui/scrollbar.rs` (launch track and thumb styles): the classic values
+  - src/main.rs:175 (Theme::init(&cliargs.theme)), src/gitui.rs:249, 392 (Theme::init(&PathBuf::new()) in tests), src/components/diff.rs:1017-1045 (test_line_break uses Theme::init)
+  - THEMES.md:1-70
+  - neb: BUG-0092. Decisions D22, D23
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Theme::default() keeps every amber value (the tests in src/ui/mod.rs, src/ui/scrollbar.rs, src/app.rs and src/components/commitlist.rs rely on it). Theme::init keeps its signature. No file is written except by the existing old-format conversion. COLORTERM is not read (13C).
+
+[PRE_GATE]
+grep -q 'scroll_thumb_fg: Color' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a user who had `(selection_bg: Some("LightBlue"))` in theme.ron before Phase 12 sees exactly the launch colors again, with LightBlue selection, and can opt into amber with base: Some("amber").
+
+Contract & Behavior:
+State changed: the Theme that Theme::init returns. Writers: Theme::default (amber), Theme::classic (new), the patch path (load_patch + apply), the old-format path (load_old_theme + save_patch), the unreadable-file path, the missing-file path, and the thumb-follow rule (item 3f).
+
+1. src/ui/style.rs: `pub fn classic() -> Self` (called by init, so no dead_code). Values:
+   - The 24 launch fields: exactly the values of `impl Default for Theme` at 389ae89b.
+   - border_focused_fg, scroll_track_fg, panel_bg: Color::Reset (launch set no color there; confirm with git show).
+   - attention_fg: Color::Yellow (launch attention_block() hard-coded it).
+   - scroll_thumb_fg: the classic selection_bg (launch thumb was selection_bg).
+2. theme.ron gains a `base` key, read from patch-format files: `base: Some("amber")` or `base: Some("classic")`. Absent means classic. Any other string logs a warning, counts as classic, and the file's other fields still apply.
+3. Theme::init(theme_path), by the state of the file:
+   a. Patch-format file, base absent or "classic": Theme::classic() with the file's fields applied.
+   b. Patch-format file, base "amber": Theme::default() with the file's fields applied.
+   c. Old full-format file: fields it names keep their values, fields it omits take classic values. It is converted to patch format as today. The written file loads back (rule a) to the same Theme on all 29 fields.
+   d. A conversion write that fails: the loaded theme from c is used, the warning is logged as today.
+   e. File exists but can't be read or parsed as either format: Theme::classic(), error logged, file untouched.
+   f. File missing (NotFound, including the empty path tests pass): Theme::default(), as today. 13C changes this state.
+   g. Thumb follow: in a and c, when the file doesn't set scroll_thumb_fg, scroll_thumb_fg equals the resolved selection_bg. In b and f it keeps the base's value. A file that sets scroll_thumb_fg always wins.
+   Edge cases:
+   - `()` (empty patch): Theme::classic().
+   - Patch sets selection_bg LightBlue only: classic everywhere, selection_bg and scroll_thumb_fg LightBlue.
+   - `(base: Some("amber"), selection_bg: Some("Black"))`: amber everywhere, selection_bg Black, scroll_thumb_fg Rgb(255, 216, 102).
+   - Old full-format `(selection_bg: "Black", line_break: "~")`: classic elsewhere, selection_bg and scroll_thumb_fg Black, line_break "~"; the second init reads the converted file and gives the same Theme.
+4. Existing tests whose partial-file halves assumed amber fills change to classic expectations: t12b_patch_sets_border_and_track (partial: border Reset, track Reset), t12c_panel_bg_default_patch_and_old_format (old file: popup bg Reset), t12d_patch_sets_attention_fg (partial: Yellow), test_smoke (selected_tab equals Theme::classic().selected_tab), t12a_partial_old_theme_loads (expected built from Theme::classic() as in item 3 edge cases). t12a_bad_file_gives_default is replaced by t13b_bad_file_gives_classic. Their default and override halves keep their amber and override expectations.
+5. THEMES.md: say that a theme.ron fills unset fields from the classic gitui colors, that `base: Some("amber")` fills them from amber instead, show both lines, and say an unreadable file falls back to classic.
+
+Must still work:
+- `-t <name>.ron` preset files (e.g. Catppuccin) load as before: they have no base, so they resolve against classic, as at launch.
+- src/main.rs startup and the gitui.rs snapshot tests (empty path -> missing -> amber; snapshots carry symbols, not colors).
+- diff.rs test_line_break (patch `(line_break: Some("+"))` -> "+").
+- Every Theme::default() user in tests.
+- dead_code: classic() and the base key both have a production reader.
+
+Drops:
+- Patch files written by Phase 12 builds' conversion (diffed against amber) now resolve against classic and lose their amber fills; adding base: Some("amber") restores them.
+- A theme.ron that exists but can't be read or parsed gives the classic theme instead of amber (launch behavior).
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile, compared with assert_theme_eq.
+  - `t13b_classic_matches_launch`: Theme::classic() asserted field by field with literal values copied from 389ae89b (a comment names the commit), plus the five values in item 1.
+  - `t13b_patch_without_base_is_classic`: `(selection_bg: Some("LightBlue"))` -> Theme { selection_bg: LightBlue, scroll_thumb_fg: LightBlue, ..Theme::classic() }; `()` -> Theme::classic().
+  - `t13b_patch_base_amber`: `(base: Some("amber"), selection_bg: Some("Black"))` -> Theme { selection_bg: Black, ..Theme::default() }.
+  - `t13b_patch_base_classic_and_unknown`: `(base: Some("classic"))` -> Theme::classic(); `(base: Some("neon"), tag_fg: Some("Red"))` -> Theme { tag_fg: Red, ..Theme::classic() }.
+  - `t13b_patch_thumb_wins`: `(selection_bg: Some("LightBlue"), scroll_thumb_fg: Some("Cyan"))` -> scroll_thumb_fg Cyan, selection_bg LightBlue, rest classic.
+  - `t13b_bad_file_gives_classic`: file "not ron" -> Theme::classic(); file content unchanged afterwards.
+  - `t13b_missing_file_is_amber`: a path inside a tempdir that doesn't exist -> Theme::default().
+  - `t12a_partial_old_theme_loads` (changed): first and second init both equal the old-format edge case in item 3.
+  - The item 4 tests pass with their changed expectations.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn classic' src/ui/style.rs && grep -q 'fn t13b_classic_matches_launch' src/ui/style.rs && grep -q 'fn t13b_patch_without_base_is_classic' src/ui/style.rs && grep -q 'fn t13b_patch_base_amber' src/ui/style.rs && grep -q 'fn t13b_patch_base_classic_and_unknown' src/ui/style.rs && grep -q 'fn t13b_patch_thumb_wins' src/ui/style.rs && grep -q 'fn t13b_bad_file_gives_classic' src/ui/style.rs && grep -q 'fn t13b_missing_file_is_amber' src/ui/style.rs && grep -q 'base: Some("amber")' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 13C: Amber Only on Truecolor Terminals
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 13C: with no theme file, gitui uses the amber theme only when COLORTERM says truecolor or 24bit and the classic colors otherwise; README and THEMES describe the rule and how to switch.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - THEMES.md
+  - README.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:302-349 (load_patch, init and the 13B resolution), 389-end (tests, t13b_missing_file_is_amber)
+  - src/main.rs:175, src/gitui.rs:249, 392 (Theme::init callers)
+  - README.md:255-275, THEMES.md:1-20
+  - neb: BUG-0093. Decision D21
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Theme::init keeps its signature. Resolution of an existing file (13B states a-e) ignores COLORTERM. No test calls std::env::set_var or remove_var. assets/ and CHANGELOG.md don't change.
+
+[PRE_GATE]
+grep -q 'fn classic' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: on a terminal without 24-bit color and no theme.ron, gitui looks like classic gitui; on a truecolor terminal it is amber; a theme.ron decides for itself.
+
+Contract & Behavior:
+State changed: the missing-file result of Theme::init (13B state f). Its only writer is the new COLORTERM rule; the other states keep their 13B writers.
+
+1. src/ui/style.rs:
+   - `fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self` holds the resolution (crate lints deny pedantic and nursery, so no `&PathBuf` in a new signature); `pub fn init(theme_path: &PathBuf) -> Self` calls it with `std::env::var("COLORTERM").ok()` (a non-UTF-8 value counts as unset).
+   - Missing file: if colorterm, trimmed, equals "truecolor" or "24bit" ignoring ASCII case -> Theme::default() (amber). Unset, empty or any other value ("256color", "yes") -> Theme::classic().
+   - Existing file: exactly the 13B rules; colorterm is ignored, so base: Some("amber") gives amber on any terminal.
+   Edge cases:
+   a. Missing file, Some("truecolor"), Some("24bit"), Some(" TrueColor "): amber.
+   b. Missing file, None, Some(""), Some("256color"): classic.
+   c. `(base: Some("amber"))` with None: amber. `(tag_fg: Some("Red"))` with Some("truecolor"): classic with tag_fg Red.
+   d. Unreadable file with Some("truecolor"): classic (13B state e).
+2. Tests: t13b_missing_file_is_amber is replaced by the t13c missing-file tests below, which call init_for and never read the real environment.
+3. THEMES.md (top, replacing "default on light terminal") and README.md (the theme section around line 267): the default is amber on terminals that set COLORTERM=truecolor or 24bit, and the classic gitui colors otherwise; an existing theme.ron fills from classic unless it sets base: Some("amber"); on a light-background truecolor terminal, put `(base: Some("classic"))` in theme.ron. assets/light-theme.png stays, captioned as the classic theme on a light terminal.
+
+Must still work:
+- src/main.rs startup (init signature unchanged).
+- gitui.rs snapshot tests under any COLORTERM (empty path -> missing file; snapshots carry symbols, not colors). The POST_GATE runs the gitui tests with COLORTERM=truecolor and with it unset.
+- Every 13B test that uses a real file.
+- dead_code: init_for is called by init.
+
+Drops:
+- With no theme.ron, a terminal that doesn't set COLORTERM to truecolor or 24bit (including truecolor-capable tmux or ssh sessions that don't pass it) gets the classic theme instead of amber.
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile or a tempdir path that doesn't exist, compared with assert_theme_eq.
+  - `t13c_missing_file_truecolor_is_amber`: init_for(missing, each value in edge case a) -> Theme::default().
+  - `t13c_missing_file_no_truecolor_is_classic`: init_for(missing, each value in edge case b) -> Theme::classic().
+  - `t13c_file_ignores_colorterm`: the two files in edge case c -> amber and Theme { tag_fg: Red, ..Theme::classic() }; "not ron" with Some("truecolor") -> Theme::classic().
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && env COLORTERM=truecolor cargo test --locked -p gitui && env -u COLORTERM cargo test --locked -p gitui && grep -q 'fn init_for' src/ui/style.rs && grep -q 'fn t13c_missing_file_truecolor_is_amber' src/ui/style.rs && grep -q 'fn t13c_missing_file_no_truecolor_is_classic' src/ui/style.rs && grep -q 'fn t13c_file_ignores_colorterm' src/ui/style.rs && grep -q 'COLORTERM' THEMES.md && grep -q 'COLORTERM' README.md
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
