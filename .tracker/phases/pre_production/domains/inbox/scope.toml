@@ -46,6 +46,6 @@ created_at = "2026-11-23T02:20:05Z"
 [[items.tasks]]
 id = "TASK-0114"
 title = "An Unchanged Staged Deletion Doesn't Block the Switch"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-23T02:20:05Z"
