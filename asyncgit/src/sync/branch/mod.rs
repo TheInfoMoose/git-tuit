@@ -461,6 +461,44 @@ fn untracked_path_collides_with_tree(
 	false
 }
 
+fn worktree_matches_tree_entry(
+	full: &std::path::Path,
+	entry: &git2::TreeEntry<'_>,
+) -> Result<bool> {
+	match entry.filemode() {
+		0o100_644 | 0o100_755 => {
+			let meta = std::fs::symlink_metadata(full)?;
+			if meta.file_type().is_dir()
+				|| meta.file_type().is_symlink()
+			{
+				return Ok(false);
+			}
+			// Compare raw on-disk bytes against the HEAD blob without
+			// applying content filters (e.g. autocrlf): if raw bytes
+			// differ only by a filter, treat as a collision (safe side).
+			let bytes = std::fs::read(full)?;
+			let oid = git2::Oid::hash_object(
+				git2::ObjectType::Blob,
+				&bytes,
+			)?;
+			Ok(oid == entry.id())
+		}
+		0o120_000 => {
+			let meta = std::fs::symlink_metadata(full)?;
+			if !meta.file_type().is_symlink() {
+				return Ok(false);
+			}
+			let target = std::fs::read_link(full)?;
+			let oid = git2::Oid::hash_object(
+				git2::ObjectType::Blob,
+				target.as_os_str().as_encoded_bytes(),
+			)?;
+			Ok(oid == entry.id())
+		}
+		_ => Ok(false),
+	}
+}
+
 fn find_untracked_collisions(
 	repo: &Repository,
 	head_tree: &git2::Tree<'_>,
@@ -483,11 +521,20 @@ fn find_untracked_collisions(
 		let path = bytes2string(entry.path_bytes())?;
 		let rel_path = std::path::Path::new(&path);
 
-		if head_tree.get_path(rel_path).is_ok()
-			|| untracked_path_collides_with_tree(
-				target_tree,
-				rel_path,
-			) {
+		if let Ok(head_entry) = head_tree.get_path(rel_path) {
+			if let Some(workdir) = repo.workdir() {
+				if worktree_matches_tree_entry(
+					&workdir.join(rel_path),
+					&head_entry,
+				)? {
+					continue;
+				}
+			}
+			collisions.push(path);
+			continue;
+		}
+
+		if untracked_path_collides_with_tree(target_tree, rel_path) {
 			collisions.push(path);
 		}
 	}

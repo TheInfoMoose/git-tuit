@@ -1203,4 +1203,149 @@ mod tests {
 			"main_edit"
 		);
 	}
+
+	#[test]
+	fn t10b_unchanged_overwrite_proceeds() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "notes.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(
+			&repo_path,
+			root,
+			"notes.txt",
+			"other",
+			"c2",
+		);
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let out = run_git(root, &["rm", "--cached", "notes.txt"]);
+		assert!(out.status.success());
+
+		let target = branch_info(&repo_path, true, "other");
+		checkout_branch_discard(&repo_path, &target).unwrap();
+
+		assert_eq!(head_branch_name(&repo_path), "other");
+		assert_eq!(
+			fs::read_to_string(root.join("notes.txt")).unwrap(),
+			"other"
+		);
+		assert_eq!(
+			get_status(&repo_path, StatusType::Both, None).unwrap(),
+			vec![]
+		);
+	}
+
+	#[test]
+	fn t10b_unchanged_remove_proceeds() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "b.txt", "other", "c2");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		write_and_commit(
+			&repo_path,
+			root,
+			"notes.txt",
+			"master_notes",
+			"c3",
+		);
+		let out = run_git(root, &["rm", "--cached", "notes.txt"]);
+		assert!(out.status.success());
+
+		let target = branch_info(&repo_path, true, "other");
+		checkout_branch_discard(&repo_path, &target).unwrap();
+
+		assert_eq!(head_branch_name(&repo_path), "other");
+		assert!(!root.join("notes.txt").exists());
+		assert_eq!(
+			get_status(&repo_path, StatusType::Both, None).unwrap(),
+			vec![]
+		);
+	}
+
+	#[test]
+	fn t10b_edited_beside_unchanged_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "keep.txt", "keep", "c1");
+		write_and_commit(&repo_path, root, "edit.txt", "orig", "c2");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "b.txt", "other", "c3");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let out = run_git(
+			root,
+			&["rm", "--cached", "keep.txt", "edit.txt"],
+		);
+		assert!(out.status.success());
+		fs::write(root.join("edit.txt"), "precious_edit").unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains("edit.txt"),
+			"error should name edit.txt: {msg}"
+		);
+		assert!(
+			!msg.contains("keep.txt"),
+			"error should not name keep.txt: {msg}"
+		);
+		assert_eq!(
+			fs::read_to_string(root.join("keep.txt")).unwrap(),
+			"keep"
+		);
+		assert_eq!(
+			fs::read_to_string(root.join("edit.txt")).unwrap(),
+			"precious_edit"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+	}
+
+	#[cfg(unix)]
+	#[test]
+	fn t10b_type_change_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "a", "c1");
+		write_and_commit(&repo_path, root, "link.txt", "a", "c2");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "b.txt", "other", "c3");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let out = run_git(root, &["rm", "--cached", "link.txt"]);
+		assert!(out.status.success());
+		fs::remove_file(root.join("link.txt")).unwrap();
+		std::os::unix::fs::symlink("a.txt", root.join("link.txt"))
+			.unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		let err =
+			checkout_branch_discard(&repo_path, &target).unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains("link.txt"),
+			"error should name link.txt: {msg}"
+		);
+		assert!(
+			fs::symlink_metadata(root.join("link.txt"))
+				.unwrap()
+				.file_type()
+				.is_symlink(),
+			"link.txt should remain a symlink"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+	}
 }
