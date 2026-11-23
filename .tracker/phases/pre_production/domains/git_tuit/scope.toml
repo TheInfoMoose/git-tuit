@@ -591,6 +591,27 @@ status = "pending"
 severity = "low"
 created_at = "2026-11-22T17:27:22Z"
 
+[[items.bugs]]
+id = "BUG-0092"
+title = "Keep existing theme.ron files rendering as they did before the amber default"
+status = "pending"
+severity = "high"
+created_at = "2026-11-23T15:26:12Z"
+
+[[items.bugs]]
+id = "BUG-0093"
+title = "Make the default theme readable on light and non-truecolor terminals"
+status = "pending"
+severity = "high"
+created_at = "2026-11-23T15:26:13Z"
+
+[[items.bugs]]
+id = "BUG-0094"
+title = "Make the scrollbar thumb visible against its track"
+status = "pending"
+severity = "medium"
+created_at = "2026-11-23T15:26:13Z"
+
 [[items.features]]
 id = "FEAT-0002"
 title = "Ship amber-on-black CRT default theme"
@@ -657,7 +678,7 @@ created_at = "2026-11-21T05:36:39Z"
 [[items.tasks]]
 id = "TASK-0007"
 title = "Add shared plain-border block helpers"
-status = "pending"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T05:36:40Z"
 
@@ -1245,7 +1266,7 @@ created_at = "2026-11-23T03:11:21Z"
 [[items.tasks]]
 id = "TASK-0123"
 title = "Drive discard-confirm tests through the app ConfirmAction dispatch"
-status = "pending"
+status = "closed"
 severity = "low"
 created_at = "2026-11-23T03:42:11Z"
 
@@ -1283,3 +1304,10 @@ title = "Discard Confirm Is Tested Through the App"
 status = "closed"
 severity = "medium"
 created_at = "2026-11-23T13:24:59Z"
+
+[[items.tasks]]
+id = "TASK-0130"
+title = "Cover all theme fields in assert_theme_eq and the default test"
+status = "pending"
+severity = "low"
+created_at = "2026-11-23T15:26:13Z"
