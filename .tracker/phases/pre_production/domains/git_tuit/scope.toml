@@ -1329,7 +1329,7 @@ created_at = "2026-11-23T16:12:19Z"
 [[items.tasks]]
 id = "TASK-0134"
 title = "Amber Only on Truecolor Terminals"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 
