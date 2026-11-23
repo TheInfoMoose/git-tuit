@@ -476,11 +476,8 @@ fn worktree_matches_tree_entry(
 			// Compare raw on-disk bytes against the HEAD blob without
 			// applying content filters (e.g. autocrlf): if raw bytes
 			// differ only by a filter, treat as a collision (safe side).
-			let bytes = std::fs::read(full)?;
-			let oid = git2::Oid::hash_object(
-				git2::ObjectType::Blob,
-				&bytes,
-			)?;
+			let oid =
+				git2::Oid::hash_file(git2::ObjectType::Blob, full)?;
 			Ok(oid == entry.id())
 		}
 		0o120_000 => {
@@ -1688,5 +1685,106 @@ mod test_remote_branches {
 			.unwrap(),
 			"topic_content"
 		);
+	}
+}
+
+#[cfg(test)]
+mod tests_discard_hash {
+	use super::*;
+	use crate::sync::tests::{repo_init, write_commit_file};
+	use std::path::Path;
+
+	fn setup_untracked_head_file(
+		content: &str,
+	) -> (tempfile::TempDir, Repository, RepoPath, BranchInfo) {
+		let (td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: RepoPath =
+			root.as_os_str().to_str().unwrap().into();
+
+		write_commit_file(&repo, "big.txt", content, "commit big");
+		create_branch(&repo_path, "other").unwrap();
+		write_commit_file(&repo, "b.txt", "b", "commit b");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		let mut index = repo.index().unwrap();
+		index.remove_path(Path::new("big.txt")).unwrap();
+		index.write().unwrap();
+
+		let other = get_branches_info(&repo_path, true)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "other")
+			.unwrap();
+
+		(td, repo, repo_path, other)
+	}
+
+	#[test]
+	fn t11c_large_unchanged_proceeds() {
+		let content = "a".repeat(1_048_577);
+		let (_td, repo, repo_path, other) =
+			setup_untracked_head_file(&content);
+		let root = repo.path().parent().unwrap();
+
+		let outcome =
+			checkout_branch_discard(&repo_path, &other).unwrap();
+		assert_eq!(outcome, DiscardOutcome::Switched);
+		assert_eq!(
+			repo.head().unwrap().name().unwrap(),
+			"refs/heads/other"
+		);
+		assert_eq!(
+			std::fs::read_to_string(root.join("big.txt")).unwrap(),
+			content
+		);
+		assert!(repo.statuses(None).unwrap().is_empty());
+	}
+
+	#[test]
+	fn t11c_large_last_byte_refuses() {
+		let content = "a".repeat(1_048_577);
+		let (_td, repo, repo_path, other) =
+			setup_untracked_head_file(&content);
+		let root = repo.path().parent().unwrap();
+
+		let mut modified = "a".repeat(1_048_576);
+		modified.push('b');
+		std::fs::write(root.join("big.txt"), &modified).unwrap();
+
+		let err =
+			checkout_branch_discard(&repo_path, &other).unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains("big.txt"),
+			"expected error naming big.txt, got: {msg}"
+		);
+		assert_eq!(
+			repo.head().unwrap().name().unwrap(),
+			"refs/heads/master"
+		);
+		let on_disk =
+			std::fs::read_to_string(root.join("big.txt")).unwrap();
+		assert!(on_disk.ends_with('b'));
+	}
+
+	#[test]
+	fn t11c_empty_unchanged_proceeds() {
+		let (_td, repo, repo_path, other) =
+			setup_untracked_head_file("");
+		let root = repo.path().parent().unwrap();
+
+		let outcome =
+			checkout_branch_discard(&repo_path, &other).unwrap();
+		assert_eq!(outcome, DiscardOutcome::Switched);
+		assert_eq!(
+			repo.head().unwrap().name().unwrap(),
+			"refs/heads/other"
+		);
+		assert_eq!(
+			std::fs::read_to_string(root.join("big.txt")).unwrap(),
+			""
+		);
+		assert!(repo.statuses(None).unwrap().is_empty());
 	}
 }
