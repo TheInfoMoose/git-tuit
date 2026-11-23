@@ -1315,7 +1315,7 @@ created_at = "2026-11-23T15:26:13Z"
 [[items.tasks]]
 id = "TASK-0132"
 title = "The Scrollbar Thumb Has Its Own Color"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 
