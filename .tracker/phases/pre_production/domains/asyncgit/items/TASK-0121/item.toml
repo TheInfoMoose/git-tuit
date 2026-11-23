@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0121"
 type = "task"
 title = "Unchanged-File Check Streams the Hash"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "asyncgit"
 created_at = "2026-11-23T03:11:21Z"
-updated_at = "2026-11-23T03:11:21Z"
+updated_at = "2026-11-23T03:22:44Z"
 source_ref = "STEP 11C"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 2
 iteration_count = 1
+last_timer_session = "TASK-0121@2026-11-23T03:20:09Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-23"
+commit = "fe4e0072"
+summary = "STEP 11C: Unchanged-File Check Streams the Hash (phased check PASS)"
