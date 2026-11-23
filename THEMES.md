@@ -38,6 +38,7 @@ The default theme uses an amber-on-black RGB palette:
 | `block_title_focused` | `#FFD866` |
 | `border_focused_fg` | `#FFB000` |
 | `scroll_track_fg` | `#5C3A00` |
+| `scroll_thumb_fg` | `#FFD866` |
 | `panel_bg` | `#0C0800` |
 | `attention_fg` | `#FF5500` |
 | `syntax` | `"base16-eighties.dark"` |
@@ -57,6 +58,7 @@ Example theme override:
 (
     selection_bg: Some("Blue"),
     selection_fg: Some("#ffffff"),
+    scroll_thumb_fg: Some("Cyan"),
 )
 ```
 

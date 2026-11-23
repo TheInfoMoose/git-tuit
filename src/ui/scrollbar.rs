@@ -147,11 +147,10 @@ mod tests {
 	use super::*;
 	use crate::ui::style::Theme;
 	use ratatui::{backend::TestBackend, style::Color, Terminal};
-	use std::rc::Rc;
+	use std::{io::Write, rc::Rc};
+	use tempfile::NamedTempFile;
 
-	#[test]
-	fn t12b_scrollbar_track_styled() {
-		let theme = Rc::new(Theme::default());
+	fn render_vertical_scrollbar(theme: &SharedTheme) -> Buffer {
 		let mut terminal =
 			Terminal::new(TestBackend::new(3, 10)).unwrap();
 
@@ -160,7 +159,7 @@ mod tests {
 				draw_scrollbar(
 					f,
 					f.area(),
-					&theme,
+					theme,
 					10,
 					0,
 					Orientation::Vertical,
@@ -168,7 +167,14 @@ mod tests {
 			})
 			.unwrap();
 
-		let buf = terminal.backend().buffer();
+		terminal.backend().buffer().clone()
+	}
+
+	fn assert_scrollbar_colors(
+		buf: &Buffer,
+		expected_track: Color,
+		expected_thumb: Color,
+	) {
 		let right = buf.area.right() - 1;
 		let mut track_count = 0;
 		let mut pos_count = 0;
@@ -177,14 +183,53 @@ mod tests {
 			let cell = &buf[(right, y)];
 			if cell.symbol() == DOUBLE_VERTICAL {
 				track_count += 1;
-				assert_eq!(cell.fg, Color::Rgb(92, 58, 0));
+				assert_eq!(cell.fg, expected_track);
 			} else if cell.symbol() == FULL {
 				pos_count += 1;
-				assert_eq!(cell.fg, Color::Rgb(42, 26, 0));
+				assert_eq!(cell.fg, expected_thumb);
 			}
 		}
 
 		assert!(track_count > 0);
 		assert_eq!(pos_count, 1);
+	}
+
+	#[test]
+	fn t12b_scrollbar_track_styled() {
+		let theme = Rc::new(Theme::default());
+		let buf = render_vertical_scrollbar(&theme);
+		assert_scrollbar_colors(
+			&buf,
+			Color::Rgb(92, 58, 0),
+			Color::Rgb(255, 216, 102),
+		);
+	}
+
+	#[test]
+	fn t13a_thumb_color_from_patch() {
+		let mut override_file = NamedTempFile::new().unwrap();
+		writeln!(override_file, r#"(scroll_thumb_fg: Some("Cyan"))"#)
+			.unwrap();
+		let overridden =
+			Rc::new(Theme::init(&override_file.path().to_path_buf()));
+		let buf = render_vertical_scrollbar(&overridden);
+		assert_scrollbar_colors(
+			&buf,
+			Color::Rgb(92, 58, 0),
+			Color::Cyan,
+		);
+
+		let mut selection_file = NamedTempFile::new().unwrap();
+		writeln!(selection_file, r#"(selection_bg: Some("Black"))"#)
+			.unwrap();
+		let selection_only = Rc::new(Theme::init(
+			&selection_file.path().to_path_buf(),
+		));
+		let buf = render_vertical_scrollbar(&selection_only);
+		assert_scrollbar_colors(
+			&buf,
+			Color::Rgb(92, 58, 0),
+			Color::Rgb(255, 216, 102),
+		);
 	}
 }

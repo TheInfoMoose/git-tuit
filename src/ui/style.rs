@@ -47,6 +47,7 @@ pub struct Theme {
 	block_title_focused: Color,
 	border_focused_fg: Color,
 	scroll_track_fg: Color,
+	scroll_thumb_fg: Color,
 	panel_bg: Color,
 	attention_fg: Color,
 	syntax: String,
@@ -58,7 +59,7 @@ impl Theme {
 	}
 
 	pub fn scroll_bar_pos(&self) -> Style {
-		Style::default().fg(self.selection_bg)
+		Style::default().fg(self.scroll_thumb_fg)
 	}
 
 	pub fn scroll_bar_track(&self) -> Style {
@@ -377,6 +378,7 @@ impl Default for Theme {
 			block_title_focused: AMBER_BRIGHT,
 			border_focused_fg: AMBER_PRIMARY,
 			scroll_track_fg: AMBER_DARK,
+			scroll_thumb_fg: AMBER_BRIGHT,
 			panel_bg: PANEL_BG,
 			attention_fg: AMBER_ALERT,
 			// Available themes can be found in:
@@ -426,45 +428,70 @@ mod tests {
 	}
 
 	fn assert_theme_eq(actual: &Theme, expected: &Theme) {
-		assert_eq!(actual.selected_tab, expected.selected_tab);
-		assert_eq!(actual.command_fg, expected.command_fg);
-		assert_eq!(actual.selection_bg, expected.selection_bg);
-		assert_eq!(actual.selection_fg, expected.selection_fg);
+		let Theme {
+			selected_tab,
+			command_fg,
+			selection_bg,
+			selection_fg,
+			use_selection_fg,
+			cmdbar_bg,
+			disabled_fg,
+			diff_line_add,
+			diff_line_delete,
+			diff_file_added,
+			diff_file_removed,
+			diff_file_moved,
+			diff_file_modified,
+			commit_hash,
+			commit_time,
+			commit_author,
+			danger_fg,
+			push_gauge_bg,
+			push_gauge_fg,
+			tag_fg,
+			branch_fg,
+			line_break,
+			block_title_focused,
+			border_focused_fg,
+			scroll_track_fg,
+			scroll_thumb_fg,
+			panel_bg,
+			attention_fg,
+			syntax,
+		} = actual;
+
+		assert_eq!(selected_tab, &expected.selected_tab);
+		assert_eq!(command_fg, &expected.command_fg);
+		assert_eq!(selection_bg, &expected.selection_bg);
+		assert_eq!(selection_fg, &expected.selection_fg);
+		assert_eq!(use_selection_fg, &expected.use_selection_fg);
+		assert_eq!(cmdbar_bg, &expected.cmdbar_bg);
+		assert_eq!(disabled_fg, &expected.disabled_fg);
+		assert_eq!(diff_line_add, &expected.diff_line_add);
+		assert_eq!(diff_line_delete, &expected.diff_line_delete);
+		assert_eq!(diff_file_added, &expected.diff_file_added);
+		assert_eq!(diff_file_removed, &expected.diff_file_removed);
+		assert_eq!(diff_file_moved, &expected.diff_file_moved);
+		assert_eq!(diff_file_modified, &expected.diff_file_modified);
+		assert_eq!(commit_hash, &expected.commit_hash);
+		assert_eq!(commit_time, &expected.commit_time);
+		assert_eq!(commit_author, &expected.commit_author);
+		assert_eq!(danger_fg, &expected.danger_fg);
+		assert_eq!(push_gauge_bg, &expected.push_gauge_bg);
+		assert_eq!(push_gauge_fg, &expected.push_gauge_fg);
+		assert_eq!(tag_fg, &expected.tag_fg);
+		assert_eq!(branch_fg, &expected.branch_fg);
+		assert_eq!(line_break, &expected.line_break);
 		assert_eq!(
-			actual.use_selection_fg,
-			expected.use_selection_fg
+			block_title_focused,
+			&expected.block_title_focused
 		);
-		assert_eq!(actual.cmdbar_bg, expected.cmdbar_bg);
-		assert_eq!(actual.disabled_fg, expected.disabled_fg);
-		assert_eq!(actual.diff_line_add, expected.diff_line_add);
-		assert_eq!(
-			actual.diff_line_delete,
-			expected.diff_line_delete
-		);
-		assert_eq!(actual.diff_file_added, expected.diff_file_added);
-		assert_eq!(
-			actual.diff_file_removed,
-			expected.diff_file_removed
-		);
-		assert_eq!(actual.diff_file_moved, expected.diff_file_moved);
-		assert_eq!(
-			actual.diff_file_modified,
-			expected.diff_file_modified
-		);
-		assert_eq!(actual.commit_hash, expected.commit_hash);
-		assert_eq!(actual.commit_time, expected.commit_time);
-		assert_eq!(actual.commit_author, expected.commit_author);
-		assert_eq!(actual.danger_fg, expected.danger_fg);
-		assert_eq!(actual.push_gauge_bg, expected.push_gauge_bg);
-		assert_eq!(actual.push_gauge_fg, expected.push_gauge_fg);
-		assert_eq!(actual.tag_fg, expected.tag_fg);
-		assert_eq!(actual.branch_fg, expected.branch_fg);
-		assert_eq!(actual.line_break, expected.line_break);
-		assert_eq!(
-			actual.block_title_focused,
-			expected.block_title_focused
-		);
-		assert_eq!(actual.syntax, expected.syntax);
+		assert_eq!(border_focused_fg, &expected.border_focused_fg);
+		assert_eq!(scroll_track_fg, &expected.scroll_track_fg);
+		assert_eq!(scroll_thumb_fg, &expected.scroll_thumb_fg);
+		assert_eq!(panel_bg, &expected.panel_bg);
+		assert_eq!(attention_fg, &expected.attention_fg);
+		assert_eq!(syntax, &expected.syntax);
 	}
 
 	#[test]
@@ -497,6 +524,11 @@ mod tests {
 			theme.block_title_focused,
 			Color::Rgb(255, 216, 102)
 		);
+		assert_eq!(theme.border_focused_fg, Color::Rgb(255, 176, 0));
+		assert_eq!(theme.scroll_track_fg, Color::Rgb(92, 58, 0));
+		assert_eq!(theme.scroll_thumb_fg, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.panel_bg, Color::Rgb(12, 8, 0));
+		assert_eq!(theme.attention_fg, Color::Rgb(255, 85, 0));
 		assert_eq!(theme.syntax, DEFAULT_SYNTAX_THEME);
 	}
 
