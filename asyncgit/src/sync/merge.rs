@@ -25,10 +25,18 @@ use super::{
 	RepoPath,
 };
 
+const GITLINK_MODE: u32 = 0o160_000;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 struct EntrySpec {
 	id: Oid,
 	mode: u32,
+}
+
+struct IndexEntries {
+	stage0: BTreeMap<Vec<u8>, EntrySpec>,
+	conflicted: BTreeSet<Vec<u8>>,
+	gitlinks: BTreeSet<Vec<u8>>,
 }
 
 fn bytes_to_path(bytes: &[u8]) -> Result<&Path> {
@@ -90,12 +98,14 @@ fn collect_head_entries(
 	Ok(entries)
 }
 
-fn collect_index_entries(
-	index: &git2::Index,
-) -> (BTreeMap<Vec<u8>, EntrySpec>, BTreeSet<Vec<u8>>) {
+fn collect_index_entries(index: &git2::Index) -> IndexEntries {
 	let mut stage0 = BTreeMap::new();
 	let mut conflicted = BTreeSet::new();
+	let mut gitlinks = BTreeSet::new();
 	for entry in index.iter() {
+		if entry.mode == GITLINK_MODE {
+			gitlinks.insert(entry.path.clone());
+		}
 		let stage = (entry.flags >> 12) & 0x3;
 		if stage == 0 {
 			stage0.insert(
@@ -109,7 +119,11 @@ fn collect_index_entries(
 			conflicted.insert(entry.path);
 		}
 	}
-	(stage0, conflicted)
+	IndexEntries {
+		stage0,
+		conflicted,
+		gitlinks,
+	}
 }
 
 fn worktree_matches_index(
@@ -118,7 +132,9 @@ fn worktree_matches_index(
 ) -> Result<bool> {
 	let meta = match fs::symlink_metadata(full) {
 		Ok(m) => m,
-		Err(e) if is_absent(&e) => return Ok(false),
+		Err(e) if is_absent(&e) => {
+			return Ok(idx_entry.mode == GITLINK_MODE);
+		}
 		Err(e) => return Err(e.into()),
 	};
 
@@ -144,7 +160,7 @@ fn worktree_matches_index(
 			)?;
 			Ok(oid == idx_entry.id)
 		}
-		0o160_000 => Ok(meta.file_type().is_dir()),
+		GITLINK_MODE => Ok(meta.file_type().is_dir()),
 		_ => Ok(false),
 	}
 }
@@ -232,6 +248,35 @@ fn find_blocking_local_changes(
 	Ok(blocking)
 }
 
+fn remove_merge_added_path(
+	full: &Path,
+	is_gitlink: bool,
+) -> Result<()> {
+	match fs::symlink_metadata(full) {
+		Ok(meta) => {
+			if meta.file_type().is_dir() {
+				if is_gitlink {
+					match fs::remove_dir(full) {
+						Ok(()) => {}
+						Err(e)
+							if e.kind()
+								== io::ErrorKind::DirectoryNotEmpty
+								|| is_absent(&e) => {}
+						Err(e) => return Err(e.into()),
+					}
+				} else {
+					fs::remove_dir_all(full)?;
+				}
+			} else {
+				fs::remove_file(full)?;
+			}
+		}
+		Err(e) if is_absent(&e) => {}
+		Err(e) => return Err(e.into()),
+	}
+	Ok(())
+}
+
 fn prune_empty_parents(path: &Path, workdir: &Path) {
 	let mut dir = path.parent();
 	while let Some(d) = dir {
@@ -280,7 +325,11 @@ pub fn abort_pending_state(repo_path: &RepoPath) -> Result<()> {
 
 	let head_entries = collect_head_entries(head_tree.as_ref())?;
 	let mut index = repo.index()?;
-	let (stage0, conflicted) = collect_index_entries(&index);
+	let IndexEntries {
+		stage0,
+		conflicted,
+		gitlinks,
+	} = collect_index_entries(&index);
 
 	let mut all_paths: BTreeSet<&[u8]> = BTreeSet::new();
 	for k in head_entries.keys() {
@@ -332,17 +381,7 @@ pub fn abort_pending_state(repo_path: &RepoPath) -> Result<()> {
 	// 1. Worktree first: remove merge-added paths, then restore HEAD paths.
 	for path in &to_remove {
 		let full = workdir.join(bytes_to_path(path)?);
-		match fs::symlink_metadata(&full) {
-			Ok(meta) => {
-				if meta.file_type().is_dir() {
-					fs::remove_dir_all(&full)?;
-				} else {
-					fs::remove_file(&full)?;
-				}
-			}
-			Err(e) if is_absent(&e) => {}
-			Err(e) => return Err(e.into()),
-		}
+		remove_merge_added_path(&full, gitlinks.contains(path))?;
 		prune_empty_parents(&full, workdir);
 	}
 
@@ -807,5 +846,155 @@ mod tests {
 		);
 		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Clean);
 		assert!(!repo.path().join("REVERT_HEAD").exists());
+	}
+
+	fn commit_gitlink(
+		repo: &Repository,
+		repo_path: &RepoPath,
+		path: &str,
+		target: CommitId,
+		msg: &str,
+	) {
+		let root = repo.path().parent().unwrap();
+		fs::create_dir_all(root.join(path)).unwrap();
+		let mut index = repo.index().unwrap();
+		index.read(true).unwrap();
+		index
+			.add(&git2::IndexEntry {
+				ctime: git2::IndexTime::new(0, 0),
+				mtime: git2::IndexTime::new(0, 0),
+				dev: 0,
+				ino: 0,
+				mode: 0o160_000,
+				uid: 0,
+				gid: 0,
+				file_size: 0,
+				id: target.into(),
+				flags: 0,
+				flags_extended: 0,
+				path: path.as_bytes().to_vec(),
+			})
+			.unwrap();
+		index.write().unwrap();
+		commit(repo_path, msg).unwrap();
+	}
+
+	fn populate_submodule(root: &Path, path: &str) {
+		let dir = root.join(path);
+		fs::create_dir_all(&dir).unwrap();
+		fs::write(dir.join(".git"), "gitdir: ../.git/modules/sub\n")
+			.unwrap();
+		fs::write(dir.join("work.txt"), "keep").unwrap();
+	}
+
+	#[test]
+	fn t10d_populated_submodule_kept() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let base =
+			write_commit_file(&repo, "test.txt", "base", "base");
+		create_branch(repo_path, "feature").unwrap();
+		write_commit_file(&repo, "test.txt", "feature", "feature");
+		commit_gitlink(&repo, repo_path, "sub", base, "add sub");
+
+		checkout_branch(repo_path, "master").unwrap();
+		write_commit_file(&repo, "test.txt", "master", "master");
+
+		merge_branch(repo_path, "feature", BranchType::Local)
+			.unwrap();
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+
+		populate_submodule(root, "sub");
+
+		abort_pending_state(repo_path).unwrap();
+
+		assert_eq!(
+			fs::read_to_string(root.join("sub/work.txt")).unwrap(),
+			"keep"
+		);
+		let fresh = crate::sync::repository::repo(repo_path).unwrap();
+		let index = fresh.index().unwrap();
+		assert!(index.get_path(Path::new("sub"), 0).is_none());
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Clean);
+		assert_eq!(
+			fs::read_to_string(root.join("test.txt")).unwrap(),
+			"master"
+		);
+	}
+
+	#[test]
+	fn t10d_empty_submodule_dir_removed() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let base =
+			write_commit_file(&repo, "test.txt", "base", "base");
+		create_branch(repo_path, "feature").unwrap();
+		write_commit_file(&repo, "test.txt", "feature", "feature");
+		commit_gitlink(&repo, repo_path, "sub", base, "add sub");
+
+		checkout_branch(repo_path, "master").unwrap();
+		write_commit_file(&repo, "test.txt", "master", "master");
+
+		merge_branch(repo_path, "feature", BranchType::Local)
+			.unwrap();
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+
+		fs::create_dir_all(root.join("sub")).unwrap();
+
+		abort_pending_state(repo_path).unwrap();
+
+		assert!(!root.join("sub").exists());
+	}
+
+	#[test]
+	fn t10d_conflicted_submodule_kept() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let c1 = write_commit_file(&repo, "test.txt", "base", "base");
+		commit_gitlink(&repo, repo_path, "sub", c1, "add sub");
+		create_branch(repo_path, "feature").unwrap();
+		let c2 = write_commit_file(
+			&repo,
+			"other.txt",
+			"feature",
+			"feature commit",
+		);
+		commit_gitlink(&repo, repo_path, "sub", c2, "update sub");
+
+		checkout_branch(repo_path, "master").unwrap();
+		let _ = fs::remove_dir(root.join("sub"));
+		let mut index = repo.index().unwrap();
+		index.read(true).unwrap();
+		index.remove_path(Path::new("sub")).unwrap();
+		index.write().unwrap();
+		commit(repo_path, "remove sub").unwrap();
+
+		merge_branch(repo_path, "feature", BranchType::Local)
+			.unwrap();
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+		let fresh = crate::sync::repository::repo(repo_path).unwrap();
+		assert!(fresh.index().unwrap().has_conflicts());
+
+		populate_submodule(root, "sub");
+
+		abort_pending_state(repo_path).unwrap();
+
+		assert_eq!(
+			fs::read_to_string(root.join("sub/work.txt")).unwrap(),
+			"keep"
+		);
+		let fresh = crate::sync::repository::repo(repo_path).unwrap();
+		let index = fresh.index().unwrap();
+		assert!(!index.iter().any(|e| e.path == b"sub"));
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Clean);
 	}
 }
