@@ -114,33 +114,10 @@ impl CheckoutOptionPopup {
 	}
 
 	fn handle_event(&mut self) -> Result<()> {
-		match self.option {
-			CheckoutOptions::KeepLocalChanges => {
-				self.checkout()?;
-				self.queue
-					.push(InternalEvent::Update(NeedsUpdate::ALL));
-				self.queue.push(InternalEvent::SelectBranch);
-				self.hide();
-			}
-			CheckoutOptions::DiscardAllLocalChagnes => {
-				let outcome = self
-					.branch
-					.as_ref()
-					.map(|branch| {
-						checkout_branch_discard(&self.repo, branch)
-					})
-					.transpose()?;
-				if let Some(outcome) = outcome {
-					self.discard_finished(outcome);
-				} else {
-					self.queue.push(InternalEvent::Update(
-						NeedsUpdate::ALL,
-					));
-					self.hide();
-				}
-				self.queue.push(InternalEvent::SelectBranch);
-			}
-		}
+		self.checkout()?;
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		self.queue.push(InternalEvent::SelectBranch);
+		self.hide();
 
 		Ok(())
 	}
@@ -487,6 +464,94 @@ mod tests {
 		(bare_dir, clone2_dir, c2_path)
 	}
 
+	fn enter_and_confirm(
+		popup: &mut CheckoutOptionPopup,
+	) -> Vec<InternalEvent> {
+		let enter = SharedKeyConfig::default().keys.enter;
+		let ev = Event::Key(crossterm::event::KeyEvent::new(
+			enter.code,
+			enter.modifiers,
+		));
+		popup.event(&ev).unwrap();
+
+		let mut out = Vec::new();
+		let mut confirm_branch = None;
+		while let Some(ev) = popup.queue.pop() {
+			match ev {
+				InternalEvent::ConfirmAction(
+					Action::CheckoutBranchDiscard(b),
+				) if confirm_branch.is_none() => {
+					confirm_branch = Some(b);
+				}
+				other => out.push(other),
+			}
+		}
+
+		if let Some(branch) = confirm_branch {
+			popup.confirm_discard(&branch);
+			while let Some(ev) = popup.queue.pop() {
+				out.push(ev);
+			}
+		}
+
+		out
+	}
+
+	fn error_messages(events: Vec<InternalEvent>) -> Vec<String> {
+		events
+			.into_iter()
+			.filter_map(|e| match e {
+				InternalEvent::ShowErrorMsg(msg) => Some(msg),
+				_ => None,
+			})
+			.collect()
+	}
+
+	#[test]
+	fn t11a_enter_on_discard_asks_first() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "other").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "other", "c2");
+		checkout_branch(&repo_path, "master").unwrap();
+
+		fs::write(root.join("a.txt"), "local_edit").unwrap();
+
+		let target = branch_info(&repo_path, true, "other");
+		let mut popup = popup_for(&repo_path, target);
+
+		let enter = SharedKeyConfig::default().keys.enter;
+		let ev = Event::Key(crossterm::event::KeyEvent::new(
+			enter.code,
+			enter.modifiers,
+		));
+		popup.event(&ev).unwrap();
+
+		let mut queued = Vec::new();
+		while let Some(ev) = popup.queue.pop() {
+			queued.push(ev);
+		}
+		assert_eq!(queued.len(), 1, "expected one queued event");
+		assert!(
+			matches!(
+				&queued[0],
+				InternalEvent::ConfirmAction(
+					Action::CheckoutBranchDiscard(b)
+				) if b.name == "other"
+			),
+			"expected ConfirmAction(CheckoutBranchDiscard(\"other\"))"
+		);
+		assert!(popup.is_visible());
+		assert_eq!(head_branch_name(&repo_path), "master");
+		assert_eq!(
+			fs::read_to_string(root.join("a.txt")).unwrap(),
+			"local_edit"
+		);
+	}
+
 	#[test]
 	fn t8b_discard_switch_succeeds() {
 		let (td, _repo) = git2_testing::repo_init();
@@ -507,7 +572,7 @@ mod tests {
 		let target = branch_info(&repo_path, true, "other");
 		let mut popup = popup_for(&repo_path, target);
 
-		popup.handle_event().unwrap();
+		enter_and_confirm(&mut popup);
 
 		assert!(!popup.is_visible());
 		assert_eq!(head_branch_name(&repo_path), "other");
@@ -554,10 +619,17 @@ mod tests {
 		let target = branch_info(&repo_path, true, "other");
 		let mut popup = popup_for(&repo_path, target);
 
-		let err = popup.handle_event().unwrap_err();
+		let errors = error_messages(enter_and_confirm(&mut popup));
+		assert_eq!(errors.len(), 1, "expected one error: {errors:?}");
 		assert!(
-			err.to_string().contains("collide.txt"),
-			"error should name colliding file: {err}"
+			errors[0].starts_with("checkout error:\n"),
+			"unexpected error prefix: {}",
+			errors[0]
+		);
+		assert!(
+			errors[0].contains("collide.txt"),
+			"error should name colliding file: {}",
+			errors[0]
 		);
 		assert!(popup.is_visible());
 		assert_eq!(head_branch_name(&repo_path), "master");
@@ -603,7 +675,7 @@ mod tests {
 
 			let target = branch_info(&repo_path, true, "other");
 			let mut popup = popup_for(&repo_path, target);
-			popup.handle_event().unwrap();
+			enter_and_confirm(&mut popup);
 
 			assert!(!popup.is_visible());
 			assert_eq!(head_branch_name(&repo_path), "other");
@@ -629,7 +701,7 @@ mod tests {
 
 			let target = branch_info(&c2_path, false, "origin/feat");
 			let mut popup = popup_for(&c2_path, target);
-			popup.handle_event().unwrap();
+			enter_and_confirm(&mut popup);
 
 			assert!(!popup.is_visible());
 			assert_eq!(head_branch_name(&c2_path), "feat");
@@ -662,7 +734,13 @@ mod tests {
 		let target = branch_info(&c2_path, false, "origin/feat");
 		let mut popup = popup_for(&c2_path, target);
 
-		assert!(popup.handle_event().is_err());
+		let errors = error_messages(enter_and_confirm(&mut popup));
+		assert_eq!(errors.len(), 1, "expected one error: {errors:?}");
+		assert!(
+			errors[0].starts_with("checkout error:\n"),
+			"unexpected error prefix: {}",
+			errors[0]
+		);
 		assert!(popup.is_visible());
 		assert_eq!(head_branch_name(&c2_path), "master");
 		assert_eq!(
@@ -703,7 +781,13 @@ mod tests {
 		let branches_before = local_branch_names(&repo_path);
 		let mut popup = popup_for(&repo_path, target);
 
-		assert!(popup.handle_event().is_err());
+		let errors = error_messages(enter_and_confirm(&mut popup));
+		assert_eq!(
+			errors,
+			vec![
+				"checkout error:\nbranch 'vanished' no longer exists"
+			]
+		);
 		assert!(popup.is_visible());
 		assert_eq!(head_branch_name(&repo_path), "master");
 		assert_eq!(
