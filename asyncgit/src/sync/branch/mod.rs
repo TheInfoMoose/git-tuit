@@ -704,12 +704,39 @@ fn resolve_discard_target<'repo>(
 	})
 }
 
+/// Outcome of [`checkout_branch_discard`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DiscardOutcome {
+	/// Switch completed and any pending merge/revert/cherry-pick state was cleared.
+	Switched,
+	/// `HEAD` moved to the target branch, but clearing merge state failed.
+	StateNotCleared(String),
+}
+
+#[cfg(test)]
+thread_local! {
+	static FAIL_CLEANUP_STATE: std::cell::Cell<bool> =
+		const { std::cell::Cell::new(false) };
+}
+
+fn cleanup_repo_state(repo: &Repository) -> Result<()> {
+	#[cfg(test)]
+	if FAIL_CLEANUP_STATE.get() {
+		return Err(Error::Generic(String::from(
+			"simulated cleanup_state failure",
+		)));
+	}
+	repo.cleanup_state()?;
+	Ok(())
+}
+
 fn apply_discard_checkout(
 	repo: &Repository,
 	target_tree: &git2::Tree<'_>,
 	target_ref_name: &str,
+	target_branch_name: &str,
 	cleanup_state: bool,
-) -> Result<()> {
+) -> Result<DiscardOutcome> {
 	let mut checkout_opts = git2::build::CheckoutBuilder::new();
 	checkout_opts.force().overwrite_ignored(true);
 	repo.checkout_tree(
@@ -724,10 +751,14 @@ fn apply_discard_checkout(
 	repo.set_head(target_ref_name)?;
 
 	if cleanup_state {
-		repo.cleanup_state()?;
+		if let Err(err) = cleanup_repo_state(repo) {
+			return Ok(DiscardOutcome::StateNotCleared(format!(
+				"switched to '{target_branch_name}', but could not clear the merge state: {err}"
+			)));
+		}
 	}
 
-	Ok(())
+	Ok(DiscardOutcome::Switched)
 }
 
 /// Discard all staged and unstaged tracked changes and switch to `branch`.
@@ -739,7 +770,7 @@ fn apply_discard_checkout(
 pub fn checkout_branch_discard(
 	repo_path: &RepoPath,
 	branch: &BranchInfo,
-) -> Result<()> {
+) -> Result<DiscardOutcome> {
 	scope_time!("checkout_branch_discard");
 
 	let repo = repo(repo_path)?;
@@ -774,51 +805,57 @@ pub fn checkout_branch_discard(
 		)));
 	}
 
-	let (target_ref_name, created_branch) = match &target {
-		DiscardTarget::Local { ref_name, .. } => {
-			(ref_name.clone(), None)
-		}
-		DiscardTarget::Remote {
-			local_name,
-			upstream_name,
-			commit,
-			..
-		} => {
-			let mut new_branch =
-				repo.branch(local_name, commit, false)?;
-			if let Err(e) =
-				new_branch.set_upstream(Some(upstream_name))
-			{
-				let _ = new_branch.delete();
-				return Err(e.into());
+	let (target_ref_name, target_branch_name, created_branch) =
+		match &target {
+			DiscardTarget::Local { ref_name, .. } => {
+				(ref_name.clone(), branch.name.as_str(), None)
 			}
-			let ref_name =
-				match bytes2string(new_branch.get().name_bytes()) {
-					Ok(name) => name,
-					Err(e) => {
-						let _ = new_branch.delete();
-						return Err(e);
-					}
-				};
-			(ref_name, Some(new_branch))
-		}
-	};
+			DiscardTarget::Remote {
+				local_name,
+				upstream_name,
+				commit,
+				..
+			} => {
+				let mut new_branch =
+					repo.branch(local_name, commit, false)?;
+				if let Err(e) =
+					new_branch.set_upstream(Some(upstream_name))
+				{
+					let _ = new_branch.delete();
+					return Err(Error::Generic(format!(
+						"could not set upstream '{upstream_name}' for '{local_name}': {e}"
+					)));
+				}
+				let ref_name =
+					match bytes2string(new_branch.get().name_bytes())
+					{
+						Ok(name) => name,
+						Err(e) => {
+							let _ = new_branch.delete();
+							return Err(e);
+						}
+					};
+				(ref_name, local_name.as_str(), Some(new_branch))
+			}
+		};
 
 	let switch_result = apply_discard_checkout(
 		&repo,
 		target.tree(),
 		&target_ref_name,
+		target_branch_name,
 		cleanup_state,
 	);
 
-	if let Err(err) = switch_result {
-		if let Some(mut new_branch) = created_branch {
-			let _ = new_branch.delete();
+	match switch_result {
+		Ok(outcome) => Ok(outcome),
+		Err(err) => {
+			if let Some(mut new_branch) = created_branch {
+				let _ = new_branch.delete();
+			}
+			Err(err)
 		}
-		return Err(err);
 	}
-
-	Ok(())
 }
 
 /// The user must not be on the branch for the branch to be deleted
@@ -1538,5 +1575,110 @@ mod test_remote_branches {
 			!branches_2[1].remote_details().unwrap().has_tracking
 		);
 		assert!(branches_2[2].remote_details().unwrap().has_tracking);
+	}
+
+	#[test]
+	fn t10c_cleanup_failure_keeps_switch() {
+		struct FailCleanupGuard;
+		impl Drop for FailCleanupGuard {
+			fn drop(&mut self) {
+				FAIL_CLEANUP_STATE.set(false);
+			}
+		}
+
+		let (r1_dir, _bare) = repo_init_bare().unwrap();
+		let (clone1_dir, clone1) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone1_path: RepoPath =
+			clone1_dir.path().to_str().unwrap().into();
+
+		write_commit_file(&clone1, "test.txt", "base", "commit1");
+		push_branch(
+			&clone1_path,
+			"origin",
+			"master",
+			false,
+			false,
+			None,
+			None,
+		)
+		.unwrap();
+
+		create_branch(&clone1_path, "topic").unwrap();
+		write_commit_file(
+			&clone1,
+			"test.txt",
+			"topic_content",
+			"commit2",
+		);
+		push_branch(
+			&clone1_path,
+			"origin",
+			"topic",
+			false,
+			false,
+			None,
+			None,
+		)
+		.unwrap();
+
+		let (clone2_dir, clone2) =
+			repo_clone(r1_dir.path().to_str().unwrap()).unwrap();
+		let clone2_path: RepoPath =
+			clone2_dir.path().to_str().unwrap().into();
+
+		// Create a conflicted merge in progress in clone2
+		create_branch(&clone2_path, "side").unwrap();
+		write_commit_file(&clone2, "test.txt", "side", "side");
+		checkout_branch(&clone2_path, "master").unwrap();
+		write_commit_file(&clone2, "test.txt", "master", "master");
+		crate::sync::merge::merge_branch(
+			&clone2_path,
+			"side",
+			BranchType::Local,
+		)
+		.unwrap();
+		assert_eq!(
+			crate::sync::repo_state(&clone2_path).unwrap(),
+			crate::sync::RepoState::Merge
+		);
+
+		let target = get_branches_info(&clone2_path, false)
+			.unwrap()
+			.into_iter()
+			.find(|b| b.name == "origin/topic")
+			.unwrap();
+
+		FAIL_CLEANUP_STATE.set(true);
+		let _guard = FailCleanupGuard;
+
+		let outcome =
+			checkout_branch_discard(&clone2_path, &target).unwrap();
+		let DiscardOutcome::StateNotCleared(msg) = outcome else {
+			panic!("expected StateNotCleared, got {outcome:?}");
+		};
+		assert!(
+			msg.starts_with(
+				"switched to 'topic', but could not clear the merge state: "
+			),
+			"unexpected message: {msg}"
+		);
+		assert_eq!(
+			clone2.head().unwrap().name().unwrap(),
+			"refs/heads/topic"
+		);
+		let local_topic =
+			clone2.find_branch("topic", BranchType::Local).unwrap();
+		assert_eq!(
+			local_topic.upstream().unwrap().name().unwrap(),
+			Some("origin/topic")
+		);
+		assert_eq!(
+			std::fs::read_to_string(
+				clone2_dir.path().join("test.txt")
+			)
+			.unwrap(),
+			"topic_content"
+		);
 	}
 }

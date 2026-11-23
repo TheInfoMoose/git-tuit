@@ -16,7 +16,7 @@ use anyhow::{Ok, Result};
 use asyncgit::sync::branch::checkout_remote_branch;
 use asyncgit::sync::{
 	checkout_branch, checkout_branch_discard, get_branches_info,
-	BranchInfo, RepoPath,
+	BranchInfo, DiscardOutcome, RepoPath,
 };
 use crossterm::event::Event;
 use ratatui::{
@@ -100,21 +100,47 @@ impl CheckoutOptionPopup {
 		Ok(())
 	}
 
+	pub(crate) fn discard_finished(
+		&mut self,
+		outcome: DiscardOutcome,
+	) {
+		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
+		self.hide();
+		if let DiscardOutcome::StateNotCleared(msg) = outcome {
+			self.queue.push(InternalEvent::ShowErrorMsg(format!(
+				"checkout warning:\n{msg}"
+			)));
+		}
+	}
+
 	fn handle_event(&mut self) -> Result<()> {
 		match self.option {
 			CheckoutOptions::KeepLocalChanges => {
 				self.checkout()?;
+				self.queue
+					.push(InternalEvent::Update(NeedsUpdate::ALL));
+				self.queue.push(InternalEvent::SelectBranch);
+				self.hide();
 			}
 			CheckoutOptions::DiscardAllLocalChagnes => {
-				if let Some(branch) = &self.branch {
-					checkout_branch_discard(&self.repo, branch)?;
+				let outcome = self
+					.branch
+					.as_ref()
+					.map(|branch| {
+						checkout_branch_discard(&self.repo, branch)
+					})
+					.transpose()?;
+				if let Some(outcome) = outcome {
+					self.discard_finished(outcome);
+				} else {
+					self.queue.push(InternalEvent::Update(
+						NeedsUpdate::ALL,
+					));
+					self.hide();
 				}
+				self.queue.push(InternalEvent::SelectBranch);
 			}
 		}
-
-		self.queue.push(InternalEvent::Update(NeedsUpdate::ALL));
-		self.queue.push(InternalEvent::SelectBranch);
-		self.hide();
 
 		Ok(())
 	}
@@ -123,11 +149,11 @@ impl CheckoutOptionPopup {
 		try_or_popup!(
 			self,
 			"checkout error:",
-			checkout_branch_discard(&self.repo, branch).map(|()| {
-				self.queue
-					.push(InternalEvent::Update(NeedsUpdate::ALL));
-				self.hide();
-			})
+			checkout_branch_discard(&self.repo, branch).map(
+				|outcome| {
+					self.discard_finished(outcome);
+				}
+			)
 		);
 	}
 
@@ -860,8 +886,16 @@ mod tests {
 		fs::write(c2_root.join("test.txt"), "tracked_edit").unwrap();
 		let target = branch_info(&c2_path, false, "origin/topic");
 
-		let res = checkout_branch_discard(&c2_path, &target);
-		assert!(res.is_err(), "expected upstream failure to refuse");
+		let err =
+			checkout_branch_discard(&c2_path, &target).unwrap_err();
+		let expected_prefix =
+			"could not set upstream 'origin/topic' for 'topic': ";
+		assert!(
+			err.to_string()
+				.trim_matches('`')
+				.starts_with(expected_prefix),
+			"error should start with {expected_prefix:?}, got: {err}"
+		);
 		assert_eq!(
 			fs::read_to_string(c2_root.join("test.txt")).unwrap(),
 			"tracked_edit"
@@ -1000,7 +1034,9 @@ mod tests {
 		assert!(root.join(".git/MERGE_HEAD").exists());
 
 		let target = branch_info(&repo_path, true, "target");
-		checkout_branch_discard(&repo_path, &target).unwrap();
+		let outcome =
+			checkout_branch_discard(&repo_path, &target).unwrap();
+		assert_eq!(outcome, DiscardOutcome::Switched);
 
 		assert_eq!(head_branch_name(&repo_path), "target");
 		assert_eq!(repo_state(&repo_path).unwrap(), RepoState::Clean);
@@ -1347,5 +1383,85 @@ mod tests {
 			"link.txt should remain a symlink"
 		);
 		assert_eq!(head_branch_name(&repo_path), "master");
+	}
+
+	#[test]
+	fn t10c_warning_closes_and_refreshes() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+		write_and_commit(&repo_path, root, "a.txt", "a", "c1");
+
+		let target = branch_info(&repo_path, true, "master");
+		let mut popup = popup_for(&repo_path, target);
+
+		popup.discard_finished(DiscardOutcome::StateNotCleared(
+			String::from(
+				"switched to 'topic', but could not clear the merge state: boom",
+			),
+		));
+
+		assert!(!popup.is_visible());
+
+		let mut saw_update_all = false;
+		let mut warnings = Vec::new();
+		while let Some(ev) = popup.queue.pop() {
+			match ev {
+				InternalEvent::Update(flags)
+					if flags.bits() == NeedsUpdate::ALL.bits() =>
+				{
+					saw_update_all = true;
+				}
+				InternalEvent::ShowErrorMsg(msg) => {
+					warnings.push(msg);
+				}
+				_ => {}
+			}
+		}
+
+		assert!(saw_update_all, "expected Update(ALL) event");
+		assert_eq!(
+			warnings,
+			vec![
+				"checkout warning:\nswitched to 'topic', but could not clear the merge state: boom"
+			]
+		);
+	}
+
+	#[test]
+	fn t10c_switched_shows_no_warning() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+		write_and_commit(&repo_path, root, "a.txt", "a", "c1");
+
+		let target = branch_info(&repo_path, true, "master");
+		let mut popup = popup_for(&repo_path, target);
+
+		popup.discard_finished(DiscardOutcome::Switched);
+
+		assert!(!popup.is_visible());
+
+		let mut saw_update_all = false;
+		let mut warnings = Vec::new();
+		while let Some(ev) = popup.queue.pop() {
+			match ev {
+				InternalEvent::Update(flags)
+					if flags.bits() == NeedsUpdate::ALL.bits() =>
+				{
+					saw_update_all = true;
+				}
+				InternalEvent::ShowErrorMsg(msg) => {
+					warnings.push(msg);
+				}
+				_ => {}
+			}
+		}
+
+		assert!(saw_update_all, "expected Update(ALL) event");
+		assert!(
+			warnings.is_empty(),
+			"expected no ShowErrorMsg, got: {warnings:?}"
+		);
 	}
 }
