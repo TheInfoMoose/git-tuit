@@ -997,4 +997,75 @@ mod tests {
 		assert!(!index.iter().any(|e| e.path == b"sub"));
 		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Clean);
 	}
+
+	#[test]
+	fn t11d_missing_submodule_dir_aborts() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		let base =
+			write_commit_file(&repo, "test.txt", "base", "base");
+		create_branch(repo_path, "feature").unwrap();
+		write_commit_file(&repo, "test.txt", "feature", "feature");
+		commit_gitlink(&repo, repo_path, "sub", base, "add sub");
+
+		checkout_branch(repo_path, "master").unwrap();
+		write_commit_file(&repo, "test.txt", "master", "master");
+
+		merge_branch(repo_path, "feature", BranchType::Local)
+			.unwrap();
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+
+		let sub = root.join("sub");
+		if sub.exists() {
+			fs::remove_dir_all(&sub).unwrap();
+		}
+		assert!(!sub.exists());
+
+		abort_pending_state(repo_path).unwrap();
+
+		assert!(!sub.exists());
+		let fresh = crate::sync::repository::repo(repo_path).unwrap();
+		let index = fresh.index().unwrap();
+		assert!(index.get_path(Path::new("sub"), 0).is_none());
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Clean);
+		assert_eq!(
+			fs::read_to_string(root.join("test.txt")).unwrap(),
+			"master"
+		);
+	}
+
+	#[test]
+	fn t11d_missing_merge_added_file_refuses() {
+		let (_td, repo) = repo_init().unwrap();
+		let root = repo.path().parent().unwrap();
+		let repo_path: &RepoPath =
+			&root.as_os_str().to_str().unwrap().into();
+
+		write_commit_file(&repo, "test.txt", "base", "base");
+		create_branch(repo_path, "feature").unwrap();
+		write_commit_file(&repo, "test.txt", "feature", "feature");
+		write_commit_file(&repo, "added.txt", "added", "add file");
+
+		checkout_branch(repo_path, "master").unwrap();
+		write_commit_file(&repo, "test.txt", "master", "master");
+
+		merge_branch(repo_path, "feature", BranchType::Local)
+			.unwrap();
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+
+		fs::remove_file(root.join("added.txt")).unwrap();
+
+		let err = abort_pending_state(repo_path).unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains(
+				"cannot abort: local changes to added.txt would be lost"
+			),
+			"unexpected error: {msg}"
+		);
+		assert_eq!(repo_state(repo_path).unwrap(), RepoState::Merge);
+	}
 }
