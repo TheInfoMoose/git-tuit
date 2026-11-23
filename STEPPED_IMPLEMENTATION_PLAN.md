@@ -42,7 +42,14 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 11):** discard-and-switch runs only through its confirmation, and the tests drive that real key path, including the merge-state warning; the unchanged-file check hashes without loading the file whole; abort's missing-submodule rule is pinned by a test.
+**Phase goal (Phase 12):** the default theme is the amber CRT palette with `theme.ron` overrides and old theme files still loading; focused borders, scrollbar tracks, attention blocks and the shared list/dialog/popup blocks take their colors from the theme with plain borders and padded titles; the discard confirmation is tested through the app's own dispatch.
+
+**Phase 12 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes theme part 1 (P3-01 FEAT-0002, P3-02 FEAT-0003 in part, P3-03 TASK-0007) and the Phase 11 review follow-up TASK-0123. `dead_code` is denied crate-wide (`src/main.rs`), so every new theme field and helper lands with a production caller; FEAT-0003 helpers whose callers are later migrations (`commandbar_key`, `commandbar_splitter`, `section_header`, `info_title`) wait for those steps. TASK-0124 is to be closed won't-fix by the user (not a step).
+
+**Phase 12 decisions (user, 2026-11-23):**
+- **D20 Scope:** theme part 1 (palette, focused/track/attention helpers, shared blocks) + TASK-0123. Pane, popup, tab bar, spinner and command bar migrations stay in the Phase 13 outline.
+
+_Phase 11 goal (done, reviewed 2026-11-23):_ discard-and-switch runs only through its confirmation, and the tests drive that real key path, including the merge-state warning; the unchanged-file check hashes without loading the file whole; abort's missing-submodule rule is pinned by a test.
 
 **Phase 11 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step; every FORBIDDEN_SCOPE line is checked against every edge case (Phase 10 review note). Takes the Phase 10 review follow-ups TASK-0117, TASK-0118 and BUG-0091. The amber theme moves to Phase 12.
 
@@ -106,10 +113,11 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 11A** | `/goal` | Discard Runs Only Through Its Confirmation | `src/popups/checkout_option.rs` | — |
-| 2 | **STEP 11B** | `/boost` | The Merge-State Warning Is Tested on the Real Path | `asyncgit/Cargo.toml`, `Cargo.toml`, `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | STEP 11A |
-| 3 | **STEP 11C** | `/goal` | Unchanged-File Check Streams the Hash | `asyncgit/src/sync/branch/mod.rs` | — |
-| 4 | **STEP 11D** | `/goal` | Abort With a Missing Submodule Dir Is Tested | `asyncgit/src/sync/merge.rs` | — |
+| 1 | **STEP 12A** | `/goal` | The Default Theme Is Amber | `src/ui/style.rs`, `THEMES.md` | — |
+| 2 | **STEP 12B** | `/goal` | Focused Borders and Scrollbar Tracks Use Theme Colors | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` | STEP 12A |
+| 3 | **STEP 12C** | `/goal` | Shared Plain Blocks With Padded Titles | `src/ui/mod.rs`, `src/ui/style.rs`, `src/ui/scrolllist.rs`, `src/components/mod.rs`, `src/popups/mod.rs` +3 | STEP 12B |
+| 4 | **STEP 12D** | `/goal` | Attention Blocks Come From the Theme | `src/ui/mod.rs`, `src/ui/style.rs`, `src/tabs/status.rs`, `src/tabs/revlog.rs`, `THEMES.md` | STEP 12C |
+| 5 | **STEP 12E** | `/goal` | Discard Confirm Is Tested Through the App | `src/app.rs`, `src/popups/msg.rs` | — |
 
 ### Completed
 
@@ -211,6 +219,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 10B** | ✅ | `/goal` | An Unchanged Staged Deletion Doesn't Block the Switch (follow-up BUG-0091 in 11C) | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` |
 | **STEP 10C** | ✅ 0eda2eb3 | `/boost` | A Switch That Moved HEAD Is Reported as Done (follow-up TASK-0117 in 11B) | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` |
 | **STEP 10D** | ✅ 5d293dfa | `/goal` | Abort Keeps a Populated Submodule (follow-up TASK-0118 in 11D) | `asyncgit/src/sync/merge.rs` |
+| **STEP 11A** | ✅ | `/goal` | Discard Runs Only Through Its Confirmation | `src/popups/checkout_option.rs` |
+| **STEP 11B** | ✅ | `/boost` | The Merge-State Warning Is Tested on the Real Path (follow-up TASK-0123 in 12E) | `asyncgit/Cargo.toml`, `Cargo.toml`, `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 11C** | ✅ fe4e0072 | `/goal` | Unchanged-File Check Streams the Hash | `asyncgit/src/sync/branch/mod.rs` |
+| **STEP 11D** | ✅ a390ed45 | `/goal` | Abort With a Missing Submodule Dir Is Tested | `asyncgit/src/sync/merge.rs` |
 
 ### User Step: IMAGE
 
@@ -244,13 +256,10 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 12 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
-  - Default palette + `#[serde(default)]` on `Theme` (P3-01)
-  - Semantic style helpers + `THEMES.md` (P3-02)
-  - Shared plain-border block helpers (P3-03)
-  - Frame paint, tab bar, spinner (P3-04)
-  - Command bar layout and styling (P3-05, P2-24)
-  - Pane and popup migrations (P3-06, P3-07; ~5 steps)
+- **Phase 13 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
+  - Frame paint (`BG_BLACK`), tab bar, spinner (P3-04)
+  - Command bar layout and styling, with the `commandbar_key` and `commandbar_splitter` helpers (P3-05, P2-24, rest of P3-02)
+  - Pane and popup migrations, with `section_header` and `info_title` (P3-06, P3-07, rest of P3-02; ~5 steps)
   - Snapshot updates + README note (P3-08)
 
 ### Open Questions
@@ -5700,6 +5709,308 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t11d_missing_submodule_dir_aborts' asyncgit/src/sync/merge.rs && grep -q 'fn t11d_missing_merge_added_file_refuses' asyncgit/src/sync/merge.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+---
+
+## Phase 12: Amber theme foundation
+
+### STEP 12A: The Default Theme Is Amber
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 12A: Theme::default() is the amber-on-black palette, and an old-format theme file that leaves fields out still loads, with the missing fields taking the new defaults.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:12-39 (Theme fields), 280-327 (load_patch, load_old_theme, save_patch, init), 330-361 (Default), 363-401 (test_smoke)
+  - src/main.rs:35-43 (dead_code and clippy pedantic/nursery are denied)
+  - neb: FEAT-0002 (AUDIT_REPORT P3-01). Plan Locked Decisions: styling tokens
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No Theme field is added, removed, renamed or retyped (theme.ron compatibility). The `syntax` default stays DEFAULT_SYNTAX_THEME. The order in Theme::init (patch first, then old format, else default) does not change. No #[allow] attributes.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a user with no theme.ron sees the amber palette; every existing theme.ron (patch format or old full format) still loads.
+
+Contract & Behavior:
+1. src/ui/style.rs palette constants: private `const`s of type Color for the tokens Default uses, named AMBER_PRIMARY Rgb(255,176,0), AMBER_BRIGHT Rgb(255,216,102), AMBER_DIM Rgb(153,99,0), AMBER_DARK Rgb(92,58,0), AMBER_ALERT Rgb(255,85,0), PANEL_BG Rgb(12,8,0), GREEN_ADD Rgb(127,217,98), SELECTION_BG Rgb(42,26,0). Every const is used (dead_code is denied); BG_BLACK is not added until the frame-paint step uses it.
+2. Theme::default() field values:
+   selected_tab AMBER_BRIGHT; command_fg AMBER_PRIMARY; selection_bg SELECTION_BG; selection_fg AMBER_BRIGHT; use_selection_fg true; cmdbar_bg PANEL_BG; disabled_fg AMBER_DIM; diff_line_add GREEN_ADD; diff_line_delete AMBER_ALERT; diff_file_added GREEN_ADD; diff_file_removed AMBER_ALERT; diff_file_moved AMBER_BRIGHT; diff_file_modified AMBER_PRIMARY; commit_hash AMBER_BRIGHT; commit_time AMBER_DIM; commit_author AMBER_PRIMARY; danger_fg AMBER_ALERT; push_gauge_bg AMBER_DARK; push_gauge_fg AMBER_BRIGHT; tag_fg AMBER_BRIGHT; branch_fg AMBER_PRIMARY; line_break "¶"; block_title_focused AMBER_BRIGHT; syntax DEFAULT_SYNTAX_THEME.
+3. Theme gets `#[serde(default)]` so the old full-format loader accepts a file that leaves fields out; each missing field takes its Theme::default() value.
+   Writers of Theme state (none of these change except as stated):
+   a. Theme::default(): the values in item 2.
+   b. Theme::init with a patch-format file: fields named in the patch override item 2; unnamed fields keep item 2.
+   c. Theme::init with an old full-format file (every field present): the file's values win for every field; save_patch then rewrites it as a patch of every field that differs from item 2, so a user's old ANSI colors are kept, not replaced by amber.
+   d. Theme::init with an old-format file that leaves fields out: named fields win, missing fields take item 2 (new with this step).
+   e. Theme::init with a missing or unparseable file: item 2, with the existing log::error line.
+4. THEMES.md: a table of the 24 fields and their default hex values (or `true` / `"¶"` / the syntax name), a line saying theme.ron only needs the fields it changes, and that old full-format files are converted on first load.
+
+Must still work:
+- test_smoke in src/ui/style.rs, unchanged.
+- Every caller of Theme::default() and Theme::init (src/app.rs, src/gitui.rs, src/main.rs, src/components/diff.rs, src/components/commitlist.rs tests): no signature changes.
+- The three insta snapshots (TestBackend's Display prints symbols only, so colors don't reach them).
+
+Drops:
+- Users with no theme.ron no longer get colors that follow their terminal's ANSI palette; the default is fixed RGB amber. A theme.ron restores any field.
+
+Tests:
+  In src/ui/style.rs `mod tests`, with tempfile::NamedTempFile as test_smoke does.
+  - `t12a_default_is_amber`: Theme::default() -> each of the 24 fields equals item 2 (compare the Rgb values, not the const names).
+  - `t12a_partial_old_theme_loads`: file `(selection_bg: "Black", line_break: "~")` -> Theme::init gives selection_bg Color::Black and line_break "~", and every other field equals Theme::default(); a second Theme::init on the same path gives the same 24 values. (Whichever loader accepts the file, the result is this.)
+  - `t12a_bad_file_gives_default`: file `not ron` -> Theme::init equals Theme::default() field for field.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'serde(default)' src/ui/style.rs && grep -q 'fn t12a_default_is_amber' src/ui/style.rs && grep -q 'fn t12a_partial_old_theme_loads' src/ui/style.rs && grep -q 'fn t12a_bad_file_gives_default' src/ui/style.rs && grep -q 'FFB000' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 12B: Focused Borders and Scrollbar Tracks Use Theme Colors
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 12B: a focused block's border is drawn in a theme color instead of the terminal default, and the scrollbar track is drawn in a theme color; both colors are new theme.ron fields.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - src/ui/scrollbar.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:12-52 (Theme fields, scroll_bar_pos, block)
+  - src/ui/scrollbar.rs:20-142 (Scrollbar style_bar/style_pos, draw_scrollbar)
+  - src/popups/externaleditor.rs:176-182 (uses block(true) as a body style too)
+  - neb: FEAT-0003 (AUDIT_REPORT P3-02, focused block and track part only)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No existing Theme field is removed, renamed or retyped. Scrollbar geometry and symbols (DOUBLE_VERTICAL, DOUBLE_HORIZONTAL, FULL, positions) don't change. block(false) doesn't change. No helper without a production caller (dead_code is denied); commandbar_key, commandbar_splitter, section_header and info_title are not added here.
+
+[PRE_GATE]
+grep -q 'serde(default)' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: focused panes and popups get an amber border, and scrollbar tracks are dark amber, all overridable in theme.ron.
+
+Contract & Behavior:
+1. src/ui/style.rs: two new Theme fields, `border_focused_fg: Color` (default Rgb(255,176,0)) and `scroll_track_fg: Color` (default Rgb(92,58,0)). They're in ThemePatch like every field.
+   Writers: Theme::default() (the values above); a patch naming them overrides; a patch not naming them keeps the defaults; an old full-format file without them loads with the defaults (12A's serde(default)).
+2. `Theme::block(&self, focus: bool) -> Style`: focus true -> fg border_focused_fg; focus false -> unchanged (fg disabled_fg).
+3. New `Theme::scroll_bar_track(&self) -> Style`: fg scroll_track_fg.
+4. src/ui/scrollbar.rs draw_scrollbar: the track cells use theme.scroll_bar_track(); the position cell still uses scroll_bar_pos().
+5. THEMES.md: both fields in the defaults table.
+
+Must still work:
+- test_smoke and the t12a_ tests (t12a_default_is_amber covers the 24 original fields; these two are extra).
+- Every caller of block(true) keeps compiling unchanged. ExternalEditorPopup's body text, which uses block(true) as its style, now renders in border_focused_fg; that's accepted until the popup migration step.
+- Scrollbar early returns (height or width <= 2, max == 0) unchanged.
+
+Drops: none
+
+Tests:
+  - `t12b_focused_border_uses_theme` (src/ui/style.rs): Theme::default().block(true) == Style::default().fg(Rgb(255,176,0)); block(false) == Style::default().fg(Rgb(153,99,0)).
+  - `t12b_patch_sets_border_and_track` (src/ui/style.rs): patch file `(border_focused_fg: Some("Green"), scroll_track_fg: Some("Red"))` -> block(true).fg Some(Color::Green), scroll_bar_track().fg Some(Color::Red); a patch file `(selection_bg: Some("Black"))` -> both keep their defaults.
+  - `t12b_scrollbar_track_styled` (src/ui/scrollbar.rs `mod tests`): Terminal with TestBackend 3x10, draw_scrollbar(f, f.area(), &theme, 10, 0, Orientation::Vertical) with Rc::new(Theme::default()) -> every `║` cell in the right column has fg Rgb(92,58,0), and the one `█` cell has fg Rgb(42,26,0).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn scroll_bar_track' src/ui/style.rs && grep -q 'border_focused_fg' THEMES.md && grep -q 'fn t12b_focused_border_uses_theme' src/ui/style.rs && grep -q 'fn t12b_patch_sets_border_and_track' src/ui/style.rs && grep -q 'fn t12b_scrollbar_track_styled' src/ui/scrollbar.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 12C: Shared Plain Blocks With Padded Titles
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 12C: ui::styled_block and ui::popup_block build every shared list, dialog and popup block: plain borders, titles padded as " {title} ", focus colors from the theme, and popups on the panel background.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/mod.rs
+  - src/ui/style.rs
+  - src/ui/scrolllist.rs
+  - src/components/mod.rs
+  - src/popups/mod.rs
+  - THEMES.md
+  - src/snapshots/gitui__gitui__tests__app_loading.snap
+  - src/snapshots/gitui__gitui__tests__app_loading_finished.snap
+READ_ONLY_REFS:
+  - src/ui/scrolllist.rs:57-75 (draw_list), src/components/mod.rs:287-301 (dialog_paragraph), src/popups/mod.rs:72-97 (popup_paragraph, the Thick border)
+  - Callers: src/components/status_tree.rs:352,397 (draw_list); src/components/commit_details/details.rs:331,370 and compare_details.rs:140,153 (dialog_paragraph); src/popups/confirm.rs:115-150 (popup_paragraph)
+  - src/gitui.rs:234-289 (gitui_starts, the snapshots); src/components/commit_details/mod.rs:429-500 (t8m tests find rows by title text)
+  - neb: TASK-0007 (AUDIT_REPORT P3-03)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Callers of draw_list, dialog_paragraph and popup_paragraph keep their call sites unchanged (signatures stay). Blocks built elsewhere (commitlist, diff, branchlist, the other popups) are not migrated here. src/snapshots/gitui__gitui__tests__app_log_tab_showing_one_commit.snap does not change. No #[allow] attributes.
+
+[PRE_GATE]
+grep -q 'fn scroll_bar_track' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: the shared builders draw one consistent block shape, and a reader sees padded titles on the Status tab panes, commit details and confirm popups.
+
+Contract & Behavior:
+1. src/ui/style.rs: new Theme field `panel_bg: Color` (default Rgb(12,8,0)), in ThemePatch, and `Theme::popup(&self) -> Style` = bg panel_bg. Writers as for 12B's fields: default, patch override, old-format file without it gets the default.
+2. src/ui/mod.rs: `pub fn styled_block<'a>(title: &str, theme: &Theme, focused: bool) -> Block<'a>`: Borders::ALL, BorderType::Plain, border_style theme.block(focused), title " {title} " styled theme.title(focused).
+   Edge cases:
+   a. Empty title: no title is set (the top border is all `─`, no "  ").
+   b. Title longer than the inner width: ratatui clips it; no panic; corners stay.
+3. src/ui/mod.rs: `pub fn popup_block<'a>(title: &str, theme: &Theme, focused: bool) -> Block<'a>`: styled_block plus style theme.popup() (panel background).
+4. Migrations: draw_list and dialog_paragraph use styled_block; popup_paragraph with block = true uses popup_block, so the confirm popup's border goes from Thick to Plain. popup_paragraph with block = false is unchanged.
+5. Snapshots app_loading and app_loading_finished: only rows 8 and 13 change. "┌Unstaged Changes" becomes "┌ Unstaged Changes " and "┌Staged Changes" becomes "┌ Staged Changes ", each row losing two `─` so its width stays 90. Every other row is byte-identical.
+6. THEMES.md: panel_bg in the defaults table.
+
+Must still work:
+- gitui_starts and every gitui.rs screen test; the t8m_ tests in src/components/commit_details/mod.rs (they find rows with contains, which padding keeps).
+- Confirm popup sizing in src/popups/confirm.rs (it depends on width only, not on border type).
+- status_tree's scroll tests at Rect 10x5 (src/components/status_tree.rs:600-683): no panic with a clipped title.
+
+Drops:
+- The confirm popup's thick border (┏━┓) becomes a plain one (┌─┐).
+
+Tests:
+  In src/ui/mod.rs `mod tests` (add one if missing), rendering into Terminal::new(TestBackend::new(w, h)) and reading cells; theme = Theme::default().
+  - `t12c_styled_block_pads_title`: styled_block("Files", &theme, true) in 20x3 -> row 0 is exactly "┌ Files ───────────┐"; cell (0,0) fg Rgb(255,176,0); cell (2,0) fg Rgb(255,216,102) with BOLD. With focused false -> cell (0,0) fg Rgb(153,99,0).
+  - `t12c_empty_title_not_padded`: styled_block("", &theme, false) in 20x3 -> row 0 is "┌" + 18 `─` + "┐".
+  - `t12c_long_title_clipped`: styled_block("Unstaged Changes", &theme, true) in 10x3 -> row 0 starts with "┌ Uns", ends with "┐", 10 cells, no panic.
+  - `t12c_popup_block_plain_on_panel`: popup_block("Confirm", &theme, true) in 20x4 -> cell (0,0) is "┌" (not "┏"); cell (1,1) bg Rgb(12,8,0).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'pub fn styled_block' src/ui/mod.rs && grep -q 'pub fn popup_block' src/ui/mod.rs && grep -q 'panel_bg' THEMES.md && grep -q '┌ Unstaged Changes ' src/snapshots/gitui__gitui__tests__app_loading_finished.snap && grep -q 'fn t12c_styled_block_pads_title' src/ui/mod.rs && grep -q 'fn t12c_empty_title_not_padded' src/ui/mod.rs && grep -q 'fn t12c_long_title_clipped' src/ui/mod.rs && grep -q 'fn t12c_popup_block_plain_on_panel' src/ui/mod.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 12D: Attention Blocks Come From the Theme
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 12D: the Status tab's pending-state block and the log search block are built by ui::attention_block with a theme color, replacing the hardcoded yellow border and red text.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/mod.rs
+  - src/ui/style.rs
+  - src/tabs/status.rs
+  - src/tabs/revlog.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:276-278 (static attention_block, Color::Yellow)
+  - src/tabs/status.rs:287-314 (draw_repo_state, Color::Red body), src/tabs/revlog.rs:433-451 (search block)
+  - src/ui/mod.rs (styled_block from STEP 12C)
+  - neb: FEAT-0003 (attention part), TASK-0007
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The text shown (repo_state_text, "Pending <state>", the search title and counts) and the layout areas don't change. No #[allow] attributes.
+
+[PRE_GATE]
+grep -q 'pub fn styled_block' src/ui/mod.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: attention blocks are AMBER_ALERT by default and overridable, with padded titles like every other block.
+
+Contract & Behavior:
+1. src/ui/style.rs: new Theme field `attention_fg: Color` (default Rgb(255,85,0)), in ThemePatch; writers as for 12B's fields. New `Theme::attention_block_style(&self) -> Style` = fg attention_fg. The static `Theme::attention_block()` is removed.
+2. src/ui/mod.rs: `pub fn attention_block<'a>(title: &str, theme: &Theme) -> Block<'a>`: Borders::ALL, BorderType::Plain, border_style theme.attention_block_style(), title " {title} " styled theme.title(true); empty title -> no title (same rule as styled_block).
+3. src/tabs/status.rs draw_repo_state: block from attention_block with the "Pending {state:?}" title; body text style theme.text_danger() instead of Color::Red. A Clean state still draws nothing.
+4. src/tabs/revlog.rs search block: built by attention_block with the same title text as today.
+5. THEMES.md: attention_fg in the defaults table.
+
+Must still work:
+- Status tab tests and revlog search tests that look for "Pending" or the search title text (padding keeps contains matches).
+- The status tab still shows the pending block only when repo state isn't Clean.
+
+Drops:
+- The yellow attention border and red pending-state text: they become attention_fg and danger_fg (both AMBER_ALERT by default).
+
+Tests:
+  - `t12d_attention_block_uses_theme` (src/ui/mod.rs): attention_block("Pending Merge", &Theme::default()) in 30x3 -> row 0 starts with "┌ Pending Merge ", cell (0,0) fg Rgb(255,85,0).
+  - `t12d_patch_sets_attention_fg` (src/ui/style.rs): patch file `(attention_fg: Some("Yellow"))` -> attention_block_style().fg Some(Color::Yellow).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'pub fn attention_block' src/ui/mod.rs && grep -q 'fn attention_block_style' src/ui/style.rs && grep -q 'attention_fg' THEMES.md && grep -q 'fn t12d_attention_block_uses_theme' src/ui/mod.rs && grep -q 'fn t12d_patch_sets_attention_fg' src/ui/style.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 12E: Discard Confirm Is Tested Through the App
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 12E: app-level tests drive discard-and-switch through App's ConfirmAction dispatch, so removing the branch-list refresh or the warning path in app.rs fails a test.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/app.rs
+  - src/popups/msg.rs
+READ_ONLY_REFS:
+  - src/app.rs:1181-1201 (process_confirmed_repo_action, the whole CheckoutBranchDiscard arm), 1513-1545 (make_test_app, send_key!), 1559-1588 (create_diverged_branch, open_branch_popup_on), 2118-2185 (t8e_discard_asks_first), 3200-3214 (render_app)
+  - src/popups/branchlist.rs:611-650 (switch_to_selected_branch: dirty tree -> CheckoutOption), 309-321 (update_branches)
+  - src/popups/checkout_option.rs:103-135 (discard_finished, confirm_discard), 1552-1623 (setup_merge_conflict_for_target, t11b_warning_through_confirm and its FailCleanupGuard)
+  - src/popups/msg.rs:22-24, 186-211 (MsgPopup msg field, show_error)
+  - neb: TASK-0123. Decisions D2, D15, D17, D19
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Only `mod tests` in src/app.rs changes. In src/popups/msg.rs only a #[cfg(test)] accessor is added. No production behavior changes.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: the app.rs CheckoutBranchDiscard arm is covered: deleting its update_branches call fails t12e_discard_refreshes_open_branch_list, and losing the warning on the way to MsgPopup fails t12e_discard_warning_through_app.
+
+Contract & Behavior:
+No writer changes. The arm's condition "branch list visible" covers two states: visible (refresh, test 1) and hidden (no refresh needed, already covered by t8e_discard_asks_first, which opens the picker directly).
+
+1. src/popups/msg.rs: `#[cfg(test)] pub(crate) fn message(&self) -> &str` returning the stored message text.
+2. src/app.rs tests:
+   Edge cases:
+   a. Branch list open, dirty tree, discard confirmed: HEAD is the target, the checkout picker is closed, the branch list is still visible and lists a branch created while the confirm was open.
+      Proof: `t12e_discard_refreshes_open_branch_list` (fails if the update_branches call in the arm is removed: nothing else refreshes the list, since NeedsUpdate::ALL doesn't reach update_branches).
+   b. Repo in a conflicted merge, cleanup forced to fail: HEAD is the target, MERGE_HEAD still exists, the picker is closed, and MsgPopup is visible with exactly "checkout warning:\nswitched to 'target', but could not clear the merge state: `simulated cleanup_state failure`" (Error::Generic prints its cause in backticks).
+      Proof: `t12e_discard_warning_through_app`.
+
+Must still work:
+- Every t8e_ test in src/app.rs; every t8b_, t11a_, t11b_ test in src/popups/checkout_option.rs.
+- The cleanup-failure switch is thread-local and reset by a drop guard, as in t11b_warning_through_confirm, so it can't leak into other tests.
+
+Drops: none
+
+Tests:
+  In src/app.rs `mod tests`, using make_test_app, send_key!, commit_file, create_diverged_branch, open_branch_popup_on and render_app.
+  - `t12e_discard_refreshes_open_branch_list`: base commit; branch "other" diverged on a.txt; a.txt dirty. open_branch_popup_on(app, kc, "other"); Enter -> checkout_option_popup visible; move_down; Enter -> confirm_popup visible. Create branch "zz-late-branch" at HEAD with git2; render_app(&app, 80, 24) doesn't contain it. Enter -> HEAD == other's commit; checkout_option_popup hidden; select_branch_popup visible; render_app(&app, 80, 24) contains "zz-late-branch".
+  - `t12e_discard_warning_through_app`: setup as setup_merge_conflict_for_target (branches "side" and "target" from c2; master's c3 conflicts with side on a.txt; `git merge side` stops with RepoState::Merge). App via make_test_app; checkout_option_popup.open(<"target" BranchInfo from get_branches_info>); move_down; Enter -> confirm visible. Set asyncgit::sync::branch::set_fail_cleanup_state(true) under a drop guard that sets it false. Enter -> results in 2b, read via msg_popup.message().
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn message' src/popups/msg.rs && grep -q 'fn t12e_discard_refreshes_open_branch_list' src/app.rs && grep -q 'fn t12e_discard_warning_through_app' src/app.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
