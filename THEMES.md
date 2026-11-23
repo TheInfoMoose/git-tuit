@@ -36,6 +36,8 @@ The default theme uses an amber-on-black RGB palette:
 | `branch_fg` | `#FFB000` |
 | `line_break` | `"¶"` |
 | `block_title_focused` | `#FFD866` |
+| `border_focused_fg` | `#FFB000` |
+| `scroll_track_fg` | `#5C3A00` |
 | `syntax` | `"base16-eighties.dark"` |
 
 The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at one of the following paths, depending on your operating system:

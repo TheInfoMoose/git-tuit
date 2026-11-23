@@ -137,6 +137,54 @@ pub fn draw_scrollbar(
 	orientation: Orientation,
 ) {
 	let mut widget = Scrollbar::new(max, pos, orientation);
+	widget.style_bar = theme.scroll_bar_track();
 	widget.style_pos = theme.scroll_bar_pos();
 	f.render_widget(widget, r);
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::ui::style::Theme;
+	use ratatui::{backend::TestBackend, style::Color, Terminal};
+	use std::rc::Rc;
+
+	#[test]
+	fn t12b_scrollbar_track_styled() {
+		let theme = Rc::new(Theme::default());
+		let mut terminal =
+			Terminal::new(TestBackend::new(3, 10)).unwrap();
+
+		terminal
+			.draw(|f| {
+				draw_scrollbar(
+					f,
+					f.area(),
+					&theme,
+					10,
+					0,
+					Orientation::Vertical,
+				);
+			})
+			.unwrap();
+
+		let buf = terminal.backend().buffer();
+		let right = buf.area.right() - 1;
+		let mut track_count = 0;
+		let mut pos_count = 0;
+
+		for y in buf.area.top()..buf.area.bottom() {
+			let cell = &buf[(right, y)];
+			if cell.symbol() == DOUBLE_VERTICAL {
+				track_count += 1;
+				assert_eq!(cell.fg, Color::Rgb(92, 58, 0));
+			} else if cell.symbol() == FULL {
+				pos_count += 1;
+				assert_eq!(cell.fg, Color::Rgb(42, 26, 0));
+			}
+		}
+
+		assert!(track_count > 0);
+		assert_eq!(pos_count, 1);
+	}
 }

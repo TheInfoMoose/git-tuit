@@ -45,6 +45,8 @@ pub struct Theme {
 	branch_fg: Color,
 	line_break: String,
 	block_title_focused: Color,
+	border_focused_fg: Color,
+	scroll_track_fg: Color,
 	syntax: String,
 }
 
@@ -53,9 +55,13 @@ impl Theme {
 		Style::default().fg(self.selection_bg)
 	}
 
+	pub fn scroll_bar_track(&self) -> Style {
+		Style::default().fg(self.scroll_track_fg)
+	}
+
 	pub fn block(&self, focus: bool) -> Style {
 		if focus {
-			Style::default()
+			Style::default().fg(self.border_focused_fg)
 		} else {
 			Style::default().fg(self.disabled_fg)
 		}
@@ -363,6 +369,8 @@ impl Default for Theme {
 			branch_fg: AMBER_PRIMARY,
 			line_break: "¶".to_string(),
 			block_title_focused: AMBER_BRIGHT,
+			border_focused_fg: AMBER_PRIMARY,
+			scroll_track_fg: AMBER_DARK,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -512,5 +520,51 @@ mod tests {
 
 		let theme = Theme::init(&path);
 		assert_theme_eq(&theme, &Theme::default());
+	}
+
+	#[test]
+	fn t12b_focused_border_uses_theme() {
+		let theme = Theme::default();
+
+		assert_eq!(
+			theme.block(true),
+			Style::default().fg(Color::Rgb(255, 176, 0))
+		);
+		assert_eq!(
+			theme.block(false),
+			Style::default().fg(Color::Rgb(153, 99, 0))
+		);
+	}
+
+	#[test]
+	fn t12b_patch_sets_border_and_track() {
+		let mut override_file = NamedTempFile::new().unwrap();
+		writeln!(
+			override_file,
+			r#"(border_focused_fg: Some("Green"), scroll_track_fg: Some("Red"))"#
+		)
+		.unwrap();
+
+		let overridden =
+			Theme::init(&override_file.path().to_path_buf());
+		assert_eq!(overridden.block(true).fg, Some(Color::Green));
+		assert_eq!(
+			overridden.scroll_bar_track().fg,
+			Some(Color::Red)
+		);
+
+		let mut partial_file = NamedTempFile::new().unwrap();
+		writeln!(partial_file, r#"(selection_bg: Some("Black"))"#)
+			.unwrap();
+
+		let partial = Theme::init(&partial_file.path().to_path_buf());
+		assert_eq!(
+			partial.block(true).fg,
+			Some(Color::Rgb(255, 176, 0))
+		);
+		assert_eq!(
+			partial.scroll_bar_track().fg,
+			Some(Color::Rgb(92, 58, 0))
+		);
 	}
 }
