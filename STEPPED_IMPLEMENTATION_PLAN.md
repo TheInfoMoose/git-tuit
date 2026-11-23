@@ -42,7 +42,15 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 9):** aborting a merge or revert and discarding to switch branches never lose untracked files or unrelated edits and leave no stale merge state; a push only ever offers the credentials of the remote it goes to; a force-push refuses when the branch moved under its prompt.
+**Phase goal (Phase 10):** discard-and-switch refuses only what git refuses (a bare main repo's HEAD doesn't count, an unchanged `git rm --cached` file doesn't block) and never reports a completed switch as a failure; aborting a merge keeps a populated submodule directory.
+
+**Phase 10 format:** outcome steps v2 with the TASK-0091 rule, a Tests list per step, and named tests (not traces) for every rollback after a write (Phase 9 review process note). Takes the Phase 9 review follow-ups BUG-0087, BUG-0088, BUG-0089, BUG-0090 and TASK-0112. The amber theme moves to Phase 11.
+
+**Phase 10 decisions (user, 2026-11-22):**
+- **D16 Staged-deleted, unchanged:** discard-and-switch proceeds when a `git rm --cached` file's content still matches its HEAD blob (BUG-0089); the staged deletion is discarded with the other changes.
+- **D17 Cleanup after switch:** once HEAD has moved, the switch stands. A failed merge-state cleanup closes the popup like a success and shows a warning (BUG-0088).
+
+_Phase 9 goal (done, reviewed 2026-11-22):_ aborting a merge or revert and discarding to switch branches never lose untracked files or unrelated edits and leave no stale merge state; a push only ever offers the credentials of the remote it goes to; a force-push refuses when the branch moved under its prompt.
 
 **Phase 9 format:** outcome steps v2 with the TASK-0091 rule (writers and states), plus a Tests list per step. Re-splits the Phase 8 review findings BUG-0070, BUG-0071, BUG-0077, BUG-0078, BUG-0079, BUG-0080. STEP 8A (deferred) is re-split as 9A; STEP 8I (deferred) stays pending as TASK-0100. The amber theme moves to Phase 10.
 
@@ -89,10 +97,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 9A** | `/boost` | Abort Undoes Only the Merge (re-split 8A) | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/mod.rs`, `src/strings.rs` | — |
-| 2 | **STEP 9B** | `/boost` | Discard-and-Switch Checks First, Leaves a Clean Target | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
-| 3 | **STEP 9C** | `/boost` | Push Credentials Come From the Target Remote | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/push.rs`, `src/popups/push_tags.rs`, `src/app.rs` | — |
-| 4 | **STEP 9D** | `/goal` | Force-Push Refuses a Moved Branch | `src/popups/confirm.rs`, `src/app.rs` | — |
+| 1 | **STEP 10A** | `/goal` | A Bare Main Repo Doesn't Hold a Branch | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | — |
+| 2 | **STEP 10B** | `/goal` | An Unchanged Staged Deletion Doesn't Block the Switch | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | — |
+| 3 | **STEP 10C** | `/boost` | A Switch That Moved HEAD Is Reported as Done | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
+| 4 | **STEP 10D** | `/goal` | Abort Keeps a Populated Submodule | `asyncgit/src/sync/merge.rs` | — |
 
 ### Completed
 
@@ -186,6 +194,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 8N** | ✅ | `/goal` | Scrolling Survives Resize | `src/components/utils/scroll_vertical.rs`, `src/components/utils/scroll_horizontal.rs`, `src/components/syntax_text.rs`, `src/components/commit_details/details.rs`, `src/ui/stateful_paragraph.rs` +1 |
 | **STEP 8O** | ✅ c12a21bb | `/boost` | Marks and Column Widths | `src/components/commitlist.rs`, `src/components/utils/mod.rs`, `src/tabs/revlog.rs`, `src/tabs/stashlist.rs` |
 | **STEP 8P** | ✅ 25cc85c7 | `/boost` | Files View Follows Its Revision | `src/app.rs`, `src/gitui.rs`, `src/queue.rs`, `src/popup_stack.rs`, `src/strings.rs` +5 |
+| **STEP 9A** | ✅ | `/boost` | Abort Undoes Only the Merge (re-split 8A; follow-up BUG-0090 in 10D) | `asyncgit/src/sync/merge.rs`, `asyncgit/src/sync/mod.rs`, `src/strings.rs` |
+| **STEP 9B** | ✅ | `/boost` | Discard-and-Switch Checks First, Leaves a Clean Target (follow-ups in 10A–10C) | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 9C** | ✅ | `/boost` | Push Credentials Come From the Target Remote | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/push.rs`, `src/popups/push_tags.rs`, `src/app.rs` |
+| **STEP 9D** | ✅ 1724dad1 | `/goal` | Force-Push Refuses a Moved Branch | `src/popups/confirm.rs`, `src/app.rs` |
 
 ### User Step: IMAGE
 
@@ -219,7 +231,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 10 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
+- **Phase 11 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
   - Shared plain-border block helpers (P3-03)
@@ -5174,6 +5186,267 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t9d_ 2>&1 | grep -cE 't9d_.* ok$')" -ge 2
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+---
+
+## Phase 10: Discard-and-switch and abort follow-ups
+
+### STEP 10A: A Bare Main Repo Doesn't Hold a Branch
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 10A: discard-and-switch from a linked worktree ignores the HEAD of a bare main repo, as git does, and still refuses a branch checked out in the main worktree or a sibling worktree.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:521-580 (head_points_to, check_branch_not_checked_out_elsewhere), 691-774 (checkout_branch_discard)
+  - src/popups/checkout_option.rs:357-388 (branch_info, head_branch_name), 730-738 (run_git), 793-835 (t9b_linked_worktree_refuses: harness pattern)
+  - neb: BUG-0087
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Only check_branch_not_checked_out_elsewhere changes in asyncgit/src/sync/branch/mod.rs. The error text "branch '<name>' is checked out at <path>" stays. src/popups/checkout_option.rs: tests only.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: from a linked worktree of a bare repo, discard-and-switch to the branch the bare HEAD names works, like `git switch`.
+
+Contract & Behavior:
+State read, not written: the HEAD of the main repo (via the common dir) and of every linked worktree. This step changes no writer.
+
+1. When the current repo is a linked worktree, the main repo's HEAD counts as "checked out" only if the main repo is not bare. A bare main repo is skipped; the scan of linked worktrees still runs.
+   Edge cases:
+   a. Main repo bare, its HEAD names the target, no worktree has it: the switch goes ahead.
+      Proof: test `t10a_bare_main_allows`.
+   b. Main repo bare, a sibling linked worktree has the target checked out: refuse naming that worktree's path; nothing changes.
+      Proof: test `t10a_bare_sibling_refuses`.
+   c. Main repo not bare, its worktree has the target checked out: refuse naming the main worktree's path; nothing changes.
+      Proof: test `t10a_linked_to_main_refuses`.
+   d. Current repo is the main worktree and a linked worktree has the target: refuse (9B).
+      Proof: existing `t9b_linked_worktree_refuses`.
+
+Must still work:
+- Every `t8b_` and `t9b_` test in src/popups/checkout_option.rs.
+- A local target that no worktree has checked out switches as today.
+
+Drops: discard-and-switch from a linked worktree no longer refuses the branch a bare main repo's HEAD names (git parity).
+
+Tests:
+  In src/popups/checkout_option.rs tests, set up with the git CLI (`run_git`), local paths only. Each worktree gets one tracked edit before the call.
+  - `t10a_bare_main_allows`: repo with one commit on master, `git clone --bare` it, `git -C <bare> worktree add <wt> -b work`; from <wt>, discard-and-switch to local master -> Ok; HEAD of <wt> is master; status of <wt> is empty.
+  - `t10a_bare_sibling_refuses`: same bare setup plus `git -C <bare> worktree add <wt2> master`; from <wt>, discard-and-switch to master -> error containing "master" and <wt2>'s directory name; <wt> still on work with its edit.
+  - `t10a_linked_to_main_refuses`: non-bare repo on master with `git worktree add <wt> -b feature`; from <wt>, discard-and-switch to master -> error containing "master"; <wt> still on feature with its edit; the main worktree is untouched.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t10a_ 2>&1 | grep -cE 't10a_.* ok$')" -ge 3 && grep -q 'is_bare()' asyncgit/src/sync/branch/mod.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 10B: An Unchanged Staged Deletion Doesn't Block the Switch
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 10B: discard-and-switch treats a `git rm --cached` file whose disk content still matches its HEAD blob as a tracked change to discard, not as an untracked collision.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:440-497 (untracked_path_collides_with_tree, find_untracked_collisions), 659-774 (apply_discard_checkout, checkout_branch_discard)
+  - asyncgit/src/sync/merge.rs:115-150 (worktree_matches_index: how a disk file is compared to a blob id)
+  - src/popups/checkout_option.rs:341-388 (write_and_commit, branch_info, head_branch_name), 878-979 (t9b_index_deleted_*, t9b_index_matches_target: harness pattern)
+  - neb: BUG-0089. Decision D16
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Only find_untracked_collisions (and private helpers it needs) changes in asyncgit/src/sync/branch/mod.rs. The collision error text stays. asyncgit/src/sync/merge.rs is not edited. src/popups/checkout_option.rs: tests only.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: `git rm --cached a.txt` with a.txt unchanged no longer blocks discard-and-switch; an edited one still does.
+
+Contract & Behavior:
+State read, not written: the HEAD tree, the index and the worktree. The switch itself (apply_discard_checkout) is unchanged.
+
+1. An un-indexed worktree path that HEAD has is not a collision when its disk content matches the HEAD entry: a regular file (HEAD mode 100644 or 100755) whose raw bytes hash to the HEAD blob id, or a symlink (HEAD mode 120000) whose target hashes to it. Such a path is skipped by both collision checks (HEAD and target tree). Anything else HEAD has stays a collision: different bytes, a different file type, or a gitlink entry. A read error is returned as an error before anything is written.
+   Edge cases:
+   a. Unchanged, the target has the path with other content: the switch goes ahead; the file has the target content.
+      Proof: test `t10b_unchanged_overwrite_proceeds`.
+   b. Unchanged, the target lacks the path: the switch goes ahead; the file is gone.
+      Proof: test `t10b_unchanged_remove_proceeds`.
+   c. Edited: refuse, naming it (9B).
+      Proof: existing `t9b_index_deleted_overwrite_refuses`, `t9b_index_deleted_remove_refuses`.
+   d. One unchanged and one edited: refuse; the error names the edited path and not the unchanged one; both files keep their content; HEAD unchanged.
+      Proof: test `t10b_edited_beside_unchanged_refuses`.
+   e. HEAD has a regular file, disk has a symlink at that path: refuse, naming it.
+      Proof: test `t10b_type_change_refuses`.
+   f. Raw bytes differ only by a content filter (e.g. autocrlf): refuse. This is the safe direction and is documented in a comment, not tested.
+2. After a switch that skipped such a path, the status is empty: index, worktree and HEAD all equal the target.
+   Proof: the status assertions in tests 1a and 1b.
+
+Must still work:
+- Every `t8b_` and `t9b_` test, including `t8b_untracked_bystander_survives` (an untracked file HEAD doesn't have survives) and `t8b_untracked_collision_changes_nothing`.
+
+Drops: discard-and-switch no longer refuses a staged-deleted file whose content matches HEAD (9B item 2 narrowed, D16).
+
+Tests:
+  In src/popups/checkout_option.rs tests, `repo_init`, `write_and_commit`, `git rm --cached` via `run_git`, then call checkout_branch_discard.
+  - `t10b_unchanged_overwrite_proceeds`: notes.txt "base" on master, branch other changes it to "other"; on master `git rm --cached notes.txt` -> Ok; HEAD other; notes.txt reads "other"; status empty.
+  - `t10b_unchanged_remove_proceeds`: other lacks notes.txt, master has it as "master_notes"; `git rm --cached notes.txt` -> Ok; HEAD other; notes.txt doesn't exist; status empty.
+  - `t10b_edited_beside_unchanged_refuses`: master has keep.txt and edit.txt; `git rm --cached` both; edit.txt rewritten "precious_edit" -> error containing "edit.txt" and not "keep.txt"; both files keep their content; HEAD master.
+  - `t10b_type_change_refuses`: master has link.txt as a regular file; `git rm --cached link.txt`, replace it with a symlink (std::os::unix::fs::symlink) to a.txt -> error containing "link.txt"; link.txt is still a symlink; HEAD master.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t10b_ 2>&1 | grep -cE 't10b_.* ok$')" -ge 4
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 10C: A Switch That Moved HEAD Is Reported as Done
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 10C: once discard-and-switch has moved HEAD, a failed merge-state cleanup no longer rolls anything back or reports failure; the popup closes and warns. A failed set_upstream names itself in the error.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+  - asyncgit/src/sync/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:499-519 (should_cleanup_state_after_discard), 659-774 (apply_discard_checkout, checkout_branch_discard), 1317-1382 (test_checkout_remote_branch: remote setup pattern)
+  - asyncgit/src/sync/merge.rs:495-507 (make_conflicting_merge: conflicted merge pattern)
+  - asyncgit/src/sync/mod.rs:38-45 (branch re-exports)
+  - src/popups/checkout_option.rs:103-132 (handle_event, confirm_discard), 323-339 (popup_for), 837-876 (t9b_upstream_failure_refuses), 981-1013 (t9b_merge_state_cleared)
+  - src/app.rs:1196-1198 (Action::CheckoutBranchDiscard -> confirm_discard)
+  - neb: BUG-0088, TASK-0112. Decision D17
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The pre-checks (state, HEAD, target, worktrees, collisions) and their messages don't change. src/app.rs is not edited. The test seam below compiles only under #[cfg(test)].
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: the user is never told a switch failed when HEAD is already on the new branch, and the new branch is never deleted from under HEAD.
+
+Contract & Behavior:
+Writers, in order, inside checkout_branch_discard: create local branch (remote target), set_upstream, checkout_tree, index write, set_head, cleanup_state; and the rollback that deletes the created branch.
+
+1. asyncgit/src/sync/branch/mod.rs: `pub enum DiscardOutcome { Switched, StateNotCleared(String) }`, re-exported from `asyncgit::sync`. `checkout_branch_discard` returns `Result<DiscardOutcome>`.
+   - Every step succeeds: `Ok(DiscardOutcome::Switched)`.
+   - cleanup_state fails after set_head succeeded: `Ok(DiscardOutcome::StateNotCleared(msg))` with msg exactly `switched to '<branch>', but could not clear the merge state: <error>`, where <branch> is the short local name switched to. Nothing is rolled back: the created branch stays, with its upstream, and HEAD stays on it.
+   - Any failure before set_head succeeds: `Err`, and a branch created by this call is deleted (as today).
+   Edge cases:
+   a. Merge in progress, remote target, cleanup fails: StateNotCleared; HEAD on the new branch; branch exists with its upstream; worktree equals the target.
+      Proof: test `t10c_cleanup_failure_keeps_switch`.
+   b. Merge in progress, cleanup succeeds: Switched; MERGE_HEAD gone.
+      Proof: `t9b_merge_state_cleared`, now also asserting `DiscardOutcome::Switched`.
+   c. set_upstream fails: Err whose message starts `could not set upstream '<upstream>' for '<branch>': `; no local branch left; HEAD unchanged.
+      Proof: `t9b_upstream_failure_refuses`, now asserting that message with upstream origin/topic and branch topic (TASK-0112).
+   d. checkout_tree, index write or set_head fails: Err and branch deleted, as today. Not forced in a test; behavior unchanged.
+2. Test seam: a #[cfg(test)], thread-local switch in asyncgit/src/sync/branch/mod.rs that makes the post-set_head cleanup return an error. Thread-local so parallel tests don't see it. It doesn't exist outside test builds and hides nothing at runtime.
+3. src/popups/checkout_option.rs: both callers (handle_event's discard path and confirm_discard) finish through `pub(crate) fn discard_finished(&mut self, outcome: DiscardOutcome)`, which pushes `InternalEvent::Update(NeedsUpdate::ALL)`, hides the popup, and for StateNotCleared(msg) also pushes `InternalEvent::ShowErrorMsg` with text `checkout warning:\n<msg>`. handle_event still pushes SelectBranch as today. An Err still shows `checkout error:` (confirm_discard) or propagates (handle_event), with the popup open, as today.
+   Edge cases:
+   a. StateNotCleared: popup hidden; Update(ALL) queued; one ShowErrorMsg with the warning text.
+      Proof: test `t10c_warning_closes_and_refreshes`.
+   b. Switched: popup hidden; Update(ALL) queued; no ShowErrorMsg.
+      Proof: test `t10c_switched_shows_no_warning`.
+
+Must still work:
+- Every `t8b_` and `t9b_` test (they unwrap or unwrap_err the result).
+- The confirm flow: src/app.rs Action::CheckoutBranchDiscard calls confirm_discard unchanged.
+- The rebase/am refusal (D15) and the merge/revert/cherry-pick cleanup on success.
+
+Drops: checkout_branch_discard no longer returns an error (or deletes the new branch) when only the merge-state cleanup fails after HEAD moved; it returns StateNotCleared (D17).
+
+Tests:
+  - `t10c_cleanup_failure_keeps_switch` (asyncgit/src/sync/branch/mod.rs tests): bare remote + clone (test_checkout_remote_branch pattern) with remote branch origin/topic; a conflicted merge in progress in the clone; seam on -> Ok(StateNotCleared(msg)); msg starts "switched to 'topic'"; HEAD -> refs/heads/topic; local topic has upstream origin/topic.
+  - `t10c_warning_closes_and_refreshes` (src/popups/checkout_option.rs tests): `popup_for` any branch, discard_finished(StateNotCleared("switched to 'topic', but could not clear the merge state: boom")) -> !is_visible(); draining the queue gives Update(ALL) and exactly one ShowErrorMsg equal to "checkout warning:\nswitched to 'topic', but could not clear the merge state: boom".
+  - `t10c_switched_shows_no_warning`: same, discard_finished(Switched) -> hidden; Update(ALL); no ShowErrorMsg.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t10c_ 2>&1 | grep -cE 't10c_.* ok$')" -ge 3 && grep -qE 'pub enum DiscardOutcome' asyncgit/src/sync/branch/mod.rs && grep -q 'could not set upstream' src/popups/checkout_option.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 10D: Abort Keeps a Populated Submodule
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 10D: aborting a merge leaves a non-empty directory at a merge-added gitlink path in place, like `git reset --merge`, and still removes an empty one.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/merge.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/merge.rs:93-150 (collect_index_entries, worktree_matches_index), 264-378 (abort_pending_state), 495-507 (make_conflicting_merge)
+  - neb: BUG-0090. Decision D1
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The refusal rules and message ("cannot abort: local changes to <paths> would be lost") don't change. Restore of HEAD paths, the index reset and cleanup_state don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a submodule the merge added and the user initialized survives abort, with everything in it.
+
+Contract & Behavior:
+Writers in abort_pending_state: removal of merge-added paths, checkout of HEAD paths, index reset, cleanup_state. Only the removal changes.
+
+1. A merge-added path (not in HEAD) whose index entry is a gitlink (mode 160000) at stage 0 or at any conflict stage, and that is a directory on disk: removed only if empty; a non-empty directory is left untouched (it shows as untracked afterwards, as with git). Its index entry is still dropped, and abort succeeds. Every other merge-added path is removed as today.
+   Edge cases:
+   a. Gitlink at stage 0, directory populated: kept with its contents; index lacks the path; state Clean.
+      Proof: test `t10d_populated_submodule_kept`.
+   b. Gitlink at stage 0, directory empty or missing: no directory left; abort succeeds.
+      Proof: test `t10d_empty_submodule_dir_removed`.
+   c. Gitlink in conflict (modify/delete: HEAD deleted it, the merged branch changed it), directory populated: kept; index lacks the path.
+      Proof: test `t10d_conflicted_submodule_kept`.
+   d. A regular file at a stage-0 gitlink path: refuse as today (worktree doesn't match the index).
+      Proof: unchanged code path; existing refusal test `t9a_edited_merge_file_refuses` covers the rule.
+
+Must still work:
+- Every `t9a_` test in asyncgit/src/sync/merge.rs, including `t9a_file_became_dir` and `t9a_dir_became_file`.
+- An empty parent directory left by a removal is still pruned.
+
+Drops: abort no longer deletes a populated directory at a merge-added submodule path; it stays as an untracked directory (git parity).
+
+Tests:
+  In asyncgit/src/sync/merge.rs tests, build gitlink entries through git2 index entries (mode 0o160000, id = any existing commit id); no network, no `git submodule`. "Populated" = the test writes sub/.git (a file) and sub/work.txt "keep".
+  - `t10d_populated_submodule_kept`: feature adds gitlink sub and changes test.txt; master changes test.txt; merge -> conflict on test.txt; populate sub; abort -> Ok; sub/work.txt reads "keep"; index has no sub; state Clean; test.txt reads master's content.
+  - `t10d_empty_submodule_dir_removed`: same, sub left empty (create it if the merge didn't) -> Ok; sub doesn't exist.
+  - `t10d_conflicted_submodule_kept`: base has gitlink sub; feature points it at another commit; master removes it; merge -> conflict on sub; populate sub; abort -> Ok; sub/work.txt reads "keep"; index has no sub; state Clean.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t10d_ 2>&1 | grep -cE 't10d_.* ok$')" -ge 3
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.

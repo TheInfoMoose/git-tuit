@@ -1,0 +1,20 @@
+schema_version = 2
+
+[item]
+id = "TASK-0115"
+type = "task"
+title = "A Switch That Moved HEAD Is Reported as Done"
+status = "open"
+severity = "medium"
+scope_ref = "asyncgit"
+created_at = "2026-11-23T02:20:05Z"
+updated_at = "2026-11-23T02:20:05Z"
+source_ref = "STEP 10C"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []
