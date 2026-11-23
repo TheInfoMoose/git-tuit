@@ -47,10 +47,15 @@ pub struct Theme {
 	block_title_focused: Color,
 	border_focused_fg: Color,
 	scroll_track_fg: Color,
+	panel_bg: Color,
 	syntax: String,
 }
 
 impl Theme {
+	pub fn popup(&self) -> Style {
+		Style::default().bg(self.panel_bg)
+	}
+
 	pub fn scroll_bar_pos(&self) -> Style {
 		Style::default().fg(self.selection_bg)
 	}
@@ -371,6 +376,7 @@ impl Default for Theme {
 			block_title_focused: AMBER_BRIGHT,
 			border_focused_fg: AMBER_PRIMARY,
 			scroll_track_fg: AMBER_DARK,
+			panel_bg: PANEL_BG,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -566,5 +572,27 @@ mod tests {
 			partial.scroll_bar_track().fg,
 			Some(Color::Rgb(92, 58, 0))
 		);
+	}
+
+	#[test]
+	fn t12c_panel_bg_default_patch_and_old_format() {
+		let default = Theme::default();
+		assert_eq!(default.panel_bg, Color::Rgb(12, 8, 0));
+		assert_eq!(
+			default.popup(),
+			Style::default().bg(Color::Rgb(12, 8, 0))
+		);
+
+		let mut override_file = NamedTempFile::new().unwrap();
+		writeln!(override_file, r#"(panel_bg: Some("Blue"))"#)
+			.unwrap();
+		let overridden =
+			Theme::init(&override_file.path().to_path_buf());
+		assert_eq!(overridden.popup().bg, Some(Color::Blue));
+
+		let mut old_file = NamedTempFile::new().unwrap();
+		writeln!(old_file, r#"(selection_bg: "Black")"#).unwrap();
+		let old_loaded = Theme::init(&old_file.path().to_path_buf());
+		assert_eq!(old_loaded.popup().bg, Some(Color::Rgb(12, 8, 0)));
 	}
 }

@@ -6,7 +6,11 @@ pub mod style;
 mod syntax_text;
 
 use filetreelist::MoveSelection;
-use ratatui::layout::{Constraint, Direction, Layout, Rect};
+use ratatui::{
+	layout::{Constraint, Direction, Layout, Rect},
+	text::Span,
+	widgets::{Block, BorderType, Borders},
+};
 pub use scrollbar::{draw_scrollbar, Orientation};
 pub use scrolllist::{draw_list, draw_list_block};
 pub use stateful_paragraph::{
@@ -15,6 +19,35 @@ pub use stateful_paragraph::{
 pub use syntax_text::{AsyncSyntaxJob, SyntaxText};
 
 use crate::keys::{key_match, SharedKeyConfig};
+use style::Theme;
+
+pub fn styled_block<'a>(
+	title: &str,
+	theme: &Theme,
+	focused: bool,
+) -> Block<'a> {
+	let block = Block::default()
+		.borders(Borders::ALL)
+		.border_type(BorderType::Plain)
+		.border_style(theme.block(focused));
+
+	if title.is_empty() {
+		block
+	} else {
+		block.title(Span::styled(
+			format!(" {title} "),
+			theme.title(focused),
+		))
+	}
+}
+
+pub fn popup_block<'a>(
+	title: &str,
+	theme: &Theme,
+	focused: bool,
+) -> Block<'a> {
+	styled_block(title, theme, focused).style(theme.popup())
+}
 
 /// return the scroll position (line) necessary to have the `selection` in view if it is not already
 pub const fn calc_scroll_top(
@@ -217,5 +250,118 @@ mod test {
 				height: 2
 			}
 		);
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::{popup_block, styled_block};
+	use crate::ui::style::Theme;
+	use pretty_assertions::assert_eq;
+	use ratatui::{
+		backend::TestBackend,
+		style::{Color, Modifier},
+		Terminal,
+	};
+
+	fn row_string(
+		terminal: &Terminal<TestBackend>,
+		y: u16,
+		width: u16,
+	) -> String {
+		let buf = terminal.backend().buffer();
+		(0..width).map(|x| buf[(x, y)].symbol()).collect::<String>()
+	}
+
+	#[test]
+	fn t12c_styled_block_pads_title() {
+		let theme = Theme::default();
+		let mut terminal =
+			Terminal::new(TestBackend::new(20, 3)).unwrap();
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					styled_block("Files", &theme, true),
+					f.area(),
+				);
+			})
+			.unwrap();
+
+		assert_eq!(
+			row_string(&terminal, 0, 20),
+			"┌ Files ───────────┐"
+		);
+		let buf = terminal.backend().buffer();
+		assert_eq!(buf[(0, 0)].fg, Color::Rgb(255, 176, 0));
+		assert_eq!(buf[(2, 0)].fg, Color::Rgb(255, 216, 102));
+		assert!(buf[(2, 0)].modifier.contains(Modifier::BOLD));
+
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					styled_block("Files", &theme, false),
+					f.area(),
+				);
+			})
+			.unwrap();
+		let buf = terminal.backend().buffer();
+		assert_eq!(buf[(0, 0)].fg, Color::Rgb(153, 99, 0));
+	}
+
+	#[test]
+	fn t12c_empty_title_not_padded() {
+		let theme = Theme::default();
+		let mut terminal =
+			Terminal::new(TestBackend::new(20, 3)).unwrap();
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					styled_block("", &theme, false),
+					f.area(),
+				);
+			})
+			.unwrap();
+
+		let expected = format!("┌{}┐", "─".repeat(18));
+		assert_eq!(row_string(&terminal, 0, 20), expected);
+	}
+
+	#[test]
+	fn t12c_long_title_clipped() {
+		let theme = Theme::default();
+		let mut terminal =
+			Terminal::new(TestBackend::new(10, 3)).unwrap();
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					styled_block("Unstaged Changes", &theme, true),
+					f.area(),
+				);
+			})
+			.unwrap();
+
+		let row = row_string(&terminal, 0, 10);
+		assert!(row.starts_with("┌ Uns"));
+		assert!(row.ends_with('┐'));
+		assert_eq!(row.chars().count(), 10);
+	}
+
+	#[test]
+	fn t12c_popup_block_plain_on_panel() {
+		let theme = Theme::default();
+		let mut terminal =
+			Terminal::new(TestBackend::new(20, 4)).unwrap();
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					popup_block("Confirm", &theme, true),
+					f.area(),
+				);
+			})
+			.unwrap();
+
+		let buf = terminal.backend().buffer();
+		assert_eq!(buf[(0, 0)].symbol(), "┌");
+		assert_eq!(buf[(1, 1)].bg, Color::Rgb(12, 8, 0));
 	}
 }

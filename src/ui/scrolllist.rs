@@ -3,8 +3,8 @@ use ratatui::{
 	buffer::Buffer,
 	layout::Rect,
 	style::Style,
-	text::{Span, Text},
-	widgets::{Block, Borders, List, ListItem, Widget},
+	text::Text,
+	widgets::{Block, List, ListItem, Widget},
 	Frame,
 };
 
@@ -65,12 +65,8 @@ pub fn draw_list<'b, L, S>(
 	S: Into<Text<'b>>,
 	L: Iterator<Item = S>,
 {
-	let list = ScrollableList::new(items).block(
-		Block::default()
-			.title(Span::styled(title, theme.title(selected)))
-			.borders(Borders::ALL)
-			.border_style(theme.block(selected)),
-	);
+	let list = ScrollableList::new(items)
+		.block(super::styled_block(title, theme, selected));
 	f.render_widget(list, r);
 }
 

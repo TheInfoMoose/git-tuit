@@ -63,13 +63,13 @@ pub use utils::{
 	time_to_string,
 };
 
-use crate::ui::style::Theme;
+use crate::ui::{style::Theme, styled_block};
 use anyhow::Result;
 use crossterm::event::Event;
 use ratatui::{
 	layout::{Alignment, Rect},
-	text::{Span, Text},
-	widgets::{Block, Borders, Paragraph},
+	text::Text,
+	widgets::Paragraph,
 	Frame,
 };
 
@@ -291,11 +291,6 @@ fn dialog_paragraph<'a>(
 	focused: bool,
 ) -> Paragraph<'a> {
 	Paragraph::new(content)
-		.block(
-			Block::default()
-				.title(Span::styled(title, theme.title(focused)))
-				.borders(Borders::ALL)
-				.border_style(theme.block(focused)),
-		)
+		.block(styled_block(title, theme, focused))
 		.alignment(Alignment::Left)
 }

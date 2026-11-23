@@ -62,11 +62,11 @@ pub use tag_commit::TagCommitPopup;
 pub use taglist::TagListPopup;
 pub use update_remote_url::UpdateRemoteUrlPopup;
 
-use crate::ui::style::Theme;
+use crate::ui::{popup_block, style::Theme};
 use ratatui::{
 	layout::Alignment,
-	text::{Span, Text},
-	widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+	text::Text,
+	widgets::{Paragraph, Wrap},
 };
 
 fn popup_paragraph<'a, T>(
@@ -84,13 +84,7 @@ where
 		.wrap(Wrap { trim: true });
 
 	if block {
-		paragraph.block(
-			Block::default()
-				.title(Span::styled(title, theme.title(focused)))
-				.borders(Borders::ALL)
-				.border_type(BorderType::Thick)
-				.border_style(theme.block(focused)),
-		)
+		paragraph.block(popup_block(title, theme, focused))
 	} else {
 		paragraph
 	}
