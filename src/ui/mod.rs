@@ -49,6 +49,22 @@ pub fn popup_block<'a>(
 	styled_block(title, theme, focused).style(theme.popup())
 }
 
+pub fn attention_block<'a>(title: &str, theme: &Theme) -> Block<'a> {
+	let block = Block::default()
+		.borders(Borders::ALL)
+		.border_type(BorderType::Plain)
+		.border_style(theme.attention_block_style());
+
+	if title.is_empty() {
+		block
+	} else {
+		block.title(Span::styled(
+			format!(" {title} "),
+			theme.title(true),
+		))
+	}
+}
+
 /// return the scroll position (line) necessary to have the `selection` in view if it is not already
 pub const fn calc_scroll_top(
 	current_top: usize,
@@ -255,7 +271,7 @@ mod test {
 
 #[cfg(test)]
 mod tests {
-	use super::{popup_block, styled_block};
+	use super::{attention_block, popup_block, styled_block};
 	use crate::ui::style::Theme;
 	use pretty_assertions::assert_eq;
 	use ratatui::{
@@ -363,5 +379,36 @@ mod tests {
 		let buf = terminal.backend().buffer();
 		assert_eq!(buf[(0, 0)].symbol(), "┌");
 		assert_eq!(buf[(1, 1)].bg, Color::Rgb(12, 8, 0));
+	}
+
+	#[test]
+	fn t12d_attention_block_uses_theme() {
+		let theme = Theme::default();
+		let mut terminal =
+			Terminal::new(TestBackend::new(30, 3)).unwrap();
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					attention_block("Pending Merge", &theme),
+					f.area(),
+				);
+			})
+			.unwrap();
+
+		assert!(row_string(&terminal, 0, 30)
+			.starts_with("┌ Pending Merge "));
+		let buf = terminal.backend().buffer();
+		assert_eq!(buf[(0, 0)].fg, Color::Rgb(255, 85, 0));
+
+		terminal
+			.draw(|f| {
+				f.render_widget(
+					attention_block("", &theme),
+					f.area(),
+				);
+			})
+			.unwrap();
+		let expected = format!("┌{}┐", "─".repeat(28));
+		assert_eq!(row_string(&terminal, 0, 30), expected);
 	}
 }

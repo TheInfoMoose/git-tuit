@@ -11,7 +11,7 @@ use crate::{
 	options::SharedOptions,
 	queue::{Action, InternalEvent, NeedsUpdate, Queue, ResetItem},
 	strings, try_or_popup,
-	ui::style::Theme,
+	ui::{attention_block, style::SharedTheme},
 };
 use anyhow::Result;
 use asyncgit::{
@@ -27,8 +27,7 @@ use crossterm::event::Event;
 use itertools::Itertools;
 use ratatui::{
 	layout::{Alignment, Constraint, Direction, Layout},
-	style::{Color, Style},
-	widgets::{Block, BorderType, Borders, Paragraph},
+	widgets::Paragraph,
 };
 
 /// what part of the screen is focused
@@ -81,6 +80,7 @@ pub struct Status {
 	git_action_executed: bool,
 	options: SharedOptions,
 	key_config: SharedKeyConfig,
+	theme: SharedTheme,
 }
 
 impl DrawableComponent for Status {
@@ -199,6 +199,7 @@ impl Status {
 			),
 			key_config: env.key_config.clone(),
 			options: env.options.clone(),
+			theme: env.theme.clone(),
 			repo: env.repo.clone(),
 		}
 	}
@@ -296,17 +297,11 @@ impl Status {
 			);
 
 			let w = Paragraph::new(txt)
-				.block(
-					Block::default()
-						.border_type(BorderType::Plain)
-						.borders(Borders::all())
-						.border_style(Theme::attention_block())
-						.title(format!(
-							"Pending {:?}",
-							self.git_state
-						)),
-				)
-				.style(Style::default().fg(Color::Red))
+				.block(attention_block(
+					&format!("Pending {:?}", self.git_state),
+					&self.theme,
+				))
+				.style(self.theme.text_danger())
 				.alignment(Alignment::Left);
 
 			f.render_widget(w, r);

@@ -48,6 +48,7 @@ pub struct Theme {
 	border_focused_fg: Color,
 	scroll_track_fg: Color,
 	panel_bg: Color,
+	attention_fg: Color,
 	syntax: String,
 }
 
@@ -294,8 +295,8 @@ impl Theme {
 			.bg(self.push_gauge_bg)
 	}
 
-	pub fn attention_block() -> Style {
-		Style::default().fg(Color::Yellow)
+	pub fn attention_block_style(&self) -> Style {
+		Style::default().fg(self.attention_fg)
 	}
 
 	fn load_patch(theme_path: &PathBuf) -> Result<ThemePatch> {
@@ -377,6 +378,7 @@ impl Default for Theme {
 			border_focused_fg: AMBER_PRIMARY,
 			scroll_track_fg: AMBER_DARK,
 			panel_bg: PANEL_BG,
+			attention_fg: AMBER_ALERT,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -594,5 +596,33 @@ mod tests {
 		writeln!(old_file, r#"(selection_bg: "Black")"#).unwrap();
 		let old_loaded = Theme::init(&old_file.path().to_path_buf());
 		assert_eq!(old_loaded.popup().bg, Some(Color::Rgb(12, 8, 0)));
+	}
+
+	#[test]
+	fn t12d_patch_sets_attention_fg() {
+		let default = Theme::default();
+		assert_eq!(
+			default.attention_block_style().fg,
+			Some(Color::Rgb(255, 85, 0))
+		);
+
+		let mut override_file = NamedTempFile::new().unwrap();
+		writeln!(override_file, r#"(attention_fg: Some("Yellow"))"#)
+			.unwrap();
+		let overridden =
+			Theme::init(&override_file.path().to_path_buf());
+		assert_eq!(
+			overridden.attention_block_style().fg,
+			Some(Color::Yellow)
+		);
+
+		let mut partial_file = NamedTempFile::new().unwrap();
+		writeln!(partial_file, r#"(selection_bg: Some("Black"))"#)
+			.unwrap();
+		let partial = Theme::init(&partial_file.path().to_path_buf());
+		assert_eq!(
+			partial.attention_block_style().fg,
+			Some(Color::Rgb(255, 85, 0))
+		);
 	}
 }

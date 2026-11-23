@@ -10,7 +10,7 @@ use crate::{
 	queue::{Action, InternalEvent, Queue, StackablePopupOpen},
 	strings::{self, order},
 	try_or_popup,
-	ui::style::{SharedTheme, Theme},
+	ui::{attention_block, style::SharedTheme},
 };
 use anyhow::Result;
 use asyncgit::{
@@ -28,8 +28,7 @@ use crossterm::event::Event;
 use indexmap::IndexSet;
 use ratatui::{
 	layout::{Alignment, Constraint, Direction, Layout, Rect},
-	text::Span,
-	widgets::{Block, Borders, Paragraph},
+	widgets::Paragraph,
 	Frame,
 };
 use std::{
@@ -432,19 +431,14 @@ impl Revlog {
 
 		f.render_widget(
 			Paragraph::new(text)
-				.block(
-					Block::default()
-						.title(Span::styled(
-							format!(
-								"{} {}",
-								strings::POPUP_TITLE_LOG_SEARCH,
-								title
-							),
-							self.theme.title(true),
-						))
-						.borders(Borders::ALL)
-						.border_style(Theme::attention_block()),
-				)
+				.block(attention_block(
+					&format!(
+						"{} {}",
+						strings::POPUP_TITLE_LOG_SEARCH,
+						title
+					),
+					&self.theme,
+				))
 				.alignment(Alignment::Left),
 			area,
 		);
