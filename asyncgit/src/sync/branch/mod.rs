@@ -713,14 +713,22 @@ pub enum DiscardOutcome {
 	StateNotCleared(String),
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-hooks"))]
 thread_local! {
 	static FAIL_CLEANUP_STATE: std::cell::Cell<bool> =
 		const { std::cell::Cell::new(false) };
 }
 
+/// Test-only hook to force `cleanup_repo_state` to fail on the
+/// current thread.
+#[cfg(feature = "test-hooks")]
+#[doc(hidden)]
+pub fn set_fail_cleanup_state(fail: bool) {
+	FAIL_CLEANUP_STATE.set(fail);
+}
+
 fn cleanup_repo_state(repo: &Repository) -> Result<()> {
-	#[cfg(test)]
+	#[cfg(any(test, feature = "test-hooks"))]
 	if FAIL_CLEANUP_STATE.get() {
 		return Err(Error::Generic(String::from(
 			"simulated cleanup_state failure",

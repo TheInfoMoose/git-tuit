@@ -43,5 +43,6 @@ serial_test = { version = "3.3", default-features = false }
 
 [features]
 default = ["trace-libgit"]
+test-hooks = []
 trace-libgit = []
 vendor-openssl = ["openssl-sys"]

@@ -1548,4 +1548,96 @@ mod tests {
 			"expected no ShowErrorMsg, got: {warnings:?}"
 		);
 	}
+
+	fn setup_merge_conflict_for_target(
+	) -> (TempDir, RepoPath, CheckoutOptionPopup) {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+		create_branch(&repo_path, "side").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "side", "c2");
+		create_branch(&repo_path, "target").unwrap();
+		checkout_branch(&repo_path, "master").unwrap();
+		write_and_commit(&repo_path, root, "a.txt", "master", "c3");
+
+		let merge_out = run_git(root, &["merge", "side"]);
+		assert!(
+			!merge_out.status.success(),
+			"merge should stop on conflict"
+		);
+		assert_eq!(repo_state(&repo_path).unwrap(), RepoState::Merge);
+		assert!(root.join(".git/MERGE_HEAD").exists());
+
+		let target = branch_info(&repo_path, true, "target");
+		let popup = popup_for(&repo_path, target);
+		(td, repo_path, popup)
+	}
+
+	#[test]
+	fn t11b_warning_through_confirm() {
+		struct FailCleanupGuard;
+		impl Drop for FailCleanupGuard {
+			fn drop(&mut self) {
+				asyncgit::sync::branch::set_fail_cleanup_state(false);
+			}
+		}
+
+		let (td, repo_path, mut popup) =
+			setup_merge_conflict_for_target();
+		let root = td.path();
+
+		asyncgit::sync::branch::set_fail_cleanup_state(true);
+		let _guard = FailCleanupGuard;
+
+		let events = enter_and_confirm(&mut popup);
+
+		assert!(!popup.is_visible());
+
+		let update_all_count = events
+			.iter()
+			.filter(|ev| {
+				matches!(
+					ev,
+					InternalEvent::Update(flags)
+						if flags.bits() == NeedsUpdate::ALL.bits()
+				)
+			})
+			.count();
+		assert_eq!(
+			update_all_count, 1,
+			"expected one Update(ALL) event"
+		);
+
+		let warnings = error_messages(events);
+		assert_eq!(
+			warnings,
+			vec![
+				"checkout warning:\nswitched to 'target', but could not clear the merge state: `simulated cleanup_state failure`"
+			]
+		);
+
+		assert_eq!(head_branch_name(&repo_path), "target");
+		assert!(root.join(".git/MERGE_HEAD").exists());
+	}
+
+	#[test]
+	fn t11b_clean_switch_through_confirm() {
+		let (td, _repo_path, mut popup) =
+			setup_merge_conflict_for_target();
+		let root = td.path();
+
+		let events = enter_and_confirm(&mut popup);
+
+		assert!(!popup.is_visible());
+
+		let warnings = error_messages(events);
+		assert!(
+			warnings.is_empty(),
+			"expected no ShowErrorMsg, got: {warnings:?}"
+		);
+
+		assert!(!root.join(".git/MERGE_HEAD").exists());
+	}
 }

@@ -67,6 +67,7 @@ unicode-width = "0.2"
 which = "8.0"
 
 [dev-dependencies]
+asyncgit = { path = "./asyncgit", default-features = false, features = ["test-hooks"] }
 env_logger = "0.11"
 git2-testing = { path = "./git2-testing" }
 insta = { version = "1.41.0", features = ["filters"] }
