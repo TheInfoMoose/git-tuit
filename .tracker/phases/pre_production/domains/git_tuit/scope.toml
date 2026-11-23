@@ -1322,14 +1322,14 @@ created_at = "2026-11-23T16:12:19Z"
 [[items.tasks]]
 id = "TASK-0133"
 title = "Existing Theme Files Keep Their Look"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 
 [[items.tasks]]
 id = "TASK-0134"
 title = "Amber Only on Truecolor Terminals"
-status = "pending"
+status = "open"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 

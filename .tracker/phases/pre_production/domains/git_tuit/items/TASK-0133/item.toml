@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0133"
 type = "task"
 title = "Existing Theme Files Keep Their Look"
-status = "pending"
+status = "open"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-23T16:12:19Z"
-updated_at = "2026-11-23T23:32:46Z"
+updated_at = "2026-11-23T23:38:03Z"
 source_ref = "STEP 13B"
 
 [effort]
