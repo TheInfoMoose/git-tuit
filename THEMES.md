@@ -5,7 +5,38 @@ default on light terminal:
 
 ## Configuration
 
-To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Note that you don’t have to specify the full theme anymore (as of 0.23). Instead, it is sufficient to override just the values that you want to differ from their default values.
+To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Your `theme.ron` only needs the fields it changes (as of 0.23); old full-format theme files are automatically converted to the patch format on first load, with any omitted fields taking their default values.
+
+## Default Theme
+
+The default theme uses an amber-on-black RGB palette:
+
+| Field | Default |
+| --- | --- |
+| `selected_tab` | `#FFD866` |
+| `command_fg` | `#FFB000` |
+| `selection_bg` | `#2A1A00` |
+| `selection_fg` | `#FFD866` |
+| `use_selection_fg` | `true` |
+| `cmdbar_bg` | `#0C0800` |
+| `disabled_fg` | `#996300` |
+| `diff_line_add` | `#7FD962` |
+| `diff_line_delete` | `#FF5500` |
+| `diff_file_added` | `#7FD962` |
+| `diff_file_removed` | `#FF5500` |
+| `diff_file_moved` | `#FFD866` |
+| `diff_file_modified` | `#FFB000` |
+| `commit_hash` | `#FFD866` |
+| `commit_time` | `#996300` |
+| `commit_author` | `#FFB000` |
+| `danger_fg` | `#FF5500` |
+| `push_gauge_bg` | `#5C3A00` |
+| `push_gauge_fg` | `#FFD866` |
+| `tag_fg` | `#FFD866` |
+| `branch_fg` | `#FFB000` |
+| `line_break` | `"¶"` |
+| `block_title_focused` | `#FFD866` |
+| `syntax` | `"base16-eighties.dark"` |
 
 The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at one of the following paths, depending on your operating system:
 

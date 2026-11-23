@@ -9,7 +9,17 @@ use struct_patch::Patch;
 
 pub type SharedTheme = Rc<Theme>;
 
+const AMBER_PRIMARY: Color = Color::Rgb(255, 176, 0);
+const AMBER_BRIGHT: Color = Color::Rgb(255, 216, 102);
+const AMBER_DIM: Color = Color::Rgb(153, 99, 0);
+const AMBER_DARK: Color = Color::Rgb(92, 58, 0);
+const AMBER_ALERT: Color = Color::Rgb(255, 85, 0);
+const PANEL_BG: Color = Color::Rgb(12, 8, 0);
+const GREEN_ADD: Color = Color::Rgb(127, 217, 98);
+const SELECTION_BG: Color = Color::Rgb(42, 26, 0);
+
 #[derive(Serialize, Deserialize, Debug, Clone, Patch)]
+#[serde(default)]
 #[patch(attribute(derive(Serialize, Deserialize)))]
 pub struct Theme {
 	selected_tab: Color,
@@ -330,29 +340,29 @@ impl Theme {
 impl Default for Theme {
 	fn default() -> Self {
 		Self {
-			selected_tab: Color::Reset,
-			command_fg: Color::White,
-			selection_bg: Color::Blue,
-			selection_fg: Color::White,
+			selected_tab: AMBER_BRIGHT,
+			command_fg: AMBER_PRIMARY,
+			selection_bg: SELECTION_BG,
+			selection_fg: AMBER_BRIGHT,
 			use_selection_fg: true,
-			cmdbar_bg: Color::Blue,
-			disabled_fg: Color::DarkGray,
-			diff_line_add: Color::Green,
-			diff_line_delete: Color::Red,
-			diff_file_added: Color::LightGreen,
-			diff_file_removed: Color::LightRed,
-			diff_file_moved: Color::LightMagenta,
-			diff_file_modified: Color::Yellow,
-			commit_hash: Color::Magenta,
-			commit_time: Color::LightCyan,
-			commit_author: Color::Green,
-			danger_fg: Color::Red,
-			push_gauge_bg: Color::Blue,
-			push_gauge_fg: Color::Reset,
-			tag_fg: Color::LightMagenta,
-			branch_fg: Color::LightYellow,
+			cmdbar_bg: PANEL_BG,
+			disabled_fg: AMBER_DIM,
+			diff_line_add: GREEN_ADD,
+			diff_line_delete: AMBER_ALERT,
+			diff_file_added: GREEN_ADD,
+			diff_file_removed: AMBER_ALERT,
+			diff_file_moved: AMBER_BRIGHT,
+			diff_file_modified: AMBER_PRIMARY,
+			commit_hash: AMBER_BRIGHT,
+			commit_time: AMBER_DIM,
+			commit_author: AMBER_PRIMARY,
+			danger_fg: AMBER_ALERT,
+			push_gauge_bg: AMBER_DARK,
+			push_gauge_fg: AMBER_BRIGHT,
+			tag_fg: AMBER_BRIGHT,
+			branch_fg: AMBER_PRIMARY,
 			line_break: "¶".to_string(),
-			block_title_focused: Color::Reset,
+			block_title_focused: AMBER_BRIGHT,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -397,5 +407,110 @@ mod tests {
 		assert_eq!(theme.selection_bg, Color::Black);
 		assert_eq!(theme.selection_fg, Color::Rgb(255, 255, 255));
 		assert_eq!(theme.syntax, "InspiredGitHub");
+	}
+
+	fn assert_theme_eq(actual: &Theme, expected: &Theme) {
+		assert_eq!(actual.selected_tab, expected.selected_tab);
+		assert_eq!(actual.command_fg, expected.command_fg);
+		assert_eq!(actual.selection_bg, expected.selection_bg);
+		assert_eq!(actual.selection_fg, expected.selection_fg);
+		assert_eq!(
+			actual.use_selection_fg,
+			expected.use_selection_fg
+		);
+		assert_eq!(actual.cmdbar_bg, expected.cmdbar_bg);
+		assert_eq!(actual.disabled_fg, expected.disabled_fg);
+		assert_eq!(actual.diff_line_add, expected.diff_line_add);
+		assert_eq!(
+			actual.diff_line_delete,
+			expected.diff_line_delete
+		);
+		assert_eq!(actual.diff_file_added, expected.diff_file_added);
+		assert_eq!(
+			actual.diff_file_removed,
+			expected.diff_file_removed
+		);
+		assert_eq!(actual.diff_file_moved, expected.diff_file_moved);
+		assert_eq!(
+			actual.diff_file_modified,
+			expected.diff_file_modified
+		);
+		assert_eq!(actual.commit_hash, expected.commit_hash);
+		assert_eq!(actual.commit_time, expected.commit_time);
+		assert_eq!(actual.commit_author, expected.commit_author);
+		assert_eq!(actual.danger_fg, expected.danger_fg);
+		assert_eq!(actual.push_gauge_bg, expected.push_gauge_bg);
+		assert_eq!(actual.push_gauge_fg, expected.push_gauge_fg);
+		assert_eq!(actual.tag_fg, expected.tag_fg);
+		assert_eq!(actual.branch_fg, expected.branch_fg);
+		assert_eq!(actual.line_break, expected.line_break);
+		assert_eq!(
+			actual.block_title_focused,
+			expected.block_title_focused
+		);
+		assert_eq!(actual.syntax, expected.syntax);
+	}
+
+	#[test]
+	fn t12a_default_is_amber() {
+		let theme = Theme::default();
+
+		assert_eq!(theme.selected_tab, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.command_fg, Color::Rgb(255, 176, 0));
+		assert_eq!(theme.selection_bg, Color::Rgb(42, 26, 0));
+		assert_eq!(theme.selection_fg, Color::Rgb(255, 216, 102));
+		assert!(theme.use_selection_fg);
+		assert_eq!(theme.cmdbar_bg, Color::Rgb(12, 8, 0));
+		assert_eq!(theme.disabled_fg, Color::Rgb(153, 99, 0));
+		assert_eq!(theme.diff_line_add, Color::Rgb(127, 217, 98));
+		assert_eq!(theme.diff_line_delete, Color::Rgb(255, 85, 0));
+		assert_eq!(theme.diff_file_added, Color::Rgb(127, 217, 98));
+		assert_eq!(theme.diff_file_removed, Color::Rgb(255, 85, 0));
+		assert_eq!(theme.diff_file_moved, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.diff_file_modified, Color::Rgb(255, 176, 0));
+		assert_eq!(theme.commit_hash, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.commit_time, Color::Rgb(153, 99, 0));
+		assert_eq!(theme.commit_author, Color::Rgb(255, 176, 0));
+		assert_eq!(theme.danger_fg, Color::Rgb(255, 85, 0));
+		assert_eq!(theme.push_gauge_bg, Color::Rgb(92, 58, 0));
+		assert_eq!(theme.push_gauge_fg, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.tag_fg, Color::Rgb(255, 216, 102));
+		assert_eq!(theme.branch_fg, Color::Rgb(255, 176, 0));
+		assert_eq!(theme.line_break, "¶");
+		assert_eq!(
+			theme.block_title_focused,
+			Color::Rgb(255, 216, 102)
+		);
+		assert_eq!(theme.syntax, DEFAULT_SYNTAX_THEME);
+	}
+
+	#[test]
+	fn t12a_partial_old_theme_loads() {
+		let mut file = NamedTempFile::new().unwrap();
+		writeln!(file, r#"(selection_bg: "Black", line_break: "~")"#)
+			.unwrap();
+		let path = file.path().to_path_buf();
+
+		let expected = Theme {
+			selection_bg: Color::Black,
+			line_break: "~".to_string(),
+			..Theme::default()
+		};
+
+		let first = Theme::init(&path);
+		assert_theme_eq(&first, &expected);
+
+		let second = Theme::init(&path);
+		assert_theme_eq(&second, &expected);
+	}
+
+	#[test]
+	fn t12a_bad_file_gives_default() {
+		let mut file = NamedTempFile::new().unwrap();
+		writeln!(file, "not ron").unwrap();
+		let path = file.path().to_path_buf();
+
+		let theme = Theme::init(&path);
+		assert_theme_eq(&theme, &Theme::default());
 	}
 }
