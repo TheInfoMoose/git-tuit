@@ -536,7 +536,8 @@ fn check_branch_not_checked_out_elsewhere(
 		if let Ok(main_repo) = Repository::open(repo.commondir()) {
 			let main_gitdir = std::fs::canonicalize(main_repo.path())
 				.unwrap_or_else(|_| main_repo.path().to_path_buf());
-			if main_gitdir != self_gitdir
+			if !main_repo.is_bare()
+				&& main_gitdir != self_gitdir
 				&& head_points_to(&main_repo, ref_name)
 			{
 				let wt_path = main_repo

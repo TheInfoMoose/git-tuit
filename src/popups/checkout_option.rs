@@ -1011,4 +1011,196 @@ mod tests {
 			vec![]
 		);
 	}
+
+	#[test]
+	fn t10a_bare_main_allows() {
+		let (src_td, _src_repo) = git2_testing::repo_init();
+		let src_root = src_td.path();
+		let src_path: RepoPath = src_root.to_str().unwrap().into();
+		write_and_commit(&src_path, src_root, "a.txt", "base", "c1");
+
+		let work_td = TempDir::new().unwrap();
+		let bare_dir = work_td.path().join("bare.git");
+		let clone_out = run_git(
+			work_td.path(),
+			&[
+				"clone",
+				"--bare",
+				src_root.to_str().unwrap(),
+				bare_dir.to_str().unwrap(),
+			],
+		);
+		assert!(
+			clone_out.status.success(),
+			"git clone --bare failed: {}",
+			String::from_utf8_lossy(&clone_out.stderr)
+		);
+
+		let wt_dir = work_td.path().join("wt-work");
+		let wt_out = run_git(
+			&bare_dir,
+			&[
+				"worktree",
+				"add",
+				wt_dir.to_str().unwrap(),
+				"-b",
+				"work",
+			],
+		);
+		assert!(
+			wt_out.status.success(),
+			"git worktree add failed: {}",
+			String::from_utf8_lossy(&wt_out.stderr)
+		);
+
+		fs::write(wt_dir.join("a.txt"), "tracked_edit").unwrap();
+
+		let wt_repo_path: RepoPath = wt_dir.to_str().unwrap().into();
+		let target = branch_info(&wt_repo_path, true, "master");
+		checkout_branch_discard(&wt_repo_path, &target).unwrap();
+
+		assert_eq!(head_branch_name(&wt_repo_path), "master");
+		assert_eq!(
+			get_status(&wt_repo_path, StatusType::Both, None)
+				.unwrap(),
+			vec![]
+		);
+	}
+
+	#[test]
+	fn t10a_bare_sibling_refuses() {
+		let (src_td, _src_repo) = git2_testing::repo_init();
+		let src_root = src_td.path();
+		let src_path: RepoPath = src_root.to_str().unwrap().into();
+		write_and_commit(&src_path, src_root, "a.txt", "base", "c1");
+
+		let work_td = TempDir::new().unwrap();
+		let bare_dir = work_td.path().join("bare.git");
+		let clone_out = run_git(
+			work_td.path(),
+			&[
+				"clone",
+				"--bare",
+				src_root.to_str().unwrap(),
+				bare_dir.to_str().unwrap(),
+			],
+		);
+		assert!(
+			clone_out.status.success(),
+			"git clone --bare failed: {}",
+			String::from_utf8_lossy(&clone_out.stderr)
+		);
+
+		let wt_dir = work_td.path().join("wt-work");
+		let wt_out = run_git(
+			&bare_dir,
+			&[
+				"worktree",
+				"add",
+				wt_dir.to_str().unwrap(),
+				"-b",
+				"work",
+			],
+		);
+		assert!(
+			wt_out.status.success(),
+			"git worktree add wt-work failed: {}",
+			String::from_utf8_lossy(&wt_out.stderr)
+		);
+
+		let sibling_dir = work_td.path().join("wt-master");
+		let sibling_out = run_git(
+			&bare_dir,
+			&[
+				"worktree",
+				"add",
+				sibling_dir.to_str().unwrap(),
+				"master",
+			],
+		);
+		assert!(
+			sibling_out.status.success(),
+			"git worktree add wt-master failed: {}",
+			String::from_utf8_lossy(&sibling_out.stderr)
+		);
+
+		fs::write(wt_dir.join("a.txt"), "wt_edit").unwrap();
+		fs::write(sibling_dir.join("a.txt"), "sibling_edit").unwrap();
+
+		let wt_repo_path: RepoPath = wt_dir.to_str().unwrap().into();
+		let target = branch_info(&wt_repo_path, true, "master");
+		let err = checkout_branch_discard(&wt_repo_path, &target)
+			.unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains("master"),
+			"error should name master: {msg}"
+		);
+		assert!(
+			msg.contains("wt-master"),
+			"error should name sibling worktree dir: {msg}"
+		);
+		assert_eq!(head_branch_name(&wt_repo_path), "work");
+		assert_eq!(
+			fs::read_to_string(wt_dir.join("a.txt")).unwrap(),
+			"wt_edit"
+		);
+		assert_eq!(
+			fs::read_to_string(sibling_dir.join("a.txt")).unwrap(),
+			"sibling_edit"
+		);
+	}
+
+	#[test]
+	fn t10a_linked_to_main_refuses() {
+		let (td, _repo) = git2_testing::repo_init();
+		let root = td.path();
+		let repo_path: RepoPath = root.to_str().unwrap().into();
+		write_and_commit(&repo_path, root, "a.txt", "base", "c1");
+
+		let wt_td = TempDir::new().unwrap();
+		let wt_dir = wt_td.path().join("wt-feature");
+		let wt_out = run_git(
+			root,
+			&[
+				"worktree",
+				"add",
+				wt_dir.to_str().unwrap(),
+				"-b",
+				"feature",
+			],
+		);
+		assert!(
+			wt_out.status.success(),
+			"git worktree add failed: {}",
+			String::from_utf8_lossy(&wt_out.stderr)
+		);
+
+		fs::write(root.join("a.txt"), "main_edit").unwrap();
+		fs::write(wt_dir.join("a.txt"), "wt_edit").unwrap();
+
+		let wt_repo_path: RepoPath = wt_dir.to_str().unwrap().into();
+		let target = branch_info(&wt_repo_path, true, "master");
+		let err = checkout_branch_discard(&wt_repo_path, &target)
+			.unwrap_err();
+		let msg = err.to_string();
+		assert!(
+			msg.contains("master"),
+			"error should name master: {msg}"
+		);
+		assert!(
+			msg.contains(root.file_name().unwrap().to_str().unwrap()),
+			"error should name main worktree path: {msg}"
+		);
+		assert_eq!(head_branch_name(&wt_repo_path), "feature");
+		assert_eq!(
+			fs::read_to_string(wt_dir.join("a.txt")).unwrap(),
+			"wt_edit"
+		);
+		assert_eq!(head_branch_name(&repo_path), "master");
+		assert_eq!(
+			fs::read_to_string(root.join("a.txt")).unwrap(),
+			"main_edit"
+		);
+	}
 }
