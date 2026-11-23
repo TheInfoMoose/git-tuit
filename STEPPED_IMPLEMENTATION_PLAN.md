@@ -42,7 +42,16 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 10):** discard-and-switch refuses only what git refuses (a bare main repo's HEAD doesn't count, an unchanged `git rm --cached` file doesn't block) and never reports a completed switch as a failure; aborting a merge keeps a populated submodule directory.
+**Phase goal (Phase 11):** discard-and-switch runs only through its confirmation, and the tests drive that real key path, including the merge-state warning; the unchanged-file check hashes without loading the file whole; abort's missing-submodule rule is pinned by a test.
+
+**Phase 11 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step; every FORBIDDEN_SCOPE line is checked against every edge case (Phase 10 review note). Takes the Phase 10 review follow-ups TASK-0117, TASK-0118 and BUG-0091. The amber theme moves to Phase 12.
+
+**Phase 11 decisions (user, 2026-11-22):**
+- **D18 Discard arm:** the Discard branch of `CheckoutOptionPopup::handle_event` (unreachable from keys) is deleted; the tests that drove it go through Enter → `ConfirmAction` → `confirm_discard`.
+- **D19 Test seam:** asyncgit gets a `test-hooks` feature that exposes its existing cleanup-failure switch; only gitui's dev-dependency enables it. Production builds never compile it.
+- **Not taken:** the parked security items BUG-0020, BUG-0025, BUG-0026, BUG-0030 stay parked (git-parity threat model).
+
+_Phase 10 goal (done, reviewed 2026-11-22):_ discard-and-switch refuses only what git refuses (a bare main repo's HEAD doesn't count, an unchanged `git rm --cached` file doesn't block) and never reports a completed switch as a failure; aborting a merge keeps a populated submodule directory.
 
 **Phase 10 format:** outcome steps v2 with the TASK-0091 rule, a Tests list per step, and named tests (not traces) for every rollback after a write (Phase 9 review process note). Takes the Phase 9 review follow-ups BUG-0087, BUG-0088, BUG-0089, BUG-0090 and TASK-0112. The amber theme moves to Phase 11.
 
@@ -97,10 +106,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 10A** | `/goal` | A Bare Main Repo Doesn't Hold a Branch | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | — |
-| 2 | **STEP 10B** | `/goal` | An Unchanged Staged Deletion Doesn't Block the Switch | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | — |
-| 3 | **STEP 10C** | `/boost` | A Switch That Moved HEAD Is Reported as Done | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` | — |
-| 4 | **STEP 10D** | `/goal` | Abort Keeps a Populated Submodule | `asyncgit/src/sync/merge.rs` | — |
+| 1 | **STEP 11A** | `/goal` | Discard Runs Only Through Its Confirmation | `src/popups/checkout_option.rs` | — |
+| 2 | **STEP 11B** | `/boost` | The Merge-State Warning Is Tested on the Real Path | `asyncgit/Cargo.toml`, `Cargo.toml`, `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` | STEP 11A |
+| 3 | **STEP 11C** | `/goal` | Unchanged-File Check Streams the Hash | `asyncgit/src/sync/branch/mod.rs` | — |
+| 4 | **STEP 11D** | `/goal` | Abort With a Missing Submodule Dir Is Tested | `asyncgit/src/sync/merge.rs` | — |
 
 ### Completed
 
@@ -198,6 +207,10 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 9B** | ✅ | `/boost` | Discard-and-Switch Checks First, Leaves a Clean Target (follow-ups in 10A–10C) | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` |
 | **STEP 9C** | ✅ | `/boost` | Push Credentials Come From the Target Remote | `asyncgit/src/sync/cred.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/push.rs`, `src/popups/push_tags.rs`, `src/app.rs` |
 | **STEP 9D** | ✅ 1724dad1 | `/goal` | Force-Push Refuses a Moved Branch | `src/popups/confirm.rs`, `src/app.rs` |
+| **STEP 10A** | ✅ | `/goal` | A Bare Main Repo Doesn't Hold a Branch | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 10B** | ✅ | `/goal` | An Unchanged Staged Deletion Doesn't Block the Switch (follow-up BUG-0091 in 11C) | `asyncgit/src/sync/branch/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 10C** | ✅ 0eda2eb3 | `/boost` | A Switch That Moved HEAD Is Reported as Done (follow-up TASK-0117 in 11B) | `asyncgit/src/sync/branch/mod.rs`, `asyncgit/src/sync/mod.rs`, `src/popups/checkout_option.rs` |
+| **STEP 10D** | ✅ 5d293dfa | `/goal` | Abort Keeps a Populated Submodule (follow-up TASK-0118 in 11D) | `asyncgit/src/sync/merge.rs` |
 
 ### User Step: IMAGE
 
@@ -231,7 +244,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 11 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
+- **Phase 12 — Amber CRT theme and chrome.** Goal: the Locked Decisions' styling tokens are the default theme, with `theme.ron` overrides still working.
   - Default palette + `#[serde(default)]` on `Theme` (P3-01)
   - Semantic style helpers + `THEMES.md` (P3-02)
   - Shared plain-border block helpers (P3-03)
@@ -5447,6 +5460,246 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && test "$(cargo test --workspace --locked t10d_ 2>&1 | grep -cE 't10d_.* ok$')" -ge 3
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 11A: Discard Runs Only Through Its Confirmation
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 11A: the checkout-options popup has one discard path (Enter on Discard -> ConfirmAction -> confirm_discard); the unreachable discard arm in handle_event is gone and the t8b tests drive the real key path.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - src/popups/checkout_option.rs:103-192 (discard_finished, handle_event, confirm_discard, open_discard_confirm), 280-320 (Component::event)
+  - src/app.rs:1196-1197 (Action::CheckoutBranchDiscard -> confirm_discard)
+  - src/components/utils/mod.rs:15-27 (try_or_popup: pushes ShowErrorMsg("{msg}\n{err}"))
+  - src/popups/create_branch.rs:234 (building an Enter key Event in tests)
+  - neb: TASK-0117 (context). Decision D18
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. asyncgit doesn't change. Non-test behavior visible from keys doesn't change: Enter on "Keep local changes" still checks out, pushes Update(ALL) and SelectBranch and hides; Enter on Discard still opens the confirmation and runs nothing; Esc still hides. No user-visible string changes.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: the only code that discards and switches is confirm_discard, and every discard test reaches it the way a user does.
+
+Contract & Behavior:
+Writers of the worktree/HEAD from this popup: `checkout()` (Keep, unchanged) and `checkout_branch_discard` (Discard). After this step the non-test code calls `checkout_branch_discard(` exactly once, inside `confirm_discard`. Writers of popup visibility and the queue: event (Esc, Enter), handle_event (Keep only), open_discard_confirm, confirm_discard / discard_finished; none change behavior.
+
+1. src/popups/checkout_option.rs, non-test code: handle_event no longer has a Discard branch. Enter on Discard keeps going through open_discard_confirm as today.
+   Edge cases:
+   a. Enter on Discard, branch still exists: queue gets exactly one `ConfirmAction(Action::CheckoutBranchDiscard(<fresh BranchInfo>))`; HEAD, worktree and index unchanged; popup still visible.
+      Proof: test `t11a_enter_on_discard_asks_first`.
+   b. Enter on Discard, target branch deleted since open: ShowErrorMsg "checkout error:\nbranch 'vanished' no longer exists"; no ConfirmAction; popup visible; nothing changed.
+      Proof: test `t8b_missing_target_changes_nothing` (rerouted).
+   c. Enter on Discard with no branch set: popup hides, nothing queued (today's open_discard_confirm).
+      Proof: unchanged code path.
+   d. Enter on Keep: unchanged (checkout, Update(ALL), SelectBranch, hide).
+      Proof: unchanged code path; FORBIDDEN_SCOPE.
+2. Test helper in `mod tests`: `fn enter_and_confirm(popup: &mut CheckoutOptionPopup) -> Vec<InternalEvent>`. Sends Enter (from `SharedKeyConfig::default()`) through `Component::event`, drains the queue, and if a `ConfirmAction(Action::CheckoutBranchDiscard(b))` was queued calls `popup.confirm_discard(&b)` and drains again. Returns every drained event except that ConfirmAction, in order.
+3. The t8b tests that called `popup.handle_event()` on the Discard option now call `enter_and_confirm`, keeping their names, setup and repo assertions:
+   - success cases (`t8b_discard_switch_succeeds`, both halves of `t8b_untracked_bystander_survives`): popup hidden; same file/HEAD/status assertions as today.
+   - refusal cases: popup visible; exactly one ShowErrorMsg starting "checkout error:\n"; same "nothing changed" assertions as today. `t8b_untracked_collision_changes_nothing` also asserts that message contains "collide.txt". `t8b_missing_target_changes_nothing` asserts the message in 1b.
+
+Must still work:
+- Every t8b_, t8k_, t9b_, t10a_, t10b_, t10c_ test in src/popups/checkout_option.rs (t9b/t10a/t10b call asyncgit directly; t10c calls discard_finished directly; both stay as they are).
+- src/app.rs Action::CheckoutBranchDiscard still calls confirm_discard (signature unchanged).
+
+Drops: the Discard arm of `handle_event`, which ran the discard without a confirmation and pushed SelectBranch afterwards. Unreachable from keys (Enter on Discard always opens the confirmation), so no user-visible behavior is lost.
+
+Tests:
+  In src/popups/checkout_option.rs `mod tests`, using `popup_for`, `write_and_commit`, `branch_info`, `head_branch_name` as today.
+  - `t11a_enter_on_discard_asks_first`: master a.txt "base"; branch other with a.txt "other"; back on master, a.txt edited to "local_edit"; popup_for(other); send Enter through `Component::event` (no confirm_discard call) -> queue holds exactly one ConfirmAction(CheckoutBranchDiscard) naming "other"; popup visible; HEAD master; a.txt reads "local_edit".
+  - rerouted t8b tests as in item 3.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn enter_and_confirm' src/popups/checkout_option.rs && grep -q 'fn t11a_enter_on_discard_asks_first' src/popups/checkout_option.rs && test "$(sed '/^mod tests {/,$d' src/popups/checkout_option.rs | grep -c 'checkout_branch_discard(')" -eq 1
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 11B: The Merge-State Warning Is Tested on the Real Path
+
+* **Recommended Command:** `/boost`
+
+```text
+[STEP_ID]
+STEP 11B: a gitui test drives Enter on Discard -> confirm_discard with asyncgit's cleanup failure switched on and sees the "checkout warning" popup, via a new asyncgit `test-hooks` feature that only gitui's dev-dependency enables.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/Cargo.toml
+  - Cargo.toml
+  - asyncgit/src/sync/branch/mod.rs
+  - src/popups/checkout_option.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:716-762 (FAIL_CLEANUP_STATE, cleanup_repo_state, apply_discard_checkout), 1581-1670 (t10c_cleanup_failure_keeps_switch)
+  - src/popups/checkout_option.rs:103-114 (discard_finished), 148-158 (confirm_discard), 1016-1049 (t9b_merge_state_cleared: merge-state setup)
+  - asyncgit/src/lib.rs:11-44 (crate lints: forbid(missing_docs), clippy::cargo, pedantic, nursery)
+  - neb: TASK-0117. Decision D19
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Cargo.lock doesn't change. Production behavior of checkout_branch_discard and DiscardOutcome doesn't change. Non-test code in src/popups/checkout_option.rs doesn't change. gitui's [dependencies] and [features] tables don't change; asyncgit's default features don't change.
+
+[PRE_GATE]
+grep -q 'fn enter_and_confirm' src/popups/checkout_option.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: dropping the outcome in confirm_discard fails a test.
+
+Contract & Behavior:
+Writers of the cleanup-failure switch (thread-local, default false): asyncgit's `t10c_cleanup_failure_keeps_switch` (sets it, guard resets) and the new public setter. Each test that sets it resets it on exit, panic included.
+
+1. asyncgit/Cargo.toml: new feature `test-hooks = []`, not in `default`.
+2. asyncgit/src/sync/branch/mod.rs: the switch and its check in `cleanup_repo_state` compile under `cfg(any(test, feature = "test-hooks"))`, so a build without the feature has neither. New `#[doc(hidden)] pub fn set_fail_cleanup_state(fail: bool)` with a doc comment, compiled only with `feature = "test-hooks"`, reachable as `asyncgit::sync::branch::set_fail_cleanup_state`. When on, `cleanup_repo_state` fails with "simulated cleanup_state failure" as today.
+   Edge cases:
+   a. Switch never set: discard behaves as today.
+      Proof: every existing t9b_/t10_ test passes unchanged.
+   b. Switch set on one test thread: other test threads are unaffected (thread-local).
+      Proof: unchanged storage; parallel `cargo test` run in POST_GATE.
+3. Cargo.toml (gitui): `[dev-dependencies]` gains `asyncgit = { path = "./asyncgit", default-features = false, features = ["test-hooks"] }`; table stays alphabetical.
+4. src/popups/checkout_option.rs tests: new test below, using `enter_and_confirm` (STEP 11A: sends Enter, runs confirm_discard on the queued ConfirmAction, returns the other queued events).
+   Edge cases:
+   a. Cleanup fails after HEAD moved: popup hidden; one Update(ALL); exactly one ShowErrorMsg equal to "checkout warning:\nswitched to 'target', but could not clear the merge state: simulated cleanup_state failure"; HEAD on target; .git/MERGE_HEAD still exists.
+      Proof: test `t11b_warning_through_confirm`.
+   b. Cleanup succeeds on the same setup: popup hidden; no ShowErrorMsg; MERGE_HEAD gone.
+      Proof: test `t11b_clean_switch_through_confirm`.
+
+Must still work:
+- `t10c_cleanup_failure_keeps_switch` (asyncgit) and `t10c_warning_closes_and_refreshes`, `t10c_switched_shows_no_warning`, `t9b_merge_state_cleared` (gitui).
+- `cargo build --release` without the feature (not run by the gate; the cfg in item 2 guarantees it).
+
+Drops: none
+
+Tests:
+  In src/popups/checkout_option.rs `mod tests`. Setup for both = `t9b_merge_state_cleared`'s: a.txt base; branch side changes a.txt; branch target; master changes a.txt; `git merge side` stops on conflict; repo_state Merge; popup_for(target).
+  - `t11b_warning_through_confirm`: set the switch on with a drop guard that turns it off; `enter_and_confirm` -> results in 4a.
+  - `t11b_clean_switch_through_confirm`: switch untouched; `enter_and_confirm` -> results in 4b.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qE '^test-hooks = \[\]' asyncgit/Cargo.toml && grep -q 'pub fn set_fail_cleanup_state' asyncgit/src/sync/branch/mod.rs && grep -q 'fn t11b_warning_through_confirm' src/popups/checkout_option.rs && grep -q 'fn t11b_clean_switch_through_confirm' src/popups/checkout_option.rs && git diff --quiet HEAD -- Cargo.lock
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 11C: Unchanged-File Check Streams the Hash
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 11C: discard-and-switch hashes an untracked-in-HEAD regular file without reading it whole into memory; which files block the switch doesn't change.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/branch/mod.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/branch/mod.rs:464-544 (worktree_matches_tree_entry, find_untracked_collisions), 770-850 (checkout_branch_discard), 1189-1250 (tests_checkout: test helpers)
+  - neb: BUG-0091. Decision D16
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The symlink branch, the dir/symlink-vs-file refusals, the "no content filters (raw bytes)" rule and the collision error message don't change. find_untracked_collisions doesn't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a `git rm --cached` multi-hundred-MB file no longer costs its size in memory during discard-and-switch.
+
+Contract & Behavior:
+No repo state is written by this function; it only reads. The one reader that changes is the regular-file (0o100644/0o100755) arm.
+
+1. worktree_matches_tree_entry, regular-file arm: hash the on-disk file as a blob with libgit2's streamed, unfiltered file hash (`git2::Oid::hash_file(ObjectType::Blob, path)`) instead of `std::fs::read` + `hash_object`. Result: true exactly when the raw bytes hash to the HEAD entry's blob id, as today. An I/O error is still returned as an error.
+   Edge cases:
+   a. File larger than any read buffer (1 MiB + 1 byte), unchanged: matches; discard-and-switch proceeds; the file keeps its content; status clean.
+      Proof: test `t11c_large_unchanged_proceeds`.
+   b. Same file with only its last byte changed: no match; discard-and-switch refuses with an error naming the file; HEAD still master.
+      Proof: test `t11c_large_last_byte_refuses`.
+   c. Empty file, unchanged: matches; proceeds.
+      Proof: test `t11c_empty_unchanged_proceeds`.
+   d. Path is now a directory or symlink: refuses as today.
+      Proof: unchanged code path (`t10b_type_change_refuses` in src/popups/checkout_option.rs).
+
+Must still work:
+- t10b_ tests in src/popups/checkout_option.rs (unchanged overwrite/remove proceeds, edited refuses, type change refuses).
+- t8b_ untracked-collision refusals.
+
+Drops: none
+
+Tests:
+  New `mod tests_discard_hash` in asyncgit/src/sync/branch/mod.rs, using `crate::sync::tests::{repo_init, write_commit_file}`. "Untrack" = remove the path from the repo index with git2 (`Index::remove_path` + `write`), the same index state as `git rm --cached`.
+  - `t11c_large_unchanged_proceeds`: commit big.txt = "a" repeated 1_048_577 times on master; create branch other and commit b.txt there; back on master; untrack big.txt; `checkout_branch_discard` to local other -> Ok(Switched); HEAD other; big.txt unchanged.
+  - `t11c_large_last_byte_refuses`: same, then rewrite big.txt with its last byte "b" -> Err whose text contains "big.txt"; HEAD master; big.txt still ends in "b".
+  - `t11c_empty_unchanged_proceeds`: same as the first with big.txt empty -> Ok(Switched).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'Oid::hash_file' asyncgit/src/sync/branch/mod.rs && grep -q 'fn t11c_large_unchanged_proceeds' asyncgit/src/sync/branch/mod.rs && grep -q 'fn t11c_large_last_byte_refuses' asyncgit/src/sync/branch/mod.rs && grep -q 'fn t11c_empty_unchanged_proceeds' asyncgit/src/sync/branch/mod.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 11D: Abort With a Missing Submodule Dir Is Tested
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 11D: tests pin abort's handling of a missing merge-added path: a missing gitlink directory doesn't block the abort; a missing merge-added regular file still refuses.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - asyncgit/src/sync/merge.rs
+READ_ONLY_REFS:
+  - asyncgit/src/sync/merge.rs:129-166 (worktree_matches_index), 195-249 (find_blocking_local_changes), 314-380 (abort_pending_state), 851-953 (commit_gitlink, t10d tests)
+  - neb: TASK-0118. Decision D1
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Only `mod tests` in asyncgit/src/sync/merge.rs changes; no non-test code changes. (Both edge cases below are today's behavior; this step only adds tests.)
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: reverting the missing-gitlink rule in worktree_matches_index fails a test.
+
+Contract & Behavior:
+No writer changes. The condition "merge-added path missing on disk" covers two states; each gets a test.
+
+1. asyncgit/src/sync/merge.rs tests:
+   Edge cases:
+   a. Merge-added gitlink at stage 0, directory missing: abort Ok; sub doesn't exist; index has no sub; state Clean; test.txt reads master's content.
+      Proof: test `t11d_missing_submodule_dir_aborts` (fails if the missing-path arm of worktree_matches_index returns false for a gitlink).
+   b. Merge-added regular file at stage 0, deleted by the user: abort refuses with "cannot abort: local changes to <path> would be lost" naming it; state still Merge (git reset --merge refuses an unstaged change to a path that differs between HEAD and the index).
+      Proof: test `t11d_missing_merge_added_file_refuses`.
+
+Must still work:
+- Every t9a_ and t10d_ test in asyncgit/src/sync/merge.rs.
+
+Drops: none
+
+Tests:
+  In asyncgit/src/sync/merge.rs `mod tests`, using `repo_init`, `write_commit_file`, `commit_gitlink`, `merge_branch` as the t10d tests do.
+  - `t11d_missing_submodule_dir_aborts`: t10d_empty_submodule_dir_removed's setup; after the merge remove sub if it exists and assert it doesn't; abort -> results in 1a.
+  - `t11d_missing_merge_added_file_refuses`: feature adds added.txt and changes test.txt; master changes test.txt; merge -> conflict on test.txt; delete added.txt; abort -> Err containing "added.txt"; repo_state Merge.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t11d_missing_submodule_dir_aborts' asyncgit/src/sync/merge.rs && grep -q 'fn t11d_missing_merge_added_file_refuses' asyncgit/src/sync/merge.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
