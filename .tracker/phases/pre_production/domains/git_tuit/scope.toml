@@ -1420,7 +1420,7 @@ created_at = "2026-11-24T19:13:38Z"
 [[items.tasks]]
 id = "TASK-0142"
 title = "The Base-Less Notice Is Tested"
-status = "open"
+status = "closed"
 severity = "medium"
 created_at = "2026-11-24T19:13:38Z"
 
