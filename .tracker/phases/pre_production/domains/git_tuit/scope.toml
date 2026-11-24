@@ -1409,3 +1409,45 @@ title = "Make the base-less theme hint testable and visible"
 status = "pending"
 severity = "low"
 created_at = "2026-11-24T18:58:54Z"
+
+[[items.tasks]]
+id = "TASK-0141"
+title = "A Base File Keeps Its Bare Colors"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"
+
+[[items.tasks]]
+id = "TASK-0142"
+title = "The Base-Less Notice Is Tested"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"
+
+[[items.tasks]]
+id = "TASK-0143"
+title = "The Changelog Names the Amber Default"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"
+
+[[items.tasks]]
+id = "TASK-0144"
+title = "The Frame Is Painted With the Canvas Color"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"
+
+[[items.tasks]]
+id = "TASK-0145"
+title = "The Tab Bar Uses the Amber Chrome"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"
+
+[[items.tasks]]
+id = "TASK-0146"
+title = "The Spinner Uses the Theme"
+status = "open"
+severity = "medium"
+created_at = "2026-11-24T19:13:38Z"

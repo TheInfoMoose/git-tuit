@@ -42,7 +42,17 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 14):** a `theme.ron` that names a base is never rewritten; `base` is read case-insensitively, with or without `Some`; a theme file without a base says in the log how to get amber; THEMES.md and the changelog say the same.
+**Phase goal (Phase 15):** a `theme.ron` that sets `base` keeps its colors whether or not they're wrapped in `Some`; the base-less notice is proven by a test; the changelog describes the amber default; the frame is painted with the theme canvas color, the tab bar uses the amber chrome, and the spinner is themed.
+
+**Phase 15 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes the Phase 14 review findings BUG-0098, TASK-0140, BUG-0099 and the first chrome item FEAT-0004 (P3-04, frame paint, tab bar, spinner). The rest of the chrome stays in the Phase 16 outline.
+
+**Phase 15 decisions (user, 2026-11-24):**
+- **D27 Scope:** the three Phase 14 follow-ups plus frame paint, tab bar and spinner.
+- **D28 Mixed-form base:** a file that sets `base` and writes its colors without `Some` gets those colors on the named base, and is never rewritten (BUG-0098).
+- **D29 Base-less notice:** stays log-only; the decision to log it is made testable (TASK-0140).
+- **D30 Tab chrome:** the active tab is BOLD and UNDERLINED in both themes. A new `rule_fg` field colors the tab dividers and the rule under the tab bar: amber `#5C3A00`; on the classic base an unset `rule_fg` follows `disabled_fg`, so classic looks unchanged.
+
+**Phase 14 goal (done):** a `theme.ron` that names a base is never rewritten; `base` is read case-insensitively, with or without `Some`; a theme file without a base says in the log how to get amber; THEMES.md and the changelog say the same.
 
 **Phase 14 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes the Phase 13 review findings BUG-0095, BUG-0097, BUG-0096 and TASK-0137. The chrome migrations move to the Phase 15 outline.
 
@@ -131,8 +141,12 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 14A** | `/goal` | The Theme Base Is Read Leniently and Never Rewritten | `src/ui/style.rs` | — |
-| 2 | **STEP 14B** | `/goal` | Base-Less Theme Files Say How to Get Amber | `src/ui/style.rs`, `THEMES.md`, `CHANGELOG.md` | STEP 14A |
+| 1 | **STEP 15A** | `/goal` | A Base File Keeps Its Bare Colors | `src/ui/style.rs`, `THEMES.md` | — |
+| 2 | **STEP 15B** | `/goal` | The Base-Less Notice Is Tested | `src/ui/style.rs` | STEP 15A |
+| 3 | **STEP 15C** | `/goal` | The Changelog Names the Amber Default | `CHANGELOG.md` | — |
+| 4 | **STEP 15D** | `/goal` | The Frame Is Painted With the Canvas Color | `src/ui/style.rs`, `src/app.rs`, `THEMES.md` | — |
+| 5 | **STEP 15E** | `/goal` | The Tab Bar Uses the Amber Chrome | `src/ui/style.rs`, `src/app.rs`, `THEMES.md` | — |
+| 6 | **STEP 15F** | `/goal` | The Spinner Uses the Theme | `src/spinner.rs`, `src/gitui.rs`, `src/ui/style.rs` | STEP 15D |
 
 ### Completed
 
@@ -246,6 +260,8 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 13A** | ✅ | `/goal` | The Scrollbar Thumb Has Its Own Color | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` |
 | **STEP 13B** | ✅ | `/boost` | Existing Theme Files Keep Their Look (follow-ups BUG-0095, BUG-0097, TASK-0137 in 14A, 14B) | `src/ui/style.rs`, `THEMES.md` |
 | **STEP 13C** | ✅ a6fd16f9 | `/goal` | Amber Only on Truecolor Terminals (follow-up BUG-0096 in 14B) | `src/ui/style.rs`, `THEMES.md`, `README.md` |
+| **STEP 14A** | ✅ 93ab6f31 | `/goal` | The Theme Base Is Read Leniently and Never Rewritten (follow-up BUG-0098 in 15A) | `src/ui/style.rs` |
+| **STEP 14B** | ✅ 51376e33 | `/goal` | Base-Less Theme Files Say How to Get Amber (follow-ups TASK-0140, BUG-0099 in 15B, 15C) | `src/ui/style.rs`, `THEMES.md`, `CHANGELOG.md` |
 
 ### User Step: IMAGE
 
@@ -279,8 +295,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 15 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
-  - Frame paint (`BG_BLACK`), tab bar, spinner (P3-04)
+- **Phase 16 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks. (Frame paint, tab bar and spinner, P3-04, are in Phase 15.)
   - Command bar layout and styling, with the `commandbar_key` and `commandbar_splitter` helpers (P3-05, P2-24, rest of P3-02)
   - Pane and popup migrations, with `section_header` and `info_title` (P3-06, P3-07, rest of P3-02; ~5 steps)
   - Snapshot updates + README note (P3-08)
@@ -6396,6 +6411,359 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t14b_baseless_file_untouched' src/ui/style.rs && grep -qF 'has no base; unset fields use the classic colors' src/ui/style.rs && grep -qF 'Unset fields are filled from the classic gitui colors unless' THEMES.md && ! grep -qF 'To change the colors of the default theme' THEMES.md && grep -qF 'without `base` now fills unset fields from the classic colors' CHANGELOG.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15A: A Base File Keeps Its Bare Colors
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15A: a theme.ron that sets base and writes its colors without Some gets those colors on the named base and is never rewritten; THEMES.md says so.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:167-345 (deserialize_optional_string, deserialize_present, OldThemeFile, into_patch)
+  - src/ui/style.rs:627-737 (apply_classic_patch, save_patch, init_for)
+  - src/ui/style.rs:1293-1336 (t14a_base_file_never_rewritten, t14a_old_format_with_base_text_converts)
+  - THEMES.md:8-11, 68-78
+  - neb: BUG-0098. Decision D28
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Patch-format files (colors in Some) resolve exactly as today. The old-format conversion of a file without a base key (rewrite + "Converted old theme" log) is unchanged. No new log lines; the unknown-base warning and the `theme error` line keep their text. Theme fields and their defaults don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a user who writes `(base: "amber", selection_bg: "Black")`, the bare form THEMES.md shows for base, gets amber with a black selection instead of a plain classic theme.
+
+Contract & Behavior:
+State changed: the Theme returned by Theme::init_for for a file that fails the patch parse but parses in the old (bare-color) format and has a `base` key. Writers of theme.ron: only save_patch, still called only for an old-format file with no `base` key. No file that has a `base` key is ever written.
+
+1. src/ui/style.rs, init_for, old-format branch: when the file has a `base` key, read its value with the same rules as the patch format (bare string, Some(string) or None; name trimmed and matched ASCII case-insensitively) and resolve the bare colors on it exactly as the patch branch does: "amber" -> Theme::default() plus the colors; "classic" -> the classic patch rule (apply_classic_patch, so an unset scroll_thumb_fg follows selection_bg); an unknown name -> the existing unknown-base warning and the classic patch rule; None -> the classic patch rule. The file is never rewritten. A `base` value that isn't a string, Some(string) or None still rejects the whole file: `theme error` log, Theme::classic(), file unchanged.
+   Edge cases (which wins):
+   a. `(base: "amber", selection_bg: "Black")` and `(base: Some("amber"), selection_bg: "Black")`: Theme { selection_bg: Black, ..Theme::default() }; file unchanged.
+   b. `(base: " AMBER ", tag_fg: "Red")`: Theme { tag_fg: Red, ..Theme::default() }.
+   c. `(base: "classic", selection_bg: "Black")`: Theme { selection_bg: Black, scroll_thumb_fg: Black, ..Theme::classic() }; file unchanged.
+   d. `(base: "neon", tag_fg: "Red")`: Theme { tag_fg: Red, ..Theme::classic() }; unknown-base warning; file unchanged.
+   e. `(base: None, tag_fg: "Red")`: Theme { tag_fg: Red, ..Theme::classic() }; file unchanged.
+   f. `(base: 5)` and `(base: Some(5), selection_bg: "Black")`: Theme::classic(); file unchanged (as today).
+   g. Old-format file without `base`, e.g. `(selection_bg: "Black", syntax: "base16-ocean.dark", line_break: "base")`: converted and rewritten exactly as today.
+   h. COLORTERM never changes the result for any of a-f (an existing file ignores it, 13C).
+2. THEMES.md, Configuration paragraph (line 10): the parenthetical clause about a file with a base key that fails to parse is removed (such a file now loads, item 1), and the paragraph gains this sentence: A file that sets `base` is never rewritten, and it may write every color without `Some`.
+   The line-77 note becomes: Note that you need to wrap values in `Some` due to the way the overrides work (as of 0.23); `base` also takes a bare string, and a file that sets `base` may write every color without `Some`.
+
+Must still work:
+- Every t13b_*, t13c_*, t14a_* and t14b_* test, except that t14a_base_file_never_rewritten loses its first case (it moves to t15a_mixed_base_keeps_colors with the new expected theme).
+- The rest of THEMES.md line 10 (classic fill rule, base names ignore case, old-format conversion, classic fallback on an unreadable or unparsable file), line 6, the palette table and both ron examples.
+
+Drops:
+  - A theme.ron that sets base and writes bare colors no longer loads as plain classic with every color dropped; it gets its colors on the named base (D28).
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile, compared with assert_theme_eq, each with Theme::init_for(path, Some("truecolor")) and with None.
+  - `t15a_mixed_base_keeps_colors`: edge cases a-e -> the expected themes; each file's text after the call equals what was written.
+  - `t14a_base_file_never_rewritten`: the two files in edge case f -> Theme::classic(); file unchanged.
+  - `t14a_old_format_with_base_text_converts`: unchanged (edge case g).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t15a_mixed_base_keeps_colors' src/ui/style.rs && grep -q 'fn t14a_base_file_never_rewritten' src/ui/style.rs && grep -qF 'A file that sets `base` is never rewritten, and it may write every color without `Some`.' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15B: The Base-Less Notice Is Tested
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15B: theme loading returns the base-less notice alongside the theme, init_for logs exactly that notice, and a test proves which files get it.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+READ_ONLY_REFS:
+  - src/ui/style.rs:664-742 (init_for, init)
+  - neb: TASK-0140. Decision D29
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Theme::init and Theme::init_for keep their signatures and return the same Theme for every file. The notice text doesn't change. No capturing logger, no change to test_smoke's env_logger setup. No UI notice. theme.ron writers are unchanged.
+
+[PRE_GATE]
+grep -q 'fn t15a_mixed_base_keeps_colors' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: deleting or misplacing the base-less notice fails a test.
+
+Contract & Behavior:
+State changed: none at runtime (same theme, same log line). The decision to log moves into a testable function.
+
+1. src/ui/style.rs: a private `fn load_with_notice(theme_path: &Path, colorterm: Option<&str>) -> (Self, Option<String>)` holds all of init_for's resolution. The Option is Some exactly when the base-less info line applies, holding exactly:
+   `theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some("amber") to use the amber theme.`
+   init_for calls it, logs the notice at info level when it's Some, and returns the theme. Every other log line stays where it is and keeps its text.
+   Edge cases (which states get the notice):
+   a. Notice: `(tag_fg: Some("Red"))`, `()`, `(base: None)` (patch format), and `(base: None, tag_fg: "Red")` (bare colors, 15A).
+   b. No notice: `(base: "amber")`, `(base: Some("classic"))`, `(base: "neon")` (keeps its warning), `(base: "amber", selection_bg: "Black")`.
+   c. No notice: missing file, unreadable path (a directory), `not ron`, `(base: 5)`.
+   d. No notice: an old-format file without base, e.g. `(selection_bg: "Black")`, on the run that converts it (as 14B case d).
+   e. colorterm Some("truecolor") and None give the same notice.
+   Testing note: the log call itself stays untested (one process-wide logger; test_smoke installs env_logger). Hydrogen checks in the diff that init_for logs the returned notice and nothing else.
+
+Must still work:
+- Every theme test in src/ui/style.rs, unchanged.
+- init_for returns the theme load_with_notice returns, for every file.
+
+Drops: none
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile (a tempdir for the unreadable case, a path inside an empty tempdir for missing), each with Some("truecolor") and None.
+  - `t15b_notice_only_without_base`: edge case a files -> notice equal to the format above with that path; edge cases b, c, d -> None; the theme half equals Theme::init_for's result for the same file and colorterm.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn load_with_notice' src/ui/style.rs && grep -q 'fn t15b_notice_only_without_base' src/ui/style.rs && grep -qF 'has no base; unset fields use the classic colors' src/ui/style.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15C: The Changelog Names the Amber Default
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15C: the CHANGELOG Unreleased theme line describes the change users will see, amber on truecolor terminals with no theme.ron, instead of an unreleased intermediate state.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - CHANGELOG.md
+READ_ONLY_REFS:
+  - CHANGELOG.md:8-24
+  - THEMES.md:1-11
+  - neb: BUG-0099
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No other CHANGELOG line, section or release changes. README.md and THEMES.md don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: someone upgrading from released gitui reads what actually changed for them.
+
+Contract & Behavior:
+State changed: one CHANGELOG line.
+
+1. CHANGELOG.md, `## Unreleased` -> `### Changed`: the bullet that starts `* a `theme.ron` without `base` now fills unset fields` is replaced, in the same position, by exactly:
+   `* amber-on-black default theme when there is no `theme.ron` and `COLORTERM` is `truecolor` or `24bit`; an existing `theme.ron` keeps the classic colors unless it sets `base: Some("amber")` ([THEMES.md](THEMES.md))`
+   Edge cases:
+   a. The four other `### Changed` bullets, the `### Added` and `### Fixes` sections keep their text and order.
+   b. Exactly one Unreleased bullet mentions amber.
+
+Must still work:
+- Everything in CHANGELOG.md outside that one bullet.
+
+Drops:
+  - The CHANGELOG line saying a base-less theme.ron now fills from classic "instead of amber" (released gitui never had amber; BUG-0099).
+
+Tests:
+  - none (docs only); POST_GATE greps the new line and the absence of the old one.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -qF '* amber-on-black default theme when there is no `theme.ron` and `COLORTERM` is `truecolor` or `24bit`' CHANGELOG.md && ! grep -qF 'from the classic colors instead of amber' CHANGELOG.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15D: The Frame Is Painted With the Canvas Color
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15D: a new canvas_bg theme field (amber #000000, classic Reset) paints the whole frame before anything else draws.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - src/app.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:17-165 (palette consts, Theme, ThemePatchFile, into_parts)
+  - src/ui/style.rs:246-380 (OldThemeFile, into_patch, classic)
+  - src/ui/style.rs:627-650, 745-781, 822-887 (apply_classic_patch, save_patch, Default, assert_theme_eq)
+  - src/app.rs:258-303 (App::draw), 1513-1535 (make_test_app), 3200-3214 (render_app)
+  - THEMES.md:12-47
+  - neb: FEAT-0004 (P3-04)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. No other Theme field or default changes. Classic renders exactly as today. The insta snapshots in src/snapshots/ don't change. Widgets that set their own bg (including an explicit Color::Reset, e.g. Theme::tags(false)) aren't changed here; that is the Phase 16 pane migration.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: on the amber theme, every cell no widget paints is black, not the terminal's own background.
+
+Contract & Behavior:
+State changed: a new Theme field `canvas_bg: Color`. Writers: Theme::default (amber) = Color::Rgb(0, 0, 0) via a `BG_BLACK` const; Theme::classic = Color::Reset; the patch file key `canvas_bg: Some(<color>)`; the old-format key `canvas_bg: <color>`; save_patch through the existing patch diff. assert_theme_eq compares it.
+
+1. src/ui/style.rs: the field as above, read from patch and old-format files like every other color; `pub fn canvas(&self) -> Style` = Style::default().bg(canvas_bg).
+2. src/app.rs, App::draw: first paints the whole frame area with Theme::canvas(), then draws everything as today.
+3. THEMES.md, Default Theme table: a row `| `canvas_bg` | `#000000` |` directly above the `syntax` row.
+   Edge cases:
+   a. Amber, 80x24 and 18x12: cell (0, 0) and cell (width - 1, 1) (outside the tab bar's 1-column margin) have bg Rgb(0, 0, 0).
+   b. Classic, same sizes and cells: bg Color::Reset (unchanged look).
+   c. `(canvas_bg: Some("Black"))`: Theme { canvas_bg: Black, ..Theme::classic() }.
+   d. `(base: "amber", canvas_bg: Some("Red"))`: Theme { canvas_bg: Red, ..Theme::default() }.
+   e. Old-format `(canvas_bg: "Black")`: converted; the theme is classic with canvas_bg Black; a second load of the rewritten file gives the same theme.
+   f. Redraw after a resize paints the new area (it's painted every draw).
+
+Must still work:
+- All theme tests (assert_theme_eq now includes canvas_bg).
+- The three insta snapshots (text only) unchanged.
+- Every App rendering test in src/app.rs and src/gitui.rs.
+
+Drops: none
+
+Tests:
+  - `t15d_canvas_bg_from_theme` (src/ui/style.rs `mod tests`): Theme::default().canvas_bg == Rgb(0, 0, 0); Theme::classic().canvas_bg == Reset; edge cases c, d, e via NamedTempFile and Theme::init_for(path, None).
+  - `t15d_frame_painted_with_canvas` (src/app.rs tests): an App built like make_test_app with Theme::default(), drawn into TestBackend 80x24 and 18x12 -> edge case a; the same with Theme::classic() -> edge case b. A helper that takes the Theme is the coder's choice.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn canvas' src/ui/style.rs && grep -q 'fn t15d_canvas_bg_from_theme' src/ui/style.rs && grep -q 'fn t15d_frame_painted_with_canvas' src/app.rs && grep -qF '| `canvas_bg` | `#000000` |' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15E: The Tab Bar Uses the Amber Chrome
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15E: the active tab is bold and underlined; a new rule_fg field (amber #5C3A00; classic follows disabled_fg) colors the tab dividers and the rule under the tab bar.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - src/app.rs
+  - THEMES.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:393-456 (block, title, tab, text)
+  - src/ui/style.rs:627-650 (apply_classic_patch, save_patch: the scroll_thumb_fg pattern)
+  - src/app.rs:1373-1441 (draw_top_bar)
+  - src/popups/branchlist.rs:660-672 (the other Theme::tab caller)
+  - src/strings.rs:97 (tab_divider)
+  - neb: FEAT-0004 (P3-04). Decision D30
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Tab labels, divider text, tab widths and the repo-path ellipsis don't change. Inactive tabs and the repo path keep disabled_fg. src/popups/branchlist.rs isn't edited (its active tab gains BOLD through Theme::tab; its divider keeps its current style). The insta snapshots don't change.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: the tab bar matches the Nebulous/Orrery chrome on amber, and classic looks the same apart from a bold active tab.
+
+Contract & Behavior:
+State changed: a new Theme field `rule_fg: Color`. Writers: Theme::default = AMBER_DARK; Theme::classic = Color::DarkGray; patch key `rule_fg: Some(<color>)`; old-format key `rule_fg: <color>`; apply_classic_patch: when the file doesn't set rule_fg, rule_fg = the resolved disabled_fg; the amber base has no fallback (unset stays AMBER_DARK); save_patch writes rule_fg only when it differs from disabled_fg. assert_theme_eq compares it.
+
+1. src/ui/style.rs: the field; `pub fn rule(&self) -> Style` = fg rule_fg. Theme::tab(true) adds Modifier::BOLD and keeps fg selected_tab and UNDERLINED. Theme::tab(false) unchanged.
+2. src/app.rs, draw_top_bar: the bottom border uses Theme::rule(); each divider is drawn in Theme::rule(); labels and path keep their styles.
+3. THEMES.md: Default Theme table row `| `rule_fg` | `#5C3A00` |` directly above the `syntax` row (below canvas_bg if 15D landed), plus one sentence after the table: With the classic base, an unset `rule_fg` follows `disabled_fg`.
+   Edge cases:
+   a. Amber, 80x24: the "Status" label cells have fg Rgb(255, 216, 102) with BOLD and UNDERLINED; the "Log" label cells fg Rgb(153, 99, 0); every divider cell and every rule-row cell from x = 1 to width - 2 at y = 1 fg Rgb(92, 58, 0); the repo-path cells fg Rgb(153, 99, 0).
+   b. Amber, 18x12 (labels cut off): the visible "Status" cells keep the active style; every rule-row cell from x = 1 to 16 fg Rgb(92, 58, 0).
+   c. Classic, 80x24: rule-row and divider cells fg DarkGray (as today); "Status" cells fg Reset, BOLD and UNDERLINED.
+   d. Classic file `(disabled_fg: Some("Red"))`: rule_fg Red. `(disabled_fg: Some("Red"), rule_fg: Some("Green"))`: Green.
+   e. `(base: "amber", disabled_fg: Some("Red"))`: rule_fg Rgb(92, 58, 0).
+   f. Old-format `(disabled_fg: "Red")`: converted; the rewritten file has no `rule_fg`; reload gives rule_fg Red. Old-format `(rule_fg: "Green")`: the rewritten file keeps it; reload gives Green.
+   g. Switching tabs (keys 1-5) moves the active style; the rule and dividers keep rule_fg.
+
+Must still work:
+- All theme tests, the branch list's Local/Remote tabs (labels, switching), every App rendering test, the three insta snapshots.
+
+Drops: none
+
+Tests:
+  - `t15e_rule_fg_from_theme` (src/ui/style.rs `mod tests`): edge cases d, e, f via NamedTempFile and Theme::init_for(path, None); Theme::tab(true) has BOLD and UNDERLINED for both themes.
+  - `t15e_tab_bar_chrome` (src/app.rs tests): App drawn into TestBackend -> edge cases a, b (Theme::default()) and c (Theme::classic()); then the "2" key event selects Log and the "Log" cells carry the active style (edge case g).
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn rule' src/ui/style.rs && grep -q 'fn t15e_rule_fg_from_theme' src/ui/style.rs && grep -q 'fn t15e_tab_bar_chrome' src/app.rs && grep -qF '| `rule_fg` | `#5C3A00` |' THEMES.md && grep -qF 'an unset `rule_fg` follows `disabled_fg`' THEMES.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 15F: The Spinner Uses the Theme
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 15F: the busy spinner at the top-left cell is drawn in the theme's selected_tab color on canvas_bg, and its blank state keeps canvas_bg.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/spinner.rs
+  - src/gitui.rs
+  - src/ui/style.rs
+READ_ONLY_REFS:
+  - src/spinner.rs:1-65
+  - src/gitui.rs:34-152 (Gitui::new receives the Theme before App::new takes it; run_main_loop)
+  - src/ui/style.rs canvas_bg / canvas (from 15D)
+  - neb: FEAT-0004 (P3-04)
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. Spinner characters, position (0, 0), tick rate and when it shows don't change. No new Theme field. Classic draws exactly as today (fg and bg Reset). The insta snapshots don't change.
+
+[PRE_GATE]
+grep -q 'canvas_bg' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: on amber the spinner is bright amber on black and never leaves a terminal-background hole at (0, 0).
+
+Contract & Behavior:
+State changed: the Style the Spinner draws its cell with. Writers: the one Spinner built in Gitui::run_main_loop, from the Theme that Gitui::new was given. The spinner still writes straight to the backend, so its blank state must carry the canvas bg: the frame draw won't repaint (0, 0) after the spinner wrote there.
+
+1. src/ui/style.rs: `pub fn spinner(&self) -> Style` = fg selected_tab, bg canvas_bg.
+2. src/spinner.rs: the spinner draws both the busy character and the blank ' ' with the Style it was given (constructor argument or draw argument: coder's choice). It still writes only when the character changes.
+3. src/gitui.rs: Gitui keeps Theme::spinner() of the Theme passed to Gitui::new (taken before the Theme moves into App::new), and run_main_loop gives it to the spinner. App is not edited.
+   Edge cases:
+   a. Amber, active: cell (0, 0) is a SPINNER_CHARS char, fg Rgb(255, 216, 102), bg Rgb(0, 0, 0).
+   b. Amber, then inactive: cell (0, 0) is ' ', bg Rgb(0, 0, 0).
+   c. Classic: fg Reset, bg Reset in both states.
+   d. update() while active advances the char; a draw with an unchanged char writes nothing.
+
+Must still work:
+- The main loop: spinner tick, set_state(any_work_pending), quit. Every gitui.rs test and the insta snapshots.
+
+Drops: none
+
+Tests:
+  - `t15f_spinner_cell_styled` (src/spinner.rs tests): Terminal<TestBackend> 18x12; spinner with Theme::default().spinner(), set_state(true), draw -> edge case a read from terminal.backend().buffer(); set_state(false), draw -> edge case b; same with Theme::classic().spinner() -> edge case c.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn spinner' src/ui/style.rs && grep -q 'fn t15f_spinner_cell_styled' src/spinner.rs
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
