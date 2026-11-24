@@ -1027,8 +1027,7 @@ mod tests {
 			)
 			.unwrap();
 
-			let theme =
-				Rc::new(Theme::init(&file.path().to_path_buf()));
+			let theme = Rc::new(Theme::init(file.path()));
 
 			assert_eq!(
 				DiffComponent::get_line_to_add(

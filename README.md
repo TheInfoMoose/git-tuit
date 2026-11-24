@@ -264,11 +264,12 @@ This will log to:
 
 ## 10. <a name="theme"></a> Color Theme <small><sup>[Top ▲](#table-of-contents)</sup></small>
 
+Classic theme on a light terminal:
 ![](assets/light-theme.png)
 
-`gitui` should automatically work on both light and dark terminal themes.
+With no `theme.ron`, `gitui` uses the amber theme on terminals that set `COLORTERM=truecolor` or `COLORTERM=24bit`, and the classic `gitui` colors otherwise. An existing `theme.ron` fills unset fields from the classic colors unless it sets `base: Some("amber")`. On a light-background truecolor terminal, put `(base: Some("classic"))` in `theme.ron`.
 
-However, you can customize everything to your liking: See [Themes](THEMES.md).
+You can customize everything to your liking: See [Themes](THEMES.md).
 
 ## 11. <a name="bindings"></a> Key Bindings <small><sup>[Top ▲](#table-of-contents)</sup></small>
 

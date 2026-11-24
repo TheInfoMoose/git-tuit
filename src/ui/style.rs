@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::{
 	fs::{self, File},
 	io::{ErrorKind, Write},
-	path::{Path, PathBuf},
+	path::Path,
 	rc::Rc,
 };
 use struct_patch::Patch;
@@ -579,11 +579,23 @@ impl Theme {
 		self.syntax.clone()
 	}
 
-	pub fn init(theme_path: &PathBuf) -> Self {
+	fn is_truecolor(colorterm: Option<&str>) -> bool {
+		colorterm.is_some_and(|val| {
+			let trimmed = val.trim();
+			trimmed.eq_ignore_ascii_case("truecolor")
+				|| trimmed.eq_ignore_ascii_case("24bit")
+		})
+	}
+
+	fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self {
 		let content = match fs::read_to_string(theme_path) {
 			Ok(content) => content,
 			Err(e) if e.kind() == ErrorKind::NotFound => {
-				return Self::default();
+				return if Self::is_truecolor(colorterm) {
+					Self::default()
+				} else {
+					Self::classic()
+				};
 			}
 			Err(e) => {
 				log::error!("theme error [{theme_path:?}]: {e}");
@@ -640,6 +652,11 @@ impl Theme {
 					)
 			}
 		}
+	}
+
+	pub fn init(theme_path: &Path) -> Self {
+		let colorterm = std::env::var("COLORTERM").ok();
+		Self::init_for(theme_path, colorterm.as_deref())
 	}
 }
 
@@ -709,7 +726,7 @@ mod tests {
 		)
 		.unwrap();
 
-		let theme = Theme::init(&file.path().to_path_buf());
+		let theme = Theme::init(file.path());
 
 		assert_eq!(theme.selected_tab, Theme::classic().selected_tab);
 
@@ -880,8 +897,7 @@ mod tests {
 		)
 		.unwrap();
 
-		let overridden =
-			Theme::init(&override_file.path().to_path_buf());
+		let overridden = Theme::init(override_file.path());
 		assert_eq!(overridden.block(true).fg, Some(Color::Green));
 		assert_eq!(
 			overridden.scroll_bar_track().fg,
@@ -892,7 +908,7 @@ mod tests {
 		writeln!(partial_file, r#"(selection_bg: Some("Black"))"#)
 			.unwrap();
 
-		let partial = Theme::init(&partial_file.path().to_path_buf());
+		let partial = Theme::init(partial_file.path());
 		assert_eq!(partial.block(true).fg, Some(Color::Reset));
 		assert_eq!(partial.scroll_bar_track().fg, Some(Color::Reset));
 	}
@@ -909,13 +925,12 @@ mod tests {
 		let mut override_file = NamedTempFile::new().unwrap();
 		writeln!(override_file, r#"(panel_bg: Some("Blue"))"#)
 			.unwrap();
-		let overridden =
-			Theme::init(&override_file.path().to_path_buf());
+		let overridden = Theme::init(override_file.path());
 		assert_eq!(overridden.popup().bg, Some(Color::Blue));
 
 		let mut old_file = NamedTempFile::new().unwrap();
 		writeln!(old_file, r#"(selection_bg: "Black")"#).unwrap();
-		let old_loaded = Theme::init(&old_file.path().to_path_buf());
+		let old_loaded = Theme::init(old_file.path());
 		assert_eq!(old_loaded.popup().bg, Some(Color::Reset));
 	}
 
@@ -930,8 +945,7 @@ mod tests {
 		let mut override_file = NamedTempFile::new().unwrap();
 		writeln!(override_file, r#"(attention_fg: Some("Yellow"))"#)
 			.unwrap();
-		let overridden =
-			Theme::init(&override_file.path().to_path_buf());
+		let overridden = Theme::init(override_file.path());
 		assert_eq!(
 			overridden.attention_block_style().fg,
 			Some(Color::Yellow)
@@ -940,7 +954,7 @@ mod tests {
 		let mut partial_file = NamedTempFile::new().unwrap();
 		writeln!(partial_file, r#"(selection_bg: Some("Black"))"#)
 			.unwrap();
-		let partial = Theme::init(&partial_file.path().to_path_buf());
+		let partial = Theme::init(partial_file.path());
 		assert_eq!(
 			partial.attention_block_style().fg,
 			Some(Color::Yellow)
@@ -989,7 +1003,7 @@ mod tests {
 		let mut sel_file = NamedTempFile::new().unwrap();
 		writeln!(sel_file, r#"(selection_bg: Some("LightBlue"))"#)
 			.unwrap();
-		let sel_theme = Theme::init(&sel_file.path().to_path_buf());
+		let sel_theme = Theme::init(sel_file.path());
 		assert_theme_eq(
 			&sel_theme,
 			&Theme {
@@ -1001,8 +1015,7 @@ mod tests {
 
 		let mut empty_file = NamedTempFile::new().unwrap();
 		writeln!(empty_file, "()").unwrap();
-		let empty_theme =
-			Theme::init(&empty_file.path().to_path_buf());
+		let empty_theme = Theme::init(empty_file.path());
 		assert_theme_eq(&empty_theme, &Theme::classic());
 	}
 
@@ -1014,7 +1027,7 @@ mod tests {
 			r#"(base: Some("amber"), selection_bg: Some("Black"))"#
 		)
 		.unwrap();
-		let theme = Theme::init(&file.path().to_path_buf());
+		let theme = Theme::init(file.path());
 		assert_theme_eq(
 			&theme,
 			&Theme {
@@ -1028,8 +1041,7 @@ mod tests {
 	fn t13b_patch_base_classic_and_unknown() {
 		let mut classic_file = NamedTempFile::new().unwrap();
 		writeln!(classic_file, r#"(base: Some("classic"))"#).unwrap();
-		let classic_theme =
-			Theme::init(&classic_file.path().to_path_buf());
+		let classic_theme = Theme::init(classic_file.path());
 		assert_theme_eq(&classic_theme, &Theme::classic());
 
 		let mut unknown_file = NamedTempFile::new().unwrap();
@@ -1038,8 +1050,7 @@ mod tests {
 			r#"(base: Some("neon"), tag_fg: Some("Red"))"#
 		)
 		.unwrap();
-		let unknown_theme =
-			Theme::init(&unknown_file.path().to_path_buf());
+		let unknown_theme = Theme::init(unknown_file.path());
 		assert_theme_eq(
 			&unknown_theme,
 			&Theme {
@@ -1057,7 +1068,7 @@ mod tests {
 			r#"(selection_bg: Some("LightBlue"), scroll_thumb_fg: Some("Cyan"))"#
 		)
 		.unwrap();
-		let theme = Theme::init(&file.path().to_path_buf());
+		let theme = Theme::init(file.path());
 		assert_theme_eq(
 			&theme,
 			&Theme {
@@ -1069,10 +1080,52 @@ mod tests {
 	}
 
 	#[test]
-	fn t13b_missing_file_is_amber() {
+	fn t13c_missing_file_truecolor_is_amber() {
 		let dir = tempfile::tempdir().unwrap();
 		let missing = dir.path().join("does-not-exist.ron");
-		let theme = Theme::init(&missing);
-		assert_theme_eq(&theme, &Theme::default());
+		for val in ["truecolor", "24bit", " TrueColor "] {
+			let theme = Theme::init_for(&missing, Some(val));
+			assert_theme_eq(&theme, &Theme::default());
+		}
+	}
+
+	#[test]
+	fn t13c_missing_file_no_truecolor_is_classic() {
+		let dir = tempfile::tempdir().unwrap();
+		let missing = dir.path().join("does-not-exist.ron");
+		for val in [None, Some(""), Some("256color")] {
+			let theme = Theme::init_for(&missing, val);
+			assert_theme_eq(&theme, &Theme::classic());
+		}
+	}
+
+	#[test]
+	fn t13c_file_ignores_colorterm() {
+		let mut amber_file = NamedTempFile::new().unwrap();
+		writeln!(amber_file, r#"(base: Some("amber"))"#).unwrap();
+		let amber = Theme::init_for(amber_file.path(), None);
+		assert_theme_eq(&amber, &Theme::default());
+
+		let mut tag_file = NamedTempFile::new().unwrap();
+		writeln!(tag_file, r#"(tag_fg: Some("Red"))"#).unwrap();
+		let tagged =
+			Theme::init_for(tag_file.path(), Some("truecolor"));
+		assert_theme_eq(
+			&tagged,
+			&Theme {
+				tag_fg: Color::Red,
+				..Theme::classic()
+			},
+		);
+
+		let mut bad_file = NamedTempFile::new().unwrap();
+		writeln!(bad_file, "not ron").unwrap();
+		let bad = Theme::init_for(bad_file.path(), Some("truecolor"));
+		assert_theme_eq(&bad, &Theme::classic());
+
+		let dir = tempfile::tempdir().unwrap();
+		let unreadable =
+			Theme::init_for(dir.path(), Some("truecolor"));
+		assert_theme_eq(&unreadable, &Theme::classic());
 	}
 }

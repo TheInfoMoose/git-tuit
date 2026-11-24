@@ -210,17 +210,15 @@ mod tests {
 		let mut override_file = NamedTempFile::new().unwrap();
 		writeln!(override_file, r#"(scroll_thumb_fg: Some("Cyan"))"#)
 			.unwrap();
-		let overridden =
-			Rc::new(Theme::init(&override_file.path().to_path_buf()));
+		let overridden = Rc::new(Theme::init(override_file.path()));
 		let buf = render_vertical_scrollbar(&overridden);
 		assert_scrollbar_colors(&buf, Color::Reset, Color::Cyan);
 
 		let mut selection_file = NamedTempFile::new().unwrap();
 		writeln!(selection_file, r#"(selection_bg: Some("Black"))"#)
 			.unwrap();
-		let selection_only = Rc::new(Theme::init(
-			&selection_file.path().to_path_buf(),
-		));
+		let selection_only =
+			Rc::new(Theme::init(selection_file.path()));
 		let buf = render_vertical_scrollbar(&selection_only);
 		assert_scrollbar_colors(&buf, Color::Reset, Color::Black);
 	}

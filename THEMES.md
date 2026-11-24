@@ -1,7 +1,9 @@
 # Themes
 
-default on light terminal:
+Classic theme on a light terminal:
 ![](assets/light-theme.png)
+
+With no `theme.ron`, gitui uses the amber theme on terminals that set `COLORTERM=truecolor` or `COLORTERM=24bit`, and the classic gitui colors otherwise. On a light-background truecolor terminal, put `(base: Some("classic"))` in `theme.ron` to use the classic colors.
 
 ## Configuration
 
