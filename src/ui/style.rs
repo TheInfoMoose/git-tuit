@@ -675,45 +675,49 @@ impl Theme {
 		base: Option<&str>,
 		patch: ThemePatch,
 		theme_path: &Path,
-	) -> Self {
+	) -> (Self, Option<String>) {
 		match base {
-			None => {
-				log::info!(
+			None => (
+				Self::apply_classic_patch(patch),
+				Some(format!(
 					"theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some(\"amber\") to use the amber theme."
-				);
-				Self::apply_classic_patch(patch)
-			}
+				)),
+			),
 			Some(name) => {
 				let trimmed = name.trim();
 				if trimmed.eq_ignore_ascii_case("amber") {
 					let mut theme = Self::default();
 					theme.apply(patch);
-					theme
+					(theme, None)
 				} else if trimmed.eq_ignore_ascii_case("classic") {
-					Self::apply_classic_patch(patch)
+					(Self::apply_classic_patch(patch), None)
 				} else {
 					log::warn!(
 						"unknown theme base {name:?} in {theme_path:?}; using classic"
 					);
-					Self::apply_classic_patch(patch)
+					(Self::apply_classic_patch(patch), None)
 				}
 			}
 		}
 	}
 
-	fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self {
+	fn load_with_notice(
+		theme_path: &Path,
+		colorterm: Option<&str>,
+	) -> (Self, Option<String>) {
 		let content = match fs::read_to_string(theme_path) {
 			Ok(content) => content,
 			Err(e) if e.kind() == ErrorKind::NotFound => {
-				return if Self::is_truecolor(colorterm) {
+				let theme = if Self::is_truecolor(colorterm) {
 					Self::default()
 				} else {
 					Self::classic()
 				};
+				return (theme, None);
 			}
 			Err(e) => {
 				log::error!("theme error [{theme_path:?}]: {e}");
-				return Self::classic();
+				return (Self::classic(), None);
 			}
 		};
 
@@ -733,7 +737,7 @@ impl Theme {
 							log::error!(
 								"theme error [{theme_path:?}]: {patch_err}"
 							);
-							Self::classic()
+							(Self::classic(), None)
 						},
 						|old_theme| {
 							let (base, patch) =
@@ -765,13 +769,22 @@ impl Theme {
 										);
 									}
 
-									theme
+									(theme, None)
 								}
 							}
 						},
 					)
 			}
 		}
+	}
+
+	fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self {
+		let (theme, notice) =
+			Self::load_with_notice(theme_path, colorterm);
+		if let Some(notice) = notice {
+			log::info!("{notice}");
+		}
+		theme
 	}
 
 	pub fn init(theme_path: &Path) -> Self {
@@ -1458,6 +1471,78 @@ mod tests {
 				fs::read_to_string(file.path()).unwrap(),
 				text
 			);
+		}
+	}
+
+	#[test]
+	fn t15b_notice_only_without_base() {
+		let notice_cases = [
+			"(tag_fg: Some(\"Red\"))\n",
+			"()\n",
+			"(base: None)\n",
+			"(base: None, tag_fg: \"Red\")\n",
+		];
+
+		for text in notice_cases {
+			for colorterm in [Some("truecolor"), None] {
+				let mut file = NamedTempFile::new().unwrap();
+				file.write_all(text.as_bytes()).unwrap();
+				let path = file.path();
+				let expected_notice = format!(
+					"theme {path:?} has no base; unset fields use the classic colors. Add base: Some(\"amber\") to use the amber theme."
+				);
+
+				let (theme, notice) =
+					Theme::load_with_notice(path, colorterm);
+				assert_eq!(
+					notice.as_deref(),
+					Some(expected_notice.as_str())
+				);
+				assert_theme_eq(
+					&theme,
+					&Theme::init_for(path, colorterm),
+				);
+			}
+		}
+
+		let no_notice_cases = [
+			"(base: \"amber\")\n",
+			"(base: Some(\"classic\"))\n",
+			"(base: \"neon\")\n",
+			"(base: \"amber\", selection_bg: \"Black\")\n",
+			"not ron\n",
+			"(base: 5)\n",
+			"(selection_bg: \"Black\")\n",
+		];
+
+		for text in no_notice_cases {
+			for colorterm in [Some("truecolor"), None] {
+				let mut file = NamedTempFile::new().unwrap();
+				file.write_all(text.as_bytes()).unwrap();
+				let path = file.path();
+
+				let (theme, notice) =
+					Theme::load_with_notice(path, colorterm);
+				assert_eq!(notice, None);
+				assert_theme_eq(
+					&theme,
+					&Theme::init_for(path, colorterm),
+				);
+			}
+		}
+
+		let dir = tempfile::tempdir().unwrap();
+		let missing = dir.path().join("does-not-exist.ron");
+		for path in [missing.as_path(), dir.path()] {
+			for colorterm in [Some("truecolor"), None] {
+				let (theme, notice) =
+					Theme::load_with_notice(path, colorterm);
+				assert_eq!(notice, None);
+				assert_theme_eq(
+					&theme,
+					&Theme::init_for(path, colorterm),
+				);
+			}
 		}
 	}
 }
