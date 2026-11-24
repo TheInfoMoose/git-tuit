@@ -2,11 +2,11 @@
 id = "BUG-0093"
 type = "bug"
 title = "Make the default theme readable on light and non-truecolor terminals"
-status = "pending"
+status = "closed"
 severity = "high"
 scope_ref = "git_tuit"
 created_at = "2026-11-23T15:26:13Z"
-updated_at = "2026-11-23T15:26:13Z"
+updated_at = "2026-11-24T11:56:25Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-24"
+commit = "a6fd16f"
+summary = "STEP 13C: with no theme.ron, amber only when COLORTERM is truecolor/24bit, classic otherwise; README/THEMES document it. Review: .phased/reviews/13.md"

@@ -55,5 +55,5 @@ type = "custom"
 path = "domains/wix"
 
 [summary]
-total_items = 235
-completed_items = 185
+total_items = 239
+completed_items = 191

@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0130"
 type = "task"
 title = "Cover all theme fields in assert_theme_eq and the default test"
-status = "pending"
+status = "closed"
 severity = "low"
 scope_ref = "git_tuit"
 created_at = "2026-11-23T15:26:13Z"
-updated_at = "2026-11-23T15:26:13Z"
+updated_at = "2026-11-24T11:58:02Z"
 
 [effort]
 logged_time_minutes = 0
@@ -16,4 +16,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-24"
+commit = "d89ce40"
+summary = "STEP 13A: assert_theme_eq destructures Theme and compares all 29 fields; t12a_default_is_amber asserts the five extra fields. Review: .phased/reviews/13.md"
