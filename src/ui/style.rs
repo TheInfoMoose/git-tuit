@@ -409,6 +409,10 @@ impl Theme {
 		Style::default().bg(self.canvas_bg)
 	}
 
+	pub fn spinner(&self) -> Style {
+		Style::default().fg(self.selected_tab).bg(self.canvas_bg)
+	}
+
 	pub fn rule(&self) -> Style {
 		Style::default().fg(self.rule_fg)
 	}

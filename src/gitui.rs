@@ -3,6 +3,7 @@ use std::time::Instant;
 use anyhow::Result;
 use asyncgit::{sync::utils::repo_work_dir, AsyncGitNotification};
 use crossbeam_channel::{never, tick, unbounded, Receiver};
+use ratatui::style::Style;
 use scopetime::scope_time;
 
 #[cfg(test)]
@@ -24,6 +25,7 @@ use crate::{
 
 pub struct Gitui {
 	app: crate::app::App,
+	spinner_style: Style,
 	rx_input: Receiver<InputEvent>,
 	rx_git: Receiver<AsyncGitNotification>,
 	rx_app: Receiver<AsyncAppNotification>,
@@ -54,6 +56,8 @@ impl Gitui {
 			Updater::Ticker => (tick(TICK_INTERVAL), never()),
 		};
 
+		let spinner_style = theme.spinner();
+
 		let app = App::new(
 			cliargs,
 			tx_git,
@@ -65,6 +69,7 @@ impl Gitui {
 
 		Ok(Self {
 			app,
+			spinner_style,
 			rx_input: input.receiver(),
 			rx_git,
 			rx_app,
@@ -82,7 +87,7 @@ impl Gitui {
 			'static + Send + Sync,
 	{
 		let spinner_ticker = tick(SPINNER_INTERVAL);
-		let mut spinner = Spinner::default();
+		let mut spinner = Spinner::new(self.spinner_style);
 		let mut first_update = true;
 
 		self.app.update()?;
@@ -390,6 +395,7 @@ mod tests {
 			key_symbols_path: None,
 		};
 		let theme = Theme::init(&PathBuf::new());
+		let spinner_style = theme.spinner();
 		let key_config = KeyConfig::default();
 		let (tx_git, rx_git) = crossbeam_channel::unbounded();
 		let (tx_app, rx_app) = crossbeam_channel::unbounded();
@@ -410,6 +416,7 @@ mod tests {
 		.unwrap();
 		let mut gitui = Gitui {
 			app,
+			spinner_style,
 			rx_input: input.receiver(),
 			rx_git,
 			rx_app,
