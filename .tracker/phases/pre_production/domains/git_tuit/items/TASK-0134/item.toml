@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0134"
 type = "task"
 title = "Amber Only on Truecolor Terminals"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-23T16:12:19Z"
-updated_at = "2026-11-24T03:23:20Z"
+updated_at = "2026-11-24T03:27:48Z"
 source_ref = "STEP 13C"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 21
 iteration_count = 1
+last_timer_session = "TASK-0134@2026-11-24T03:06:20Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-24"
+commit = "a6fd16f9"
+summary = "STEP 13C: Amber Only on Truecolor Terminals (phased check PASS)"
