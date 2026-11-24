@@ -57,6 +57,7 @@ pub struct Theme {
 	panel_bg: Color,
 	attention_fg: Color,
 	canvas_bg: Color,
+	rule_fg: Color,
 	syntax: String,
 }
 
@@ -126,6 +127,8 @@ struct ThemePatchFile {
 	#[serde(default)]
 	canvas_bg: Option<Color>,
 	#[serde(default)]
+	rule_fg: Option<Color>,
+	#[serde(default)]
 	syntax: Option<String>,
 }
 
@@ -163,6 +166,7 @@ impl ThemePatchFile {
 				panel_bg: self.panel_bg,
 				attention_fg: self.attention_fg,
 				canvas_bg: self.canvas_bg,
+				rule_fg: self.rule_fg,
 				syntax: self.syntax,
 			},
 		)
@@ -318,6 +322,8 @@ struct OldThemeFile {
 	#[serde(default, deserialize_with = "deserialize_some")]
 	canvas_bg: Option<Color>,
 	#[serde(default, deserialize_with = "deserialize_some")]
+	rule_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
 	syntax: Option<String>,
 }
 
@@ -355,6 +361,7 @@ impl OldThemeFile {
 				panel_bg: self.panel_bg,
 				attention_fg: self.attention_fg,
 				canvas_bg: self.canvas_bg,
+				rule_fg: self.rule_fg,
 				syntax: self.syntax,
 			},
 		)
@@ -393,12 +400,17 @@ impl Theme {
 			panel_bg: Color::Reset,
 			attention_fg: Color::Yellow,
 			canvas_bg: Color::Reset,
+			rule_fg: Color::DarkGray,
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
 		}
 	}
 
 	pub fn canvas(&self) -> Style {
 		Style::default().bg(self.canvas_bg)
+	}
+
+	pub fn rule(&self) -> Style {
+		Style::default().fg(self.rule_fg)
 	}
 
 	pub fn popup(&self) -> Style {
@@ -450,7 +462,7 @@ impl Theme {
 		if selected {
 			self.text(true, false)
 				.fg(self.selected_tab)
-				.add_modifier(Modifier::UNDERLINED)
+				.add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
 		} else {
 			self.text(false, false)
 		}
@@ -649,10 +661,14 @@ impl Theme {
 
 	fn apply_classic_patch(patch: ThemePatch) -> Self {
 		let thumb_set = patch.scroll_thumb_fg.is_some();
+		let rule_set = patch.rule_fg.is_some();
 		let mut theme = Self::classic();
 		theme.apply(patch);
 		if !thumb_set {
 			theme.scroll_thumb_fg = theme.selection_bg;
+		}
+		if !rule_set {
+			theme.rule_fg = theme.disabled_fg;
 		}
 		theme
 	}
@@ -665,6 +681,8 @@ impl Theme {
 		if self.scroll_thumb_fg != self.selection_bg {
 			patch.scroll_thumb_fg = Some(self.scroll_thumb_fg);
 		}
+		patch.rule_fg = (self.rule_fg != self.disabled_fg)
+			.then_some(self.rule_fg);
 		let data = to_string_pretty(&patch, PrettyConfig::default())?;
 
 		file.write_all(data.as_bytes())?;
@@ -838,6 +856,7 @@ impl Default for Theme {
 			panel_bg: PANEL_BG,
 			attention_fg: AMBER_ALERT,
 			canvas_bg: BG_BLACK,
+			rule_fg: AMBER_DARK,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -915,6 +934,7 @@ mod tests {
 			panel_bg,
 			attention_fg,
 			canvas_bg,
+			rule_fg,
 			syntax,
 		} = actual;
 
@@ -950,6 +970,7 @@ mod tests {
 		assert_eq!(panel_bg, &expected.panel_bg);
 		assert_eq!(attention_fg, &expected.attention_fg);
 		assert_eq!(canvas_bg, &expected.canvas_bg);
+		assert_eq!(rule_fg, &expected.rule_fg);
 		assert_eq!(syntax, &expected.syntax);
 	}
 
@@ -1610,5 +1631,107 @@ mod tests {
 		assert_theme_eq(&first, &expected_old);
 		let second = Theme::init_for(old_format.path(), None);
 		assert_theme_eq(&second, &expected_old);
+	}
+
+	#[test]
+	fn t15e_rule_fg_from_theme() {
+		assert_eq!(Theme::default().rule_fg, Color::Rgb(92, 58, 0));
+		assert_eq!(
+			Theme::default().rule(),
+			Style::default().fg(Color::Rgb(92, 58, 0))
+		);
+		assert_eq!(Theme::classic().rule_fg, Color::DarkGray);
+		assert_eq!(
+			Theme::classic().rule(),
+			Style::default().fg(Color::DarkGray)
+		);
+
+		let amber_tab = Theme::default().tab(true);
+		assert_eq!(amber_tab.fg, Some(Color::Rgb(255, 216, 102)));
+		assert!(amber_tab
+			.add_modifier
+			.contains(Modifier::BOLD | Modifier::UNDERLINED));
+		let classic_tab = Theme::classic().tab(true);
+		assert_eq!(classic_tab.fg, Some(Color::Reset));
+		assert!(classic_tab
+			.add_modifier
+			.contains(Modifier::BOLD | Modifier::UNDERLINED));
+
+		// Edge case d: classic file follows disabled_fg unless rule_fg set
+		let mut classic_follow = NamedTempFile::new().unwrap();
+		writeln!(classic_follow, r#"(disabled_fg: Some("Red"))"#)
+			.unwrap();
+		assert_theme_eq(
+			&Theme::init_for(classic_follow.path(), None),
+			&Theme {
+				disabled_fg: Color::Red,
+				rule_fg: Color::Red,
+				..Theme::classic()
+			},
+		);
+
+		let mut classic_explicit = NamedTempFile::new().unwrap();
+		writeln!(
+			classic_explicit,
+			r#"(disabled_fg: Some("Red"), rule_fg: Some("Green"))"#
+		)
+		.unwrap();
+		assert_theme_eq(
+			&Theme::init_for(classic_explicit.path(), None),
+			&Theme {
+				disabled_fg: Color::Red,
+				rule_fg: Color::Green,
+				..Theme::classic()
+			},
+		);
+
+		// Edge case e: amber base has no fallback to disabled_fg
+		let mut amber_override = NamedTempFile::new().unwrap();
+		writeln!(
+			amber_override,
+			r#"(base: "amber", disabled_fg: Some("Red"))"#
+		)
+		.unwrap();
+		assert_theme_eq(
+			&Theme::init_for(amber_override.path(), None),
+			&Theme {
+				disabled_fg: Color::Red,
+				..Theme::default()
+			},
+		);
+
+		// Edge case f: old-format conversion
+		let mut old_follow = NamedTempFile::new().unwrap();
+		writeln!(old_follow, r#"(disabled_fg: "Red")"#).unwrap();
+		let expected_follow = Theme {
+			disabled_fg: Color::Red,
+			rule_fg: Color::Red,
+			..Theme::classic()
+		};
+		let first = Theme::init_for(old_follow.path(), None);
+		assert_theme_eq(&first, &expected_follow);
+		let rewritten =
+			fs::read_to_string(old_follow.path()).unwrap();
+		let parsed: ThemePatchFile =
+			ron::de::from_str(&rewritten).unwrap();
+		assert_eq!(parsed.rule_fg, None);
+		let second = Theme::init_for(old_follow.path(), None);
+		assert_theme_eq(&second, &expected_follow);
+
+		let mut old_explicit = NamedTempFile::new().unwrap();
+		writeln!(old_explicit, r#"(rule_fg: "Green")"#).unwrap();
+		let expected_explicit = Theme {
+			rule_fg: Color::Green,
+			..Theme::classic()
+		};
+		let first = Theme::init_for(old_explicit.path(), None);
+		assert_theme_eq(&first, &expected_explicit);
+		let rewritten =
+			fs::read_to_string(old_explicit.path()).unwrap();
+		let parsed: ThemePatchFile =
+			ron::de::from_str(&rewritten).unwrap();
+		assert_eq!(parsed.rule_fg, Some(Color::Green));
+		let second = Theme::init_for(old_explicit.path(), None);
+		assert_theme_eq(&second, &expected_explicit);
 	}
 }

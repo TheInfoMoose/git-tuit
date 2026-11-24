@@ -44,7 +44,10 @@ The default theme uses an amber-on-black RGB palette:
 | `panel_bg` | `#0C0800` |
 | `attention_fg` | `#FF5500` |
 | `canvas_bg` | `#000000` |
+| `rule_fg` | `#5C3A00` |
 | `syntax` | `"base16-eighties.dark"` |
+
+With the classic base, an unset `rule_fg` follows `disabled_fg`.
 
 The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at one of the following paths, depending on your operating system:
 

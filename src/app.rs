@@ -1423,11 +1423,11 @@ impl App {
 				.block(
 					Block::default()
 						.borders(Borders::BOTTOM)
-						.border_style(self.theme.block(false)),
+						.border_style(self.theme.rule()),
 				)
 				.style(self.theme.tab(false))
 				.highlight_style(self.theme.tab(true))
-				.divider(divider)
+				.divider(Span::styled(divider, self.theme.rule()))
 				.select(self.tab),
 			table_area,
 		);
@@ -4225,5 +4225,174 @@ mod tests {
 			assert_eq!(buf[(0, 0)].bg, expected_bg);
 			assert_eq!(buf[(79, 1)].bg, expected_bg);
 		}
+	}
+
+	fn tab_bar_row(
+		buf: &ratatui::buffer::Buffer,
+		width: u16,
+	) -> String {
+		(0..width).map(|x| buf[(x, 0)].symbol()).collect::<String>()
+	}
+
+	fn assert_tab_label(
+		buf: &ratatui::buffer::Buffer,
+		width: u16,
+		label: &str,
+		fg: ratatui::style::Color,
+		active: bool,
+	) {
+		use ratatui::style::Modifier;
+		let row = tab_bar_row(buf, width);
+		let start = row
+			.find(label)
+			.unwrap_or_else(|| panic!("{label:?} not in {row:?}"));
+		for dx in 0..label.len() {
+			let cell = &buf[(u16::try_from(start + dx).unwrap(), 0)];
+			assert_eq!(cell.fg, fg, "cell {label}[{dx}] fg");
+			if active {
+				assert!(
+					cell.modifier.contains(
+						Modifier::BOLD | Modifier::UNDERLINED
+					),
+					"cell {label}[{dx}] should be BOLD|UNDERLINED, got {:?}",
+					cell.modifier
+				);
+			} else {
+				assert!(
+					!cell.modifier.contains(Modifier::BOLD)
+						&& !cell
+							.modifier
+							.contains(Modifier::UNDERLINED),
+					"cell {label}[{dx}] should not be BOLD/UNDERLINED, got {:?}",
+					cell.modifier
+				);
+			}
+		}
+	}
+
+	fn assert_tab_dividers_and_rule(
+		buf: &ratatui::buffer::Buffer,
+		width: u16,
+		rule_fg: ratatui::style::Color,
+	) {
+		let row = tab_bar_row(buf, width);
+		let mut dividers = 0usize;
+		for (i, ch) in row.char_indices() {
+			if ch == '|' {
+				dividers += 1;
+				for x in [i - 1, i, i + 1] {
+					assert_eq!(
+						buf[(u16::try_from(x).unwrap(), 0)].fg,
+						rule_fg,
+						"divider cell x={x}"
+					);
+				}
+			}
+		}
+		assert_eq!(dividers, 4, "expected 4 dividers in {row:?}");
+		for x in 1..=(width - 2) {
+			assert_eq!(buf[(x, 1)].fg, rule_fg, "rule cell x={x}");
+		}
+	}
+
+	#[test]
+	fn t15e_tab_bar_chrome() {
+		use ratatui::{backend::TestBackend, style::Color, Terminal};
+
+		let (td, _repo) = git2_testing::repo_init();
+
+		// Edge case a: Amber, 80x24
+		let (mut amber_app, kc, rx_git) =
+			make_test_app_with_rx(td.path());
+		let mut term =
+			Terminal::new(TestBackend::new(80, 24)).unwrap();
+		term.draw(|f| amber_app.draw(f).unwrap()).unwrap();
+		let buf = term.backend().buffer();
+		assert_tab_label(
+			buf,
+			80,
+			"Status",
+			Color::Rgb(255, 216, 102),
+			true,
+		);
+		assert_tab_label(
+			buf,
+			80,
+			"Log",
+			Color::Rgb(153, 99, 0),
+			false,
+		);
+		assert_tab_dividers_and_rule(buf, 80, Color::Rgb(92, 58, 0));
+
+		let row = tab_bar_row(buf, 80);
+		let after_tabs =
+			row.find("Stashes [5]").unwrap() + "Stashes [5]".len();
+		let mut repo_cells = 0usize;
+		for x in u16::try_from(after_tabs).unwrap()..79 {
+			let cell = &buf[(x, 0)];
+			if cell.symbol() != " " {
+				repo_cells += 1;
+				assert_eq!(
+					cell.fg,
+					Color::Rgb(153, 99, 0),
+					"repo path cell x={x}"
+				);
+			}
+		}
+		assert!(
+			repo_cells > 0,
+			"repo path must be visible in {row:?}"
+		);
+
+		// Edge case b: Amber, 18x12
+		term.backend_mut().resize(18, 12);
+		term.draw(|f| amber_app.draw(f).unwrap()).unwrap();
+		let buf = term.backend().buffer();
+		assert_tab_label(
+			buf,
+			18,
+			"Status",
+			Color::Rgb(255, 216, 102),
+			true,
+		);
+		for x in 1..=16 {
+			assert_eq!(
+				buf[(x, 1)].fg,
+				Color::Rgb(92, 58, 0),
+				"18x12 rule cell x={x}"
+			);
+		}
+
+		// Edge case c: Classic, 80x24
+		term.backend_mut().resize(80, 24);
+		let (classic_app, _kc) =
+			make_test_app_with_theme(td.path(), Theme::classic());
+		term.draw(|f| classic_app.draw(f).unwrap()).unwrap();
+		let buf = term.backend().buffer();
+		assert_tab_label(buf, 80, "Status", Color::Reset, true);
+		assert_tab_dividers_and_rule(buf, 80, Color::DarkGray);
+
+		// Edge case g: Switching tabs ("2" selects Log)
+		send_key!(&mut amber_app, kc.keys.tab_log);
+		term.draw(|f| amber_app.draw(f).unwrap()).unwrap();
+		let buf = term.backend().buffer();
+		assert_tab_label(
+			buf,
+			80,
+			"Log",
+			Color::Rgb(255, 216, 102),
+			true,
+		);
+		assert_tab_label(
+			buf,
+			80,
+			"Status",
+			Color::Rgb(153, 99, 0),
+			false,
+		);
+		assert_tab_dividers_and_rule(buf, 80, Color::Rgb(92, 58, 0));
+
+		drop(amber_app);
+		while rx_git.recv().is_ok() {}
 	}
 }
