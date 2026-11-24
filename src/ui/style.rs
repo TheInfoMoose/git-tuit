@@ -3,8 +3,13 @@ use anyhow::Result;
 use asyncgit::{DiffLineType, StatusItemType};
 use ratatui::style::{Color, Modifier, Style};
 use ron::ser::{to_string_pretty, PrettyConfig};
-use serde::{Deserialize, Serialize};
-use std::{fs::File, io::Write, path::PathBuf, rc::Rc};
+use serde::{Deserialize, Deserializer, Serialize};
+use std::{
+	fs::{self, File},
+	io::{ErrorKind, Write},
+	path::{Path, PathBuf},
+	rc::Rc,
+};
 use struct_patch::Patch;
 
 pub type SharedTheme = Rc<Theme>;
@@ -53,7 +58,252 @@ pub struct Theme {
 	syntax: String,
 }
 
+#[derive(Deserialize)]
+struct ThemePatchFile {
+	#[serde(default)]
+	base: Option<String>,
+	#[serde(default)]
+	selected_tab: Option<Color>,
+	#[serde(default)]
+	command_fg: Option<Color>,
+	#[serde(default)]
+	selection_bg: Option<Color>,
+	#[serde(default)]
+	selection_fg: Option<Color>,
+	#[serde(default)]
+	use_selection_fg: Option<bool>,
+	#[serde(default)]
+	cmdbar_bg: Option<Color>,
+	#[serde(default)]
+	disabled_fg: Option<Color>,
+	#[serde(default)]
+	diff_line_add: Option<Color>,
+	#[serde(default)]
+	diff_line_delete: Option<Color>,
+	#[serde(default)]
+	diff_file_added: Option<Color>,
+	#[serde(default)]
+	diff_file_removed: Option<Color>,
+	#[serde(default)]
+	diff_file_moved: Option<Color>,
+	#[serde(default)]
+	diff_file_modified: Option<Color>,
+	#[serde(default)]
+	commit_hash: Option<Color>,
+	#[serde(default)]
+	commit_time: Option<Color>,
+	#[serde(default)]
+	commit_author: Option<Color>,
+	#[serde(default)]
+	danger_fg: Option<Color>,
+	#[serde(default)]
+	push_gauge_bg: Option<Color>,
+	#[serde(default)]
+	push_gauge_fg: Option<Color>,
+	#[serde(default)]
+	tag_fg: Option<Color>,
+	#[serde(default)]
+	branch_fg: Option<Color>,
+	#[serde(default)]
+	line_break: Option<String>,
+	#[serde(default)]
+	block_title_focused: Option<Color>,
+	#[serde(default)]
+	border_focused_fg: Option<Color>,
+	#[serde(default)]
+	scroll_track_fg: Option<Color>,
+	#[serde(default)]
+	scroll_thumb_fg: Option<Color>,
+	#[serde(default)]
+	panel_bg: Option<Color>,
+	#[serde(default)]
+	attention_fg: Option<Color>,
+	#[serde(default)]
+	syntax: Option<String>,
+}
+
+impl ThemePatchFile {
+	fn into_parts(self) -> (Option<String>, ThemePatch) {
+		(
+			self.base,
+			ThemePatch {
+				selected_tab: self.selected_tab,
+				command_fg: self.command_fg,
+				selection_bg: self.selection_bg,
+				selection_fg: self.selection_fg,
+				use_selection_fg: self.use_selection_fg,
+				cmdbar_bg: self.cmdbar_bg,
+				disabled_fg: self.disabled_fg,
+				diff_line_add: self.diff_line_add,
+				diff_line_delete: self.diff_line_delete,
+				diff_file_added: self.diff_file_added,
+				diff_file_removed: self.diff_file_removed,
+				diff_file_moved: self.diff_file_moved,
+				diff_file_modified: self.diff_file_modified,
+				commit_hash: self.commit_hash,
+				commit_time: self.commit_time,
+				commit_author: self.commit_author,
+				danger_fg: self.danger_fg,
+				push_gauge_bg: self.push_gauge_bg,
+				push_gauge_fg: self.push_gauge_fg,
+				tag_fg: self.tag_fg,
+				branch_fg: self.branch_fg,
+				line_break: self.line_break,
+				block_title_focused: self.block_title_focused,
+				border_focused_fg: self.border_focused_fg,
+				scroll_track_fg: self.scroll_track_fg,
+				scroll_thumb_fg: self.scroll_thumb_fg,
+				panel_bg: self.panel_bg,
+				attention_fg: self.attention_fg,
+				syntax: self.syntax,
+			},
+		)
+	}
+}
+
+fn deserialize_some<'de, D, T>(
+	deserializer: D,
+) -> std::result::Result<Option<T>, D::Error>
+where
+	D: Deserializer<'de>,
+	T: Deserialize<'de>,
+{
+	T::deserialize(deserializer).map(Some)
+}
+
+#[derive(Deserialize)]
+struct OldThemeFile {
+	#[serde(default, deserialize_with = "deserialize_some")]
+	selected_tab: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	command_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	selection_bg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	selection_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	use_selection_fg: Option<bool>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	cmdbar_bg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	disabled_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_line_add: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_line_delete: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_file_added: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_file_removed: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_file_moved: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	diff_file_modified: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	commit_hash: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	commit_time: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	commit_author: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	danger_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	push_gauge_bg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	push_gauge_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	tag_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	branch_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	line_break: Option<String>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	block_title_focused: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	border_focused_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	scroll_track_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	scroll_thumb_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	panel_bg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	attention_fg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
+	syntax: Option<String>,
+}
+
+impl OldThemeFile {
+	fn into_patch(self) -> ThemePatch {
+		ThemePatch {
+			selected_tab: self.selected_tab,
+			command_fg: self.command_fg,
+			selection_bg: self.selection_bg,
+			selection_fg: self.selection_fg,
+			use_selection_fg: self.use_selection_fg,
+			cmdbar_bg: self.cmdbar_bg,
+			disabled_fg: self.disabled_fg,
+			diff_line_add: self.diff_line_add,
+			diff_line_delete: self.diff_line_delete,
+			diff_file_added: self.diff_file_added,
+			diff_file_removed: self.diff_file_removed,
+			diff_file_moved: self.diff_file_moved,
+			diff_file_modified: self.diff_file_modified,
+			commit_hash: self.commit_hash,
+			commit_time: self.commit_time,
+			commit_author: self.commit_author,
+			danger_fg: self.danger_fg,
+			push_gauge_bg: self.push_gauge_bg,
+			push_gauge_fg: self.push_gauge_fg,
+			tag_fg: self.tag_fg,
+			branch_fg: self.branch_fg,
+			line_break: self.line_break,
+			block_title_focused: self.block_title_focused,
+			border_focused_fg: self.border_focused_fg,
+			scroll_track_fg: self.scroll_track_fg,
+			scroll_thumb_fg: self.scroll_thumb_fg,
+			panel_bg: self.panel_bg,
+			attention_fg: self.attention_fg,
+			syntax: self.syntax,
+		}
+	}
+}
+
 impl Theme {
+	pub fn classic() -> Self {
+		Self {
+			selected_tab: Color::Reset,
+			command_fg: Color::White,
+			selection_bg: Color::Blue,
+			selection_fg: Color::White,
+			use_selection_fg: true,
+			cmdbar_bg: Color::Blue,
+			disabled_fg: Color::DarkGray,
+			diff_line_add: Color::Green,
+			diff_line_delete: Color::Red,
+			diff_file_added: Color::LightGreen,
+			diff_file_removed: Color::LightRed,
+			diff_file_moved: Color::LightMagenta,
+			diff_file_modified: Color::Yellow,
+			commit_hash: Color::Magenta,
+			commit_time: Color::LightCyan,
+			commit_author: Color::Green,
+			danger_fg: Color::Red,
+			push_gauge_bg: Color::Blue,
+			push_gauge_fg: Color::Reset,
+			tag_fg: Color::LightMagenta,
+			branch_fg: Color::LightYellow,
+			line_break: "¶".to_string(),
+			block_title_focused: Color::Reset,
+			border_focused_fg: Color::Reset,
+			scroll_track_fg: Color::Reset,
+			scroll_thumb_fg: Color::Blue,
+			panel_bg: Color::Reset,
+			attention_fg: Color::Yellow,
+			syntax: DEFAULT_SYNTAX_THEME.to_string(),
+		}
+	}
+
 	pub fn popup(&self) -> Style {
 		Style::default().bg(self.panel_bg)
 	}
@@ -300,22 +550,24 @@ impl Theme {
 		Style::default().fg(self.attention_fg)
 	}
 
-	fn load_patch(theme_path: &PathBuf) -> Result<ThemePatch> {
-		let file = File::open(theme_path)?;
-
-		Ok(ron::de::from_reader(file)?)
+	fn apply_classic_patch(patch: ThemePatch) -> Self {
+		let thumb_set = patch.scroll_thumb_fg.is_some();
+		let mut theme = Self::classic();
+		theme.apply(patch);
+		if !thumb_set {
+			theme.scroll_thumb_fg = theme.selection_bg;
+		}
+		theme
 	}
 
-	fn load_old_theme(theme_path: &PathBuf) -> Result<Self> {
-		let old_file = File::open(theme_path)?;
-
-		Ok(ron::de::from_reader::<File, Self>(old_file)?)
-	}
-
-	// This is supposed to be called when theme.ron doesn't already exists.
-	fn save_patch(&self, theme_path: &PathBuf) -> Result<()> {
+	// This is supposed to be called when converting an old full-format theme.
+	fn save_patch(&self, theme_path: &Path) -> Result<()> {
 		let mut file = File::create(theme_path)?;
-		let patch = self.clone().into_patch_by_diff(Self::default());
+		let mut patch =
+			self.clone().into_patch_by_diff(Self::classic());
+		if self.scroll_thumb_fg != self.selection_bg {
+			patch.scroll_thumb_fg = Some(self.scroll_thumb_fg);
+		}
 		let data = to_string_pretty(&patch, PrettyConfig::default())?;
 
 		file.write_all(data.as_bytes())?;
@@ -328,25 +580,66 @@ impl Theme {
 	}
 
 	pub fn init(theme_path: &PathBuf) -> Self {
-		let mut theme = Self::default();
+		let content = match fs::read_to_string(theme_path) {
+			Ok(content) => content,
+			Err(e) if e.kind() == ErrorKind::NotFound => {
+				return Self::default();
+			}
+			Err(e) => {
+				log::error!("theme error [{theme_path:?}]: {e}");
+				return Self::classic();
+			}
+		};
 
-		if let Ok(patch) = Self::load_patch(theme_path).map_err(|e| {
-			log::error!("theme error [{theme_path:?}]: {e}");
-			e
-		}) {
-			theme.apply(patch);
-		} else if let Ok(old_theme) = Self::load_old_theme(theme_path)
-		{
-			theme = old_theme;
+		match ron::de::from_str::<ThemePatchFile>(&content) {
+			Ok(patch_file) => {
+				let (base, patch) = patch_file.into_parts();
+				match base.as_deref() {
+					Some("amber") => {
+						let mut theme = Self::default();
+						theme.apply(patch);
+						theme
+					}
+					None | Some("classic") => {
+						Self::apply_classic_patch(patch)
+					}
+					Some(other) => {
+						log::warn!(
+							"unknown theme base {other:?} in {theme_path:?}; using classic"
+						);
+						Self::apply_classic_patch(patch)
+					}
+				}
+			}
+			Err(patch_err) => {
+				ron::de::from_str::<OldThemeFile>(&content)
+					.map_or_else(
+						|_| {
+							log::error!(
+								"theme error [{theme_path:?}]: {patch_err}"
+							);
+							Self::classic()
+						},
+						|old_theme| {
+							let theme = Self::apply_classic_patch(
+								old_theme.into_patch(),
+							);
 
-			if theme.save_patch(theme_path).is_ok() {
-				log::info!("Converted old theme to new format. ({theme_path:?})");
-			} else {
-				log::warn!("Failed to save theme in new format. ({theme_path:?})");
+							if theme.save_patch(theme_path).is_ok() {
+								log::info!(
+									"Converted old theme to new format. ({theme_path:?})"
+								);
+							} else {
+								log::warn!(
+									"Failed to save theme in new format. ({theme_path:?})"
+								);
+							}
+
+							theme
+						},
+					)
 			}
 		}
-
-		theme
 	}
 }
 
@@ -418,7 +711,7 @@ mod tests {
 
 		let theme = Theme::init(&file.path().to_path_buf());
 
-		assert_eq!(theme.selected_tab, Theme::default().selected_tab);
+		assert_eq!(theme.selected_tab, Theme::classic().selected_tab);
 
 		assert_ne!(theme.selection_bg, Theme::default().selection_bg);
 		assert_ne!(theme.syntax, Theme::default().syntax);
@@ -541,8 +834,9 @@ mod tests {
 
 		let expected = Theme {
 			selection_bg: Color::Black,
+			scroll_thumb_fg: Color::Black,
 			line_break: "~".to_string(),
-			..Theme::default()
+			..Theme::classic()
 		};
 
 		let first = Theme::init(&path);
@@ -553,13 +847,14 @@ mod tests {
 	}
 
 	#[test]
-	fn t12a_bad_file_gives_default() {
+	fn t13b_bad_file_gives_classic() {
 		let mut file = NamedTempFile::new().unwrap();
 		writeln!(file, "not ron").unwrap();
 		let path = file.path().to_path_buf();
 
 		let theme = Theme::init(&path);
-		assert_theme_eq(&theme, &Theme::default());
+		assert_theme_eq(&theme, &Theme::classic());
+		assert_eq!(fs::read_to_string(&path).unwrap(), "not ron\n");
 	}
 
 	#[test]
@@ -598,14 +893,8 @@ mod tests {
 			.unwrap();
 
 		let partial = Theme::init(&partial_file.path().to_path_buf());
-		assert_eq!(
-			partial.block(true).fg,
-			Some(Color::Rgb(255, 176, 0))
-		);
-		assert_eq!(
-			partial.scroll_bar_track().fg,
-			Some(Color::Rgb(92, 58, 0))
-		);
+		assert_eq!(partial.block(true).fg, Some(Color::Reset));
+		assert_eq!(partial.scroll_bar_track().fg, Some(Color::Reset));
 	}
 
 	#[test]
@@ -627,7 +916,7 @@ mod tests {
 		let mut old_file = NamedTempFile::new().unwrap();
 		writeln!(old_file, r#"(selection_bg: "Black")"#).unwrap();
 		let old_loaded = Theme::init(&old_file.path().to_path_buf());
-		assert_eq!(old_loaded.popup().bg, Some(Color::Rgb(12, 8, 0)));
+		assert_eq!(old_loaded.popup().bg, Some(Color::Reset));
 	}
 
 	#[test]
@@ -654,7 +943,136 @@ mod tests {
 		let partial = Theme::init(&partial_file.path().to_path_buf());
 		assert_eq!(
 			partial.attention_block_style().fg,
-			Some(Color::Rgb(255, 85, 0))
+			Some(Color::Yellow)
 		);
+	}
+
+	#[test]
+	fn t13b_classic_matches_launch() {
+		// Values from impl Default for Theme at commit 389ae89b,
+		// plus the five fields added in Phase 12/13A.
+		let theme = Theme::classic();
+
+		assert_eq!(theme.selected_tab, Color::Reset);
+		assert_eq!(theme.command_fg, Color::White);
+		assert_eq!(theme.selection_bg, Color::Blue);
+		assert_eq!(theme.selection_fg, Color::White);
+		assert!(theme.use_selection_fg);
+		assert_eq!(theme.cmdbar_bg, Color::Blue);
+		assert_eq!(theme.disabled_fg, Color::DarkGray);
+		assert_eq!(theme.diff_line_add, Color::Green);
+		assert_eq!(theme.diff_line_delete, Color::Red);
+		assert_eq!(theme.diff_file_added, Color::LightGreen);
+		assert_eq!(theme.diff_file_removed, Color::LightRed);
+		assert_eq!(theme.diff_file_moved, Color::LightMagenta);
+		assert_eq!(theme.diff_file_modified, Color::Yellow);
+		assert_eq!(theme.commit_hash, Color::Magenta);
+		assert_eq!(theme.commit_time, Color::LightCyan);
+		assert_eq!(theme.commit_author, Color::Green);
+		assert_eq!(theme.danger_fg, Color::Red);
+		assert_eq!(theme.push_gauge_bg, Color::Blue);
+		assert_eq!(theme.push_gauge_fg, Color::Reset);
+		assert_eq!(theme.tag_fg, Color::LightMagenta);
+		assert_eq!(theme.branch_fg, Color::LightYellow);
+		assert_eq!(theme.line_break, "¶");
+		assert_eq!(theme.block_title_focused, Color::Reset);
+		assert_eq!(theme.border_focused_fg, Color::Reset);
+		assert_eq!(theme.scroll_track_fg, Color::Reset);
+		assert_eq!(theme.scroll_thumb_fg, Color::Blue);
+		assert_eq!(theme.panel_bg, Color::Reset);
+		assert_eq!(theme.attention_fg, Color::Yellow);
+		assert_eq!(theme.syntax, DEFAULT_SYNTAX_THEME);
+	}
+
+	#[test]
+	fn t13b_patch_without_base_is_classic() {
+		let mut sel_file = NamedTempFile::new().unwrap();
+		writeln!(sel_file, r#"(selection_bg: Some("LightBlue"))"#)
+			.unwrap();
+		let sel_theme = Theme::init(&sel_file.path().to_path_buf());
+		assert_theme_eq(
+			&sel_theme,
+			&Theme {
+				selection_bg: Color::LightBlue,
+				scroll_thumb_fg: Color::LightBlue,
+				..Theme::classic()
+			},
+		);
+
+		let mut empty_file = NamedTempFile::new().unwrap();
+		writeln!(empty_file, "()").unwrap();
+		let empty_theme =
+			Theme::init(&empty_file.path().to_path_buf());
+		assert_theme_eq(&empty_theme, &Theme::classic());
+	}
+
+	#[test]
+	fn t13b_patch_base_amber() {
+		let mut file = NamedTempFile::new().unwrap();
+		writeln!(
+			file,
+			r#"(base: Some("amber"), selection_bg: Some("Black"))"#
+		)
+		.unwrap();
+		let theme = Theme::init(&file.path().to_path_buf());
+		assert_theme_eq(
+			&theme,
+			&Theme {
+				selection_bg: Color::Black,
+				..Theme::default()
+			},
+		);
+	}
+
+	#[test]
+	fn t13b_patch_base_classic_and_unknown() {
+		let mut classic_file = NamedTempFile::new().unwrap();
+		writeln!(classic_file, r#"(base: Some("classic"))"#).unwrap();
+		let classic_theme =
+			Theme::init(&classic_file.path().to_path_buf());
+		assert_theme_eq(&classic_theme, &Theme::classic());
+
+		let mut unknown_file = NamedTempFile::new().unwrap();
+		writeln!(
+			unknown_file,
+			r#"(base: Some("neon"), tag_fg: Some("Red"))"#
+		)
+		.unwrap();
+		let unknown_theme =
+			Theme::init(&unknown_file.path().to_path_buf());
+		assert_theme_eq(
+			&unknown_theme,
+			&Theme {
+				tag_fg: Color::Red,
+				..Theme::classic()
+			},
+		);
+	}
+
+	#[test]
+	fn t13b_patch_thumb_wins() {
+		let mut file = NamedTempFile::new().unwrap();
+		writeln!(
+			file,
+			r#"(selection_bg: Some("LightBlue"), scroll_thumb_fg: Some("Cyan"))"#
+		)
+		.unwrap();
+		let theme = Theme::init(&file.path().to_path_buf());
+		assert_theme_eq(
+			&theme,
+			&Theme {
+				selection_bg: Color::LightBlue,
+				scroll_thumb_fg: Color::Cyan,
+				..Theme::classic()
+			},
+		);
+	}
+
+	#[test]
+	fn t13b_missing_file_is_amber() {
+		let dir = tempfile::tempdir().unwrap();
+		let missing = dir.path().join("does-not-exist.ron");
+		let theme = Theme::init(&missing);
+		assert_theme_eq(&theme, &Theme::default());
 	}
 }

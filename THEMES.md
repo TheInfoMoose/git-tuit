@@ -5,7 +5,7 @@ default on light terminal:
 
 ## Configuration
 
-To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Your `theme.ron` only needs the fields it changes (as of 0.23); old full-format theme files are automatically converted to the patch format on first load, with any omitted fields taking their default values.
+To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Your `theme.ron` only needs the fields it changes (as of 0.23). When a `theme.ron` file exists, any fields it leaves unset are filled from the classic gitui colors (`base: Some("classic")`, the default when `base` is omitted). To fill unset fields from the amber default theme instead, set `base: Some("amber")`. Old full-format theme files are automatically converted to the patch format on first load, with omitted fields taking their classic values. If `theme.ron` exists but cannot be read or parsed, gitui falls back to the classic theme.
 
 ## Default Theme
 
@@ -52,13 +52,23 @@ The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at 
 
 Alternatively, you can create a theme in the same directory mentioned above and use it with the `-t` flag followed by the name of the file in the directory. E.g. If you are on linux calling `gitui -t arc.ron`, this will load the theme in `$XDG_CONFIG_HOME/gitui/arc.ron` or `$HOME/.config/gitui/arc.ron`.
 
-Example theme override:
+Example theme override (fills unset fields from classic colors):
 
 ```ron
 (
+    base: Some("classic"),
     selection_bg: Some("Blue"),
     selection_fg: Some("#ffffff"),
     scroll_thumb_fg: Some("Cyan"),
+)
+```
+
+To override only a few colors on top of the amber default theme, set `base: Some("amber")`:
+
+```ron
+(
+    base: Some("amber"),
+    selection_bg: Some("Black"),
 )
 ```
 

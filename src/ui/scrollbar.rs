@@ -213,11 +213,7 @@ mod tests {
 		let overridden =
 			Rc::new(Theme::init(&override_file.path().to_path_buf()));
 		let buf = render_vertical_scrollbar(&overridden);
-		assert_scrollbar_colors(
-			&buf,
-			Color::Rgb(92, 58, 0),
-			Color::Cyan,
-		);
+		assert_scrollbar_colors(&buf, Color::Reset, Color::Cyan);
 
 		let mut selection_file = NamedTempFile::new().unwrap();
 		writeln!(selection_file, r#"(selection_bg: Some("Black"))"#)
@@ -226,10 +222,6 @@ mod tests {
 			&selection_file.path().to_path_buf(),
 		));
 		let buf = render_vertical_scrollbar(&selection_only);
-		assert_scrollbar_colors(
-			&buf,
-			Color::Rgb(92, 58, 0),
-			Color::Rgb(255, 216, 102),
-		);
+		assert_scrollbar_colors(&buf, Color::Reset, Color::Black);
 	}
 }
