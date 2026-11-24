@@ -647,6 +647,20 @@ status = "pending"
 severity = "low"
 created_at = "2026-11-24T18:58:55Z"
 
+[[items.bugs]]
+id = "BUG-0100"
+title = "Paint unselected tag labels on the canvas, not Reset"
+status = "pending"
+severity = "low"
+created_at = "2026-11-24T20:07:14Z"
+
+[[items.bugs]]
+id = "BUG-0101"
+title = "Say a theme file must not mix Some and bare colors"
+status = "pending"
+severity = "low"
+created_at = "2026-11-24T20:07:14Z"
+
 [[items.features]]
 id = "FEAT-0002"
 title = "Ship amber-on-black CRT default theme"
@@ -664,7 +678,7 @@ created_at = "2026-11-21T05:36:40Z"
 [[items.features]]
 id = "FEAT-0004"
 title = "Restyle tab bar and spinner chrome"
-status = "pending"
+status = "closed"
 severity = "low"
 created_at = "2026-11-21T05:36:40Z"
 

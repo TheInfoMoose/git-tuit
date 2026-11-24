@@ -2,11 +2,11 @@
 id = "FEAT-0004"
 type = "feature"
 title = "Restyle tab bar and spinner chrome"
-status = "pending"
+status = "closed"
 severity = "low"
 scope_ref = "git_tuit"
 created_at = "2026-11-21T05:36:40Z"
-updated_at = "2026-11-21T05:36:40Z"
+updated_at = "2026-11-24T20:11:17Z"
 
 [effort]
 logged_time_minutes = 0
@@ -14,4 +14,8 @@ iteration_count = 1
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-24"
+commit = "70610e7"
+summary = "Tab bar and spinner restyled: rule_fg dividers/rule, BOLD+UNDERLINED active tab (15E, 31ca70d1); spinner drawn in selected_tab on canvas_bg (15F, 70610e7a). Reviewed in Phase 15."
