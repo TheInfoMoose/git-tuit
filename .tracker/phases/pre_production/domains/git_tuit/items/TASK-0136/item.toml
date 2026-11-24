@@ -1,0 +1,19 @@
+schema_version = 2
+
+[item]
+id = "TASK-0136"
+type = "task"
+title = "Resolve clippy::ptr_arg on Theme::init(&PathBuf) in STEP 13C"
+status = "pending"
+severity = "high"
+scope_ref = "git_tuit"
+created_at = "2026-11-24T03:08:52Z"
+updated_at = "2026-11-24T03:08:52Z"
+
+[effort]
+logged_time_minutes = 0
+iteration_count = 1
+
+[history]
+recurrence_count = 0
+previous_fixes = []

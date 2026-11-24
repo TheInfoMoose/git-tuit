@@ -1329,7 +1329,7 @@ created_at = "2026-11-23T16:12:19Z"
 [[items.tasks]]
 id = "TASK-0134"
 title = "Amber Only on Truecolor Terminals"
-status = "open"
+status = "pending"
 severity = "medium"
 created_at = "2026-11-23T16:12:19Z"
 
@@ -1339,3 +1339,10 @@ title = "Update t13a_thumb_color_from_patch in src/ui/scrollbar.rs for STEP 13B 
 status = "pending"
 severity = "high"
 created_at = "2026-11-23T16:28:12Z"
+
+[[items.tasks]]
+id = "TASK-0136"
+title = "Resolve clippy::ptr_arg on Theme::init(&PathBuf) in STEP 13C"
+status = "pending"
+severity = "high"
+created_at = "2026-11-24T03:08:52Z"
