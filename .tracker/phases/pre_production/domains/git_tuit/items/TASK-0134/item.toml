@@ -4,11 +4,11 @@ schema_version = 2
 id = "TASK-0134"
 type = "task"
 title = "Amber Only on Truecolor Terminals"
-status = "pending"
+status = "open"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-23T16:12:19Z"
-updated_at = "2026-11-24T03:19:51Z"
+updated_at = "2026-11-24T03:23:20Z"
 source_ref = "STEP 13C"
 
 [effort]

@@ -6187,7 +6187,7 @@ Halt immediately after POST_GATE exits 0 and report verification status.
 ```
 
 ### STEP 13C: Amber Only on Truecolor Terminals
-* **Restaged:** 1
+* **Restaged:** 2
 
 * **Recommended Command:** `/goal`
 
@@ -6200,13 +6200,15 @@ ALLOWED_FILES:
   - src/ui/style.rs
   - THEMES.md
   - README.md
+  - src/ui/scrollbar.rs (only the `Theme::init(&....to_path_buf())` test call sites near lines 214, 221, and only if clippy flags them)
+  - src/components/diff.rs (only the `Theme::init(&....to_path_buf())` test call site near line 1031, and only if clippy flags it)
 READ_ONLY_REFS:
   - src/ui/style.rs:302-349 (load_patch, init and the 13B resolution), 389-end (tests, t13b_missing_file_is_amber)
   - src/main.rs:175, src/gitui.rs:249, 392 (Theme::init callers)
   - README.md:255-275, THEMES.md:1-20
-  - neb: BUG-0093. Decision D21
+  - neb: BUG-0093, TASK-0136. Decision D21
 FORBIDDEN_SCOPE:
-  - Any file not listed in ALLOWED_FILES. Theme::init keeps its signature. Resolution of an existing file (13B states a-e) ignores COLORTERM. No test calls std::env::set_var or remove_var. assets/ and CHANGELOG.md don't change.
+  - Any file not listed in ALLOWED_FILES. Theme::init takes `&Path` (see MUTATION_SPEC 1); src/main.rs and src/gitui.rs don't change. No `#[allow(clippy::ptr_arg)]`. Resolution of an existing file (13B states a-e) ignores COLORTERM. No test calls std::env::set_var or remove_var. assets/ and CHANGELOG.md don't change.
 
 [PRE_GATE]
 grep -q 'fn classic' src/ui/style.rs
@@ -6220,7 +6222,7 @@ Contract & Behavior:
 State changed: the missing-file result of Theme::init (13B state f). Its only writer is the new COLORTERM rule; the other states keep their 13B writers.
 
 1. src/ui/style.rs:
-   - `fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self` holds the resolution (crate lints deny pedantic and nursery, so no `&PathBuf` in a new signature); `pub fn init(theme_path: &PathBuf) -> Self` calls it with `std::env::var("COLORTERM").ok()` (a non-UTF-8 value counts as unset).
+   - `fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self` holds the resolution and `pub fn init(theme_path: &Path) -> Self` calls it with `std::env::var("COLORTERM").ok()` (a non-UTF-8 value counts as unset). Both take `&Path`, not `&PathBuf`: crate lints deny `clippy::ptr_arg`, which fires on a `&PathBuf` parameter that only delegates. Callers that pass `&PathBuf` (main.rs:175, gitui.rs:249 and 392, `&missing`, `&path`) still compile by deref coercion. If clippy's `unnecessary_to_owned` flags a test call written `Theme::init(&x.path().to_path_buf())`, change it to `Theme::init(x.path())` (style.rs, scrollbar.rs, diff.rs test sites only).
    - Missing file: if colorterm, trimmed, equals "truecolor" or "24bit" ignoring ASCII case -> Theme::default() (amber). Unset, empty or any other value ("256color", "yes") -> Theme::classic().
    - Existing file: exactly the 13B rules; colorterm is ignored, so base: Some("amber") gives amber on any terminal.
    Edge cases:
@@ -6232,7 +6234,7 @@ State changed: the missing-file result of Theme::init (13B state f). Its only wr
 3. THEMES.md (top, replacing "default on light terminal") and README.md (the theme section around line 267): the default is amber on terminals that set COLORTERM=truecolor or 24bit, and the classic gitui colors otherwise; an existing theme.ron fills from classic unless it sets base: Some("amber"); on a light-background truecolor terminal, put `(base: Some("classic"))` in theme.ron. assets/light-theme.png stays, captioned as the classic theme on a light terminal.
 
 Must still work:
-- src/main.rs startup (init signature unchanged).
+- src/main.rs startup (unchanged file; `&cliargs.theme` coerces to `&Path`).
 - gitui.rs snapshot tests under any COLORTERM (empty path -> missing file; snapshots carry symbols, not colors). The POST_GATE runs the gitui tests with COLORTERM=truecolor and with it unset.
 - Every 13B test that uses a real file.
 - dead_code: init_for is called by init.
