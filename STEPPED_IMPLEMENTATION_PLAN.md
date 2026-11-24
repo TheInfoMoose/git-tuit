@@ -295,14 +295,29 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 16 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks. (Frame paint, tab bar and spinner, P3-04, are in Phase 15.)
-  - Command bar layout and styling, with the `commandbar_key` and `commandbar_splitter` helpers (P3-05, P2-24, rest of P3-02)
-  - Pane and popup migrations, with `section_header` and `info_title` (P3-06, P3-07, rest of P3-02; ~5 steps)
-  - Snapshot updates + README note (P3-08)
+**Direction decisions (user, 2026-11-24, after the Phase 15 review):**
+- **D31 Order:** 16 stable gate + visible hint (routine), 17 theme parser redesign (risky), 18 chrome migrations, 19 snapshots + docs.
+- **D32 Parser:** one theme parser. Each field may be written `Some(x)` or bare `x`, mixed freely in one file (BUG-0101). New role keys each drive a group of fields; the existing per-field keys still load and win over a role.
+- **D33 No rewrite:** git-tuit never writes `theme.ron`. The old-format conversion (`save_patch`) is dropped; old-format files load as written.
+- **D34 Hint:** the "no base" hint (TASK-0140 visible half) shows as a dim command bar line, not only in the log.
+
+- **Phase 16 — Stable gate and a visible base hint (routine).** Goal: the base gate stops failing at random, and a user whose `theme.ron` has no base sees how to get amber without `--logging`.
+  - Done when: `t7j_focus_leaves_only_loaded_empty_diff` passes on every run without retries (BUG-0076); a base-less theme file shows a dim command bar hint naming `base: Some("amber")`; a file with a base, or no file, shows none (TASK-0140 closes).
+  - Steps: The Empty-Diff Focus Test Waits for Its Diff · The Base-Less Hint Shows in the Command Bar
+- **Phase 17 — One theme parser with role keys (risky).** Goal: every `theme.ron` that loads today still loads to the same colors, mixed `Some`/bare files load per field, and a short role list can theme the whole UI.
+  - Done when: one parser reads patch, old-format and mixed files (BUG-0101); upstream gitui `theme.ron` files load unchanged; role keys fill their fields and an explicit per-field key beats its role; no load path writes the file (D33); THEMES.md documents roles and the field each one drives.
+  - Steps: The Loader Reads Every Field Form · Old-Format Files Load Without a Rewrite · Role Keys Fill Their Fields · THEMES.md Lists the Roles
+  - Dropped behavior: the in-place conversion of old-format files to the patch format.
+- **Phase 18 — Amber CRT chrome.** Goal: every pane, popup and bar draws through the theme helpers and roles, with no `Reset` holes in the amber canvas.
+  - Done when: the command bar uses `commandbar_key`/`commandbar_splitter` and lays out on narrow terminals (P3-05, P2-24, FEAT-0005, BUG-0058); panes use the shared blocks with `section_header`/`info_title` (P3-06, TASK-0008); unselected tags paint the canvas, not `Reset` (BUG-0100); every `Clear` popup repaints `panel_bg` (P3-07, TASK-0009).
+  - Steps: The Command Bar Uses the Key and Splitter Styles · The Command Bar Fits Narrow Terminals · Panes Use the Shared Blocks (~3 steps) · Tags Paint the Canvas · Popups Repaint Their Panel (~2 steps)
+- **Phase 19 — Snapshots and docs.** Goal: snapshot tests and README match the amber default (P3-08, TASK-0010).
+  - Steps: Snapshots Match the Amber Chrome · README Shows the Default Theme
 
 ### Open Questions
 
-_None yet._
+- **Q1 (Phase 16, D34):** how does the command bar hint go away within a session: a key, the next keypress, or it stays until the file gets a base? Ask at `/phase-plan 16`.
+- **Q2 (Phase 17, D32):** the role list and which fields each role drives (e.g. canvas, panel, accent, muted, rule, alert, add, delete). Ask at `/phase-plan 17`.
 
 ### Parked
 
