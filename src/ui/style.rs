@@ -223,14 +223,21 @@ where
 	deserializer.deserialize_any(OptionalStringVisitor)
 }
 
-fn deserialize_present<'de, D>(
+#[derive(Default)]
+enum OldBaseField {
+	#[default]
+	Absent,
+	Present(Option<String>),
+}
+
+fn deserialize_old_base<'de, D>(
 	deserializer: D,
-) -> std::result::Result<bool, D::Error>
+) -> std::result::Result<OldBaseField, D::Error>
 where
 	D: Deserializer<'de>,
 {
-	let _ = serde::de::IgnoredAny::deserialize(deserializer)?;
-	Ok(true)
+	deserialize_optional_string(deserializer)
+		.map(OldBaseField::Present)
 }
 
 fn deserialize_some<'de, D, T>(
@@ -245,8 +252,8 @@ where
 
 #[derive(Deserialize)]
 struct OldThemeFile {
-	#[serde(default, deserialize_with = "deserialize_present")]
-	base: bool,
+	#[serde(default, deserialize_with = "deserialize_old_base")]
+	base: OldBaseField,
 	#[serde(default, deserialize_with = "deserialize_some")]
 	selected_tab: Option<Color>,
 	#[serde(default, deserialize_with = "deserialize_some")]
@@ -308,38 +315,41 @@ struct OldThemeFile {
 }
 
 impl OldThemeFile {
-	fn into_patch(self) -> ThemePatch {
-		ThemePatch {
-			selected_tab: self.selected_tab,
-			command_fg: self.command_fg,
-			selection_bg: self.selection_bg,
-			selection_fg: self.selection_fg,
-			use_selection_fg: self.use_selection_fg,
-			cmdbar_bg: self.cmdbar_bg,
-			disabled_fg: self.disabled_fg,
-			diff_line_add: self.diff_line_add,
-			diff_line_delete: self.diff_line_delete,
-			diff_file_added: self.diff_file_added,
-			diff_file_removed: self.diff_file_removed,
-			diff_file_moved: self.diff_file_moved,
-			diff_file_modified: self.diff_file_modified,
-			commit_hash: self.commit_hash,
-			commit_time: self.commit_time,
-			commit_author: self.commit_author,
-			danger_fg: self.danger_fg,
-			push_gauge_bg: self.push_gauge_bg,
-			push_gauge_fg: self.push_gauge_fg,
-			tag_fg: self.tag_fg,
-			branch_fg: self.branch_fg,
-			line_break: self.line_break,
-			block_title_focused: self.block_title_focused,
-			border_focused_fg: self.border_focused_fg,
-			scroll_track_fg: self.scroll_track_fg,
-			scroll_thumb_fg: self.scroll_thumb_fg,
-			panel_bg: self.panel_bg,
-			attention_fg: self.attention_fg,
-			syntax: self.syntax,
-		}
+	fn into_parts(self) -> (OldBaseField, ThemePatch) {
+		(
+			self.base,
+			ThemePatch {
+				selected_tab: self.selected_tab,
+				command_fg: self.command_fg,
+				selection_bg: self.selection_bg,
+				selection_fg: self.selection_fg,
+				use_selection_fg: self.use_selection_fg,
+				cmdbar_bg: self.cmdbar_bg,
+				disabled_fg: self.disabled_fg,
+				diff_line_add: self.diff_line_add,
+				diff_line_delete: self.diff_line_delete,
+				diff_file_added: self.diff_file_added,
+				diff_file_removed: self.diff_file_removed,
+				diff_file_moved: self.diff_file_moved,
+				diff_file_modified: self.diff_file_modified,
+				commit_hash: self.commit_hash,
+				commit_time: self.commit_time,
+				commit_author: self.commit_author,
+				danger_fg: self.danger_fg,
+				push_gauge_bg: self.push_gauge_bg,
+				push_gauge_fg: self.push_gauge_fg,
+				tag_fg: self.tag_fg,
+				branch_fg: self.branch_fg,
+				line_break: self.line_break,
+				block_title_focused: self.block_title_focused,
+				border_focused_fg: self.border_focused_fg,
+				scroll_track_fg: self.scroll_track_fg,
+				scroll_thumb_fg: self.scroll_thumb_fg,
+				panel_bg: self.panel_bg,
+				attention_fg: self.attention_fg,
+				syntax: self.syntax,
+			},
+		)
 	}
 }
 
@@ -661,6 +671,36 @@ impl Theme {
 		})
 	}
 
+	fn resolve_patch(
+		base: Option<&str>,
+		patch: ThemePatch,
+		theme_path: &Path,
+	) -> Self {
+		match base {
+			None => {
+				log::info!(
+					"theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some(\"amber\") to use the amber theme."
+				);
+				Self::apply_classic_patch(patch)
+			}
+			Some(name) => {
+				let trimmed = name.trim();
+				if trimmed.eq_ignore_ascii_case("amber") {
+					let mut theme = Self::default();
+					theme.apply(patch);
+					theme
+				} else if trimmed.eq_ignore_ascii_case("classic") {
+					Self::apply_classic_patch(patch)
+				} else {
+					log::warn!(
+						"unknown theme base {name:?} in {theme_path:?}; using classic"
+					);
+					Self::apply_classic_patch(patch)
+				}
+			}
+		}
+	}
+
 	fn init_for(theme_path: &Path, colorterm: Option<&str>) -> Self {
 		let content = match fs::read_to_string(theme_path) {
 			Ok(content) => content,
@@ -680,58 +720,56 @@ impl Theme {
 		match ron::de::from_str::<ThemePatchFile>(&content) {
 			Ok(patch_file) => {
 				let (base, patch) = patch_file.into_parts();
-				match base.as_deref() {
-					None => {
-						log::info!(
-							"theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some(\"amber\") to use the amber theme."
-						);
-						Self::apply_classic_patch(patch)
-					}
-					Some(name) => {
-						let trimmed = name.trim();
-						if trimmed.eq_ignore_ascii_case("amber") {
-							let mut theme = Self::default();
-							theme.apply(patch);
-							theme
-						} else if trimmed
-							.eq_ignore_ascii_case("classic")
-						{
-							Self::apply_classic_patch(patch)
-						} else {
-							log::warn!(
-								"unknown theme base {name:?} in {theme_path:?}; using classic"
-							);
-							Self::apply_classic_patch(patch)
-						}
-					}
-				}
+				Self::resolve_patch(
+					base.as_deref(),
+					patch,
+					theme_path,
+				)
 			}
 			Err(patch_err) => {
-				match ron::de::from_str::<OldThemeFile>(&content) {
-					Ok(old_theme) if !old_theme.base => {
-						let theme = Self::apply_classic_patch(
-							old_theme.into_patch(),
-						);
-
-						if theme.save_patch(theme_path).is_ok() {
-							log::info!(
-								"Converted old theme to new format. ({theme_path:?})"
+				ron::de::from_str::<OldThemeFile>(&content)
+					.map_or_else(
+						|_| {
+							log::error!(
+								"theme error [{theme_path:?}]: {patch_err}"
 							);
-						} else {
-							log::warn!(
-								"Failed to save theme in new format. ({theme_path:?})"
-							);
-						}
+							Self::classic()
+						},
+						|old_theme| {
+							let (base, patch) =
+								old_theme.into_parts();
+							match base {
+								OldBaseField::Present(base) => {
+									Self::resolve_patch(
+										base.as_deref(),
+										patch,
+										theme_path,
+									)
+								}
+								OldBaseField::Absent => {
+									let theme =
+										Self::apply_classic_patch(
+											patch,
+										);
 
-						theme
-					}
-					_ => {
-						log::error!(
-							"theme error [{theme_path:?}]: {patch_err}"
-						);
-						Self::classic()
-					}
-				}
+									if theme
+										.save_patch(theme_path)
+										.is_ok()
+									{
+										log::info!(
+											"Converted old theme to new format. ({theme_path:?})"
+										);
+									} else {
+										log::warn!(
+											"Failed to save theme in new format. ({theme_path:?})"
+										);
+									}
+
+									theme
+								}
+							}
+						},
+					)
 			}
 		}
 	}
@@ -1293,7 +1331,6 @@ mod tests {
 	#[test]
 	fn t14a_base_file_never_rewritten() {
 		for text in [
-			"(base: \"amber\", selection_bg: \"Black\")\n",
 			"(base: 5)\n",
 			"(base: Some(5), selection_bg: \"Black\")\n",
 		] {
@@ -1302,6 +1339,68 @@ mod tests {
 				file.write_all(text.as_bytes()).unwrap();
 				let theme = Theme::init_for(file.path(), colorterm);
 				assert_theme_eq(&theme, &Theme::classic());
+				assert_eq!(
+					fs::read_to_string(file.path()).unwrap(),
+					text
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn t15a_mixed_base_keeps_colors() {
+		let cases = [
+			(
+				"(base: \"amber\", selection_bg: \"Black\")\n",
+				Theme {
+					selection_bg: Color::Black,
+					..Theme::default()
+				},
+			),
+			(
+				"(base: Some(\"amber\"), selection_bg: \"Black\")\n",
+				Theme {
+					selection_bg: Color::Black,
+					..Theme::default()
+				},
+			),
+			(
+				"(base: \" AMBER \", tag_fg: \"Red\")\n",
+				Theme {
+					tag_fg: Color::Red,
+					..Theme::default()
+				},
+			),
+			(
+				"(base: \"classic\", selection_bg: \"Black\")\n",
+				Theme {
+					selection_bg: Color::Black,
+					scroll_thumb_fg: Color::Black,
+					..Theme::classic()
+				},
+			),
+			(
+				"(base: \"neon\", tag_fg: \"Red\")\n",
+				Theme {
+					tag_fg: Color::Red,
+					..Theme::classic()
+				},
+			),
+			(
+				"(base: None, tag_fg: \"Red\")\n",
+				Theme {
+					tag_fg: Color::Red,
+					..Theme::classic()
+				},
+			),
+		];
+
+		for (text, expected) in cases {
+			for colorterm in [Some("truecolor"), None] {
+				let mut file = NamedTempFile::new().unwrap();
+				file.write_all(text.as_bytes()).unwrap();
+				let theme = Theme::init_for(file.path(), colorterm);
+				assert_theme_eq(&theme, &expected);
 				assert_eq!(
 					fs::read_to_string(file.path()).unwrap(),
 					text
