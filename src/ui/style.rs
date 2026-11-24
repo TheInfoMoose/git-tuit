@@ -60,7 +60,10 @@ pub struct Theme {
 
 #[derive(Deserialize)]
 struct ThemePatchFile {
-	#[serde(default)]
+	#[serde(
+		default,
+		deserialize_with = "deserialize_optional_string"
+	)]
 	base: Option<String>,
 	#[serde(default)]
 	selected_tab: Option<Color>,
@@ -161,6 +164,75 @@ impl ThemePatchFile {
 	}
 }
 
+fn deserialize_optional_string<'de, D>(
+	deserializer: D,
+) -> std::result::Result<Option<String>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	struct OptionalStringVisitor;
+
+	impl<'de> serde::de::Visitor<'de> for OptionalStringVisitor {
+		type Value = Option<String>;
+
+		fn expecting(
+			&self,
+			formatter: &mut std::fmt::Formatter<'_>,
+		) -> std::fmt::Result {
+			formatter.write_str("a string, Some(string), or None")
+		}
+
+		fn visit_none<E>(self) -> std::result::Result<Self::Value, E>
+		where
+			E: serde::de::Error,
+		{
+			Ok(None)
+		}
+
+		fn visit_some<D>(
+			self,
+			deserializer: D,
+		) -> std::result::Result<Self::Value, D::Error>
+		where
+			D: Deserializer<'de>,
+		{
+			String::deserialize(deserializer).map(Some)
+		}
+
+		fn visit_str<E>(
+			self,
+			v: &str,
+		) -> std::result::Result<Self::Value, E>
+		where
+			E: serde::de::Error,
+		{
+			Ok(Some(v.to_owned()))
+		}
+
+		fn visit_string<E>(
+			self,
+			v: String,
+		) -> std::result::Result<Self::Value, E>
+		where
+			E: serde::de::Error,
+		{
+			Ok(Some(v))
+		}
+	}
+
+	deserializer.deserialize_any(OptionalStringVisitor)
+}
+
+fn deserialize_present<'de, D>(
+	deserializer: D,
+) -> std::result::Result<bool, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	let _ = serde::de::IgnoredAny::deserialize(deserializer)?;
+	Ok(true)
+}
+
 fn deserialize_some<'de, D, T>(
 	deserializer: D,
 ) -> std::result::Result<Option<T>, D::Error>
@@ -173,6 +245,8 @@ where
 
 #[derive(Deserialize)]
 struct OldThemeFile {
+	#[serde(default, deserialize_with = "deserialize_present")]
+	base: bool,
 	#[serde(default, deserialize_with = "deserialize_some")]
 	selected_tab: Option<Color>,
 	#[serde(default, deserialize_with = "deserialize_some")]
@@ -607,49 +681,52 @@ impl Theme {
 			Ok(patch_file) => {
 				let (base, patch) = patch_file.into_parts();
 				match base.as_deref() {
-					Some("amber") => {
-						let mut theme = Self::default();
-						theme.apply(patch);
-						theme
-					}
-					None | Some("classic") => {
-						Self::apply_classic_patch(patch)
-					}
-					Some(other) => {
-						log::warn!(
-							"unknown theme base {other:?} in {theme_path:?}; using classic"
-						);
-						Self::apply_classic_patch(patch)
+					None => Self::apply_classic_patch(patch),
+					Some(name) => {
+						let trimmed = name.trim();
+						if trimmed.eq_ignore_ascii_case("amber") {
+							let mut theme = Self::default();
+							theme.apply(patch);
+							theme
+						} else if trimmed
+							.eq_ignore_ascii_case("classic")
+						{
+							Self::apply_classic_patch(patch)
+						} else {
+							log::warn!(
+								"unknown theme base {name:?} in {theme_path:?}; using classic"
+							);
+							Self::apply_classic_patch(patch)
+						}
 					}
 				}
 			}
 			Err(patch_err) => {
-				ron::de::from_str::<OldThemeFile>(&content)
-					.map_or_else(
-						|_| {
-							log::error!(
-								"theme error [{theme_path:?}]: {patch_err}"
-							);
-							Self::classic()
-						},
-						|old_theme| {
-							let theme = Self::apply_classic_patch(
-								old_theme.into_patch(),
-							);
+				match ron::de::from_str::<OldThemeFile>(&content) {
+					Ok(old_theme) if !old_theme.base => {
+						let theme = Self::apply_classic_patch(
+							old_theme.into_patch(),
+						);
 
-							if theme.save_patch(theme_path).is_ok() {
-								log::info!(
-									"Converted old theme to new format. ({theme_path:?})"
-								);
-							} else {
-								log::warn!(
-									"Failed to save theme in new format. ({theme_path:?})"
-								);
-							}
+						if theme.save_patch(theme_path).is_ok() {
+							log::info!(
+								"Converted old theme to new format. ({theme_path:?})"
+							);
+						} else {
+							log::warn!(
+								"Failed to save theme in new format. ({theme_path:?})"
+							);
+						}
 
-							theme
-						},
-					)
+						theme
+					}
+					_ => {
+						log::error!(
+							"theme error [{theme_path:?}]: {patch_err}"
+						);
+						Self::classic()
+					}
+				}
 			}
 		}
 	}
@@ -1127,5 +1204,129 @@ mod tests {
 		let unreadable =
 			Theme::init_for(dir.path(), Some("truecolor"));
 		assert_theme_eq(&unreadable, &Theme::classic());
+	}
+
+	#[test]
+	fn t14a_bare_base_amber() {
+		let bare_text = "(base: \"amber\")\n";
+		let mut bare_file = NamedTempFile::new().unwrap();
+		bare_file.write_all(bare_text.as_bytes()).unwrap();
+		for colorterm in [Some("truecolor"), None] {
+			let theme = Theme::init_for(bare_file.path(), colorterm);
+			assert_theme_eq(&theme, &Theme::default());
+			assert_eq!(
+				fs::read_to_string(bare_file.path()).unwrap(),
+				bare_text
+			);
+		}
+
+		let patch_text =
+			"(base: \"amber\", selection_bg: Some(\"Black\"))\n";
+		let mut patch_file = NamedTempFile::new().unwrap();
+		patch_file.write_all(patch_text.as_bytes()).unwrap();
+		let expected = Theme {
+			selection_bg: Color::Black,
+			..Theme::default()
+		};
+		for colorterm in [Some("truecolor"), None] {
+			let theme = Theme::init_for(patch_file.path(), colorterm);
+			assert_theme_eq(&theme, &expected);
+			assert_eq!(
+				fs::read_to_string(patch_file.path()).unwrap(),
+				patch_text
+			);
+		}
+	}
+
+	#[test]
+	fn t14a_base_ignores_case() {
+		for text in [
+			r#"(base: Some("Amber"))"#,
+			r#"(base: Some(" AMBER "))"#,
+			r#"(base: "Amber")"#,
+		] {
+			let mut file = NamedTempFile::new().unwrap();
+			writeln!(file, "{text}").unwrap();
+			for colorterm in [Some("truecolor"), None] {
+				let theme = Theme::init_for(file.path(), colorterm);
+				assert_theme_eq(&theme, &Theme::default());
+			}
+		}
+
+		let mut classic_file = NamedTempFile::new().unwrap();
+		writeln!(
+			classic_file,
+			r#"(base: Some("CLASSIC"), tag_fg: Some("Red"))"#
+		)
+		.unwrap();
+		let expected_classic = Theme {
+			tag_fg: Color::Red,
+			..Theme::classic()
+		};
+		for colorterm in [Some("truecolor"), None] {
+			let theme =
+				Theme::init_for(classic_file.path(), colorterm);
+			assert_theme_eq(&theme, &expected_classic);
+		}
+
+		let mut unknown_file = NamedTempFile::new().unwrap();
+		writeln!(unknown_file, r#"(base: "neon")"#).unwrap();
+		for colorterm in [Some("truecolor"), None] {
+			let theme =
+				Theme::init_for(unknown_file.path(), colorterm);
+			assert_theme_eq(&theme, &Theme::classic());
+		}
+
+		let mut none_file = NamedTempFile::new().unwrap();
+		writeln!(none_file, "(base: None)").unwrap();
+		for colorterm in [Some("truecolor"), None] {
+			let theme = Theme::init_for(none_file.path(), colorterm);
+			assert_theme_eq(&theme, &Theme::classic());
+		}
+	}
+
+	#[test]
+	fn t14a_base_file_never_rewritten() {
+		for text in [
+			"(base: \"amber\", selection_bg: \"Black\")\n",
+			"(base: 5)\n",
+			"(base: Some(5), selection_bg: \"Black\")\n",
+		] {
+			for colorterm in [Some("truecolor"), None] {
+				let mut file = NamedTempFile::new().unwrap();
+				file.write_all(text.as_bytes()).unwrap();
+				let theme = Theme::init_for(file.path(), colorterm);
+				assert_theme_eq(&theme, &Theme::classic());
+				assert_eq!(
+					fs::read_to_string(file.path()).unwrap(),
+					text
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn t14a_old_format_with_base_text_converts() {
+		let original = "(selection_bg: \"Black\", syntax: \"base16-ocean.dark\", line_break: \"base\")\n";
+		let mut file = NamedTempFile::new().unwrap();
+		file.write_all(original.as_bytes()).unwrap();
+		let path = file.path().to_path_buf();
+
+		let expected = Theme {
+			selection_bg: Color::Black,
+			scroll_thumb_fg: Color::Black,
+			syntax: "base16-ocean.dark".to_string(),
+			line_break: "base".to_string(),
+			..Theme::classic()
+		};
+
+		let first = Theme::init_for(&path, Some("truecolor"));
+		assert_theme_eq(&first, &expected);
+
+		let rewritten = fs::read_to_string(&path).unwrap();
+		assert_ne!(rewritten, original);
+
+		let second = Theme::init_for(&path, None);
+		assert_theme_eq(&second, &expected);
 	}
 }
