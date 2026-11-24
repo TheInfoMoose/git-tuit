@@ -4,17 +4,22 @@ schema_version = 2
 id = "TASK-0144"
 type = "task"
 title = "The Frame Is Painted With the Canvas Color"
-status = "open"
+status = "closed"
 severity = "medium"
 scope_ref = "git_tuit"
 created_at = "2026-11-24T19:13:38Z"
-updated_at = "2026-11-24T19:13:38Z"
+updated_at = "2026-11-24T19:41:02Z"
 source_ref = "STEP 15D"
 
 [effort]
-logged_time_minutes = 0
+logged_time_minutes = 4
 iteration_count = 1
+last_timer_session = "TASK-0144@2026-11-24T19:36:38Z"
 
 [history]
 recurrence_count = 0
-previous_fixes = []
+
+[[history.previous_fixes]]
+date = "2026-11-24"
+commit = "09940160"
+summary = "STEP 15D: The Frame Is Painted With the Canvas Color (phased check PASS)"
