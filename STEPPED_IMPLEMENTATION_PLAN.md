@@ -42,7 +42,16 @@
 - **Neon** never commits, never edits this file, and never edits the forbidden paths. It files bugs and scope lapses as **pending** neb items.
 - **Two failures** on one step → the step is deferred. A step whose PRE_GATE then fails is deferred without running. Too many deferrals (`max(2, ⌈steps/3⌉)`) stop the phase early.
 
-**Phase goal (Phase 13):** existing `theme.ron` files render as they did before the amber default; with no theme file, amber is the default only on truecolor terminals and the classic gitui colors everywhere else; the scrollbar thumb is visible against its track; theme tests compare every field.
+**Phase goal (Phase 14):** a `theme.ron` that names a base is never rewritten; `base` is read case-insensitively, with or without `Some`; a theme file without a base says in the log how to get amber; THEMES.md and the changelog say the same.
+
+**Phase 14 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes the Phase 13 review findings BUG-0095, BUG-0097, BUG-0096 and TASK-0137. The chrome migrations move to the Phase 15 outline.
+
+**Phase 14 decisions (user, 2026-11-24):**
+- **D24 Scope:** the theme base fixes only; chrome stays in the outline.
+- **D25 Bare base:** `base: "amber"` (no `Some`) means the same as `base: Some("amber")`. Base names match trimmed and ASCII case-insensitively.
+- **D26 Base-less notice:** a theme file without a base logs one info line naming `base: Some("amber")`, and CHANGELOG Unreleased says base-less files now fill from classic.
+
+_Phase 13 goal (done, reviewed 2026-11-24):_ existing `theme.ron` files render as they did before the amber default; with no theme file, amber is the default only on truecolor terminals and the classic gitui colors everywhere else; the scrollbar thumb is visible against its track; theme tests compare every field.
 
 **Phase 13 format:** outcome steps v2 with the TASK-0091 rule and a Tests list per step. Takes the Phase 12 review findings BUG-0092, BUG-0093, BUG-0094 and TASK-0130. The chrome migrations (TASK-0008, TASK-0009, FEAT-0004, FEAT-0005, TASK-0010) move to the Phase 14 outline. "Classic" means the launch `Theme::default()` at `389ae89b` (the Phase 12 base), read with `git show 389ae89b:src/ui/style.rs`.
 
@@ -122,9 +131,8 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 
 | # | Step | Command | Scope | Target Files | Waits on |
 | :---: | :--- | :---: | :--- | :--- | :--- |
-| 1 | **STEP 13A** | `/goal` | The Scrollbar Thumb Has Its Own Color | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` | — |
-| 2 | **STEP 13B** | `/boost` | Existing Theme Files Keep Their Look | `src/ui/style.rs`, `THEMES.md` | STEP 13A |
-| 3 | **STEP 13C** | `/goal` | Amber Only on Truecolor Terminals | `src/ui/style.rs`, `THEMES.md`, `README.md` | STEP 13B |
+| 1 | **STEP 14A** | `/goal` | The Theme Base Is Read Leniently and Never Rewritten | `src/ui/style.rs` | — |
+| 2 | **STEP 14B** | `/goal` | Base-Less Theme Files Say How to Get Amber | `src/ui/style.rs`, `THEMES.md`, `CHANGELOG.md` | STEP 14A |
 
 ### Completed
 
@@ -235,6 +243,9 @@ _Phase 2 goal (done, reviewed 2026-11-21):_ the GitHub workflows are Linux-only 
 | **STEP 12C** | ✅ | `/goal` | Shared Plain Blocks With Padded Titles | `src/ui/mod.rs`, `src/ui/style.rs`, `src/ui/scrolllist.rs`, `src/components/mod.rs`, `src/popups/mod.rs` +3 |
 | **STEP 12D** | ✅ 3692ac08 | `/goal` | Attention Blocks Come From the Theme | `src/ui/mod.rs`, `src/ui/style.rs`, `src/tabs/status.rs`, `src/tabs/revlog.rs`, `THEMES.md` |
 | **STEP 12E** | ✅ a5936b4c | `/goal` | Discard Confirm Is Tested Through the App | `src/app.rs`, `src/popups/msg.rs` |
+| **STEP 13A** | ✅ | `/goal` | The Scrollbar Thumb Has Its Own Color | `src/ui/style.rs`, `src/ui/scrollbar.rs`, `THEMES.md` |
+| **STEP 13B** | ✅ | `/boost` | Existing Theme Files Keep Their Look (follow-ups BUG-0095, BUG-0097, TASK-0137 in 14A, 14B) | `src/ui/style.rs`, `THEMES.md` |
+| **STEP 13C** | ✅ a6fd16f9 | `/goal` | Amber Only on Truecolor Terminals (follow-up BUG-0096 in 14B) | `src/ui/style.rs`, `THEMES.md`, `README.md` |
 
 ### User Step: IMAGE
 
@@ -268,7 +279,7 @@ mkdir -p docs/baseline && cargo clippy --workspace --all-targets --keep-going --
 
 Outlines only (goal + step titles). Full step blocks are written at the phase review before each phase starts.
 
-- **Phase 14 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
+- **Phase 15 — Amber CRT chrome.** Goal: every pane, popup and bar uses the Phase 12 theme helpers and blocks.
   - Frame paint (`BG_BLACK`), tab bar, spinner (P3-04)
   - Command bar layout and styling, with the `commandbar_key` and `commandbar_splitter` helpers (P3-05, P2-24, rest of P3-02)
   - Pane and popup migrations, with `section_header` and `info_title` (P3-06, P3-07, rest of P3-02; ~5 steps)
@@ -6250,6 +6261,141 @@ Tests:
 
 [POST_GATE]
 cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && env COLORTERM=truecolor cargo test --locked -p gitui && env -u COLORTERM cargo test --locked -p gitui && grep -q 'fn init_for' src/ui/style.rs && grep -q 'fn t13c_missing_file_truecolor_is_amber' src/ui/style.rs && grep -q 'fn t13c_missing_file_no_truecolor_is_classic' src/ui/style.rs && grep -q 'fn t13c_file_ignores_colorterm' src/ui/style.rs && grep -q 'COLORTERM' THEMES.md && grep -q 'COLORTERM' README.md
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+---
+
+## Phase 14: Theme base fixes
+
+### STEP 14A: The Theme Base Is Read Leniently and Never Rewritten
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 14A: `base` in theme.ron is read with or without Some and ignoring case; a theme.ron that has a `base` key is never converted or rewritten as an old-format file.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+READ_ONLY_REFS:
+  - src/ui/style.rs:61-162 (ThemePatchFile, into_parts), 174-270 (OldThemeFile, deserialize_some), 553-660 (apply_classic_patch, save_patch, is_truecolor, init_for, init), 845-875 (t12a_partial_old_theme_loads, t13b_bad_file_gives_classic), 1001-1131 (t13b/t13c tests, assert_theme_eq use)
+  - neb: BUG-0095, BUG-0097. Decision D25
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. THEMES.md and CHANGELOG.md change in 14B, not here. The signatures of Theme::init and Theme::init_for. The missing-file COLORTERM rule (13C). save_patch's output format (it never writes a `base`). OldThemeFile must keep accepting unknown keys other than `base` (no `deny_unknown_fields`): old files with keys this fork doesn't know still convert. No test calls std::env::set_var or remove_var.
+
+[PRE_GATE]
+true
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: `(base: "amber")` and `(base: Some("Amber"))` both give the amber theme; a theme.ron with any `base` key is never rewritten by gitui.
+
+Contract & Behavior:
+State changed: (1) the Theme returned by init_for for an existing file; (2) the bytes of theme.ron on disk.
+Writers of (1): the patch branch (base amber / classic or absent / unknown), the old-format conversion branch, the both-failed branch (classic), the unreadable branch (classic), the missing-file branch (13C, unchanged).
+Writers of (2): exactly one, save_patch, called only from the old-format conversion branch. It now runs only when the file has no top-level `base` key.
+
+1. src/ui/style.rs, base value:
+   - `base` accepts a bare string (`base: "amber"`) and `Some("...")` with the same meaning; `base: None` and a missing key mean no base.
+   - The name is compared trimmed and ASCII case-insensitively: "amber" -> Theme::default() with the patch applied; "classic" -> the classic patch rules (apply_classic_patch, thumb follows selection_bg when unset); anything else (including "") -> the existing unknown-base warning, naming the value as written, and the classic patch rules.
+2. src/ui/style.rs, old-format guard:
+   - When the patch parse fails and the file's top-level struct has a `base` key (any value, any type), the file is not old-format: log the existing `theme error [{path:?}]: {patch_err}` line, return Theme::classic(), and leave the file byte-identical.
+   - "Top-level key" means a field of the outer `( ... )` struct. The text "base" inside a value (e.g. `syntax: "base16-eighties.dark"`, `line_break: "base"`) is not a `base` key.
+   - A file without a `base` key that fails the patch parse keeps today's behavior: old-format conversion (and rewrite) if it parses as OldThemeFile, else the error line and classic.
+   Edge cases:
+   a. `(base: "amber")` -> Theme::default(); file unchanged.
+   b. `(base: "amber", selection_bg: Some("Black"))` -> Theme { selection_bg: Black, ..Theme::default() }; file unchanged.
+   c. `(base: Some("Amber"))`, `(base: Some(" AMBER "))`, `(base: "Amber")` -> Theme::default().
+   d. `(base: Some("CLASSIC"), tag_fg: Some("Red"))` -> Theme { tag_fg: Red, ..Theme::classic() }.
+   e. `(base: "neon")` -> warning, Theme::classic().
+   f. `(base: None)` -> Theme::classic().
+   g. `(base: "amber", selection_bg: "Black")` (bare color fails the patch parse), `(base: 5)`, `(base: Some(5), selection_bg: "Black")` -> Theme::classic(); each file byte-identical.
+   h. `(selection_bg: "Black", syntax: "base16-ocean.dark", line_break: "base")` (old format, "base" only inside values) -> converted: Theme { selection_bg: Black, scroll_thumb_fg: Black, syntax: "base16-ocean.dark", line_break: "base", ..Theme::classic() }; the file is rewritten, and a second init_for on it gives the same theme.
+   i. Existing file results ignore colorterm (13C): every case above gives the same theme with Some("truecolor") and with None.
+
+Must still work:
+- Every t12*, t13b_* and t13c_* test and test_smoke, unchanged: base-less patches fill from classic, `Some("amber")`/`Some("classic")`/`Some("neon")` as in 13B, old-format conversion (t12a_partial_old_theme_loads, t12c_panel_bg_default_patch_and_old_format), "not ron" left unchanged (t13b_bad_file_gives_classic).
+- Theme::init callers (src/main.rs, src/gitui.rs, scrollbar.rs and diff.rs tests) compile unchanged.
+- dead_code is denied crate-wide: any new helper has a production caller.
+
+Drops: none
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile, loaded with Theme::init_for(path, Some("truecolor")) unless the case says otherwise, compared with assert_theme_eq; "unchanged" means fs::read_to_string after the call equals the text written.
+  - `t14a_bare_base_amber`: edge cases a and b -> expected themes; both files unchanged.
+  - `t14a_base_ignores_case`: edge cases c, d, e, f -> expected themes.
+  - `t14a_base_file_never_rewritten`: the three files in edge case g, with Some("truecolor") and with None -> Theme::classic() each time; every file unchanged.
+  - `t14a_old_format_with_base_text_converts`: edge case h -> expected theme; file text differs from what was written; second init_for gives the same theme.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t14a_bare_base_amber' src/ui/style.rs && grep -q 'fn t14a_base_ignores_case' src/ui/style.rs && grep -q 'fn t14a_base_file_never_rewritten' src/ui/style.rs && grep -q 'fn t14a_old_format_with_base_text_converts' src/ui/style.rs
+
+[HALT_INVARIANT]
+Halt immediately after POST_GATE exits 0 and report verification status.
+```
+
+### STEP 14B: Base-Less Theme Files Say How to Get Amber
+
+* **Recommended Command:** `/goal`
+
+```text
+[STEP_ID]
+STEP 14B: loading a theme.ron without a base logs one info line naming base: Some("amber"); THEMES.md leads with the classic-fill rule and the base rules from 14A; CHANGELOG Unreleased records the change.
+
+[SCOPE_LOCK]
+ALLOWED_FILES:
+  - src/ui/style.rs
+  - THEMES.md
+  - CHANGELOG.md
+READ_ONLY_REFS:
+  - src/ui/style.rs:590-660 (init_for after 14A)
+  - THEMES.md:1-80, CHANGELOG.md:8-22
+  - neb: TASK-0137, BUG-0096. Decision D26
+FORBIDDEN_SCOPE:
+  - Any file not listed in ALLOWED_FILES. The theme init_for returns for every file (14A and 13C results are unchanged). The notice never writes to theme.ron. No new log line for the missing-file, unreadable, parse-error or old-format-conversion branches. No other CHANGELOG section or release changes. README.md doesn't change.
+
+[PRE_GATE]
+grep -q 'fn t14a_bare_base_amber' src/ui/style.rs
+
+[MUTATION_SPEC]
+Outcome step (v2, TASK-0091 rule): each item is a required behavior with its edge cases. The implementation is the coder's choice (repo-rules, Outcome steps).
+
+Goal: a truecolor user whose partial theme.ron flipped to classic in 13B can find out why, and how to get amber back, from the log or the docs.
+
+Contract & Behavior:
+State changed: none (one log line; two docs). Writers of theme.ron stay exactly as 14A left them.
+
+1. src/ui/style.rs, in init_for: when the file is read, parses as a patch, and has no base (`base` key missing or `base: None`), log at info level exactly:
+   `theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some("amber") to use the amber theme.`
+   Once per init_for call, whatever colorterm says.
+   Edge cases (which states log it):
+   a. `(tag_fg: Some("Red"))`, `()`, `(base: None)`: logs the line.
+   b. `base` set to any value, known or unknown, bare or Some: no notice (an unknown base keeps its existing warning).
+   c. Missing file, unreadable file, patch-and-old-format parse failure, a file rejected by the 14A base guard: no notice.
+   d. Old-format conversion: no notice on the run that converts (it logs the existing conversion line); the converted, base-less file logs the notice on later loads like case a.
+   Testing note: the log line is not asserted by a test. `log` allows one process-wide logger and test_smoke already installs env_logger, so a capturing test logger would race it. POST_GATE greps the literal; Hydrogen checks in the diff that it sits only on the case-a branch.
+2. THEMES.md, Configuration section (line 10): the paragraph opens with: To change colors, add a `theme.ron` file with the fields you want to override. Unset fields are filled from the classic gitui colors unless the file sets `base: Some("amber")`. The current first sentence of that paragraph (the one BUG-0096 names) is removed. The paragraph also says: base names ignore case, `base: "amber"` works without `Some`, and a file that has a `base` key but doesn't parse falls back to classic and is left unchanged. Keep the rest of the paragraph's rules (old-format conversion, classic fallback on a bad file). The line-77 note ("wrap values in `Some`") says `base` is the one field that also takes a bare string.
+3. CHANGELOG.md, `## Unreleased` -> `### Changed`, appended as the last bullet:
+   `* a `theme.ron` without `base` now fills unset fields from the classic colors instead of amber; add `base: Some("amber")` to keep the amber theme`
+
+Must still work:
+- All 14A, 13B and 13C theme tests, unchanged.
+- The unknown-base warning and the `theme error` line keep their text.
+- THEMES.md line 6 (COLORTERM default rule), the palette table and both ron examples stay.
+
+Drops: none
+
+Tests:
+  In src/ui/style.rs `mod tests`, files via NamedTempFile, compared with assert_theme_eq.
+  - `t14b_baseless_file_untouched`: the three files in edge case a with Theme::init_for(path, Some("truecolor")) -> Theme { tag_fg: Red, ..Theme::classic() }, Theme::classic(), Theme::classic(); each file's text after the call equals what was written.
+
+[POST_GATE]
+cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --locked && grep -q 'fn t14b_baseless_file_untouched' src/ui/style.rs && grep -qF 'has no base; unset fields use the classic colors' src/ui/style.rs && grep -qF 'Unset fields are filled from the classic gitui colors unless' THEMES.md && ! grep -qF 'To change the colors of the default theme' THEMES.md && grep -qF 'without `base` now fills unset fields from the classic colors' CHANGELOG.md
 
 [HALT_INVARIANT]
 Halt immediately after POST_GATE exits 0 and report verification status.
