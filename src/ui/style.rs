@@ -19,6 +19,7 @@ const AMBER_BRIGHT: Color = Color::Rgb(255, 216, 102);
 const AMBER_DIM: Color = Color::Rgb(153, 99, 0);
 const AMBER_DARK: Color = Color::Rgb(92, 58, 0);
 const AMBER_ALERT: Color = Color::Rgb(255, 85, 0);
+const BG_BLACK: Color = Color::Rgb(0, 0, 0);
 const PANEL_BG: Color = Color::Rgb(12, 8, 0);
 const GREEN_ADD: Color = Color::Rgb(127, 217, 98);
 const SELECTION_BG: Color = Color::Rgb(42, 26, 0);
@@ -55,6 +56,7 @@ pub struct Theme {
 	scroll_thumb_fg: Color,
 	panel_bg: Color,
 	attention_fg: Color,
+	canvas_bg: Color,
 	syntax: String,
 }
 
@@ -122,6 +124,8 @@ struct ThemePatchFile {
 	#[serde(default)]
 	attention_fg: Option<Color>,
 	#[serde(default)]
+	canvas_bg: Option<Color>,
+	#[serde(default)]
 	syntax: Option<String>,
 }
 
@@ -158,6 +162,7 @@ impl ThemePatchFile {
 				scroll_thumb_fg: self.scroll_thumb_fg,
 				panel_bg: self.panel_bg,
 				attention_fg: self.attention_fg,
+				canvas_bg: self.canvas_bg,
 				syntax: self.syntax,
 			},
 		)
@@ -311,6 +316,8 @@ struct OldThemeFile {
 	#[serde(default, deserialize_with = "deserialize_some")]
 	attention_fg: Option<Color>,
 	#[serde(default, deserialize_with = "deserialize_some")]
+	canvas_bg: Option<Color>,
+	#[serde(default, deserialize_with = "deserialize_some")]
 	syntax: Option<String>,
 }
 
@@ -347,6 +354,7 @@ impl OldThemeFile {
 				scroll_thumb_fg: self.scroll_thumb_fg,
 				panel_bg: self.panel_bg,
 				attention_fg: self.attention_fg,
+				canvas_bg: self.canvas_bg,
 				syntax: self.syntax,
 			},
 		)
@@ -384,8 +392,13 @@ impl Theme {
 			scroll_thumb_fg: Color::Blue,
 			panel_bg: Color::Reset,
 			attention_fg: Color::Yellow,
+			canvas_bg: Color::Reset,
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
 		}
+	}
+
+	pub fn canvas(&self) -> Style {
+		Style::default().bg(self.canvas_bg)
 	}
 
 	pub fn popup(&self) -> Style {
@@ -824,6 +837,7 @@ impl Default for Theme {
 			scroll_thumb_fg: AMBER_BRIGHT,
 			panel_bg: PANEL_BG,
 			attention_fg: AMBER_ALERT,
+			canvas_bg: BG_BLACK,
 			// Available themes can be found in:
 			// [ThemeSet::load_defaults function](https://github.com/trishume/syntect/blob/7fe13c0fd53cdfa0f9fea1aa14c5ba37f81d8b71/src/dumps.rs#L215).
 			syntax: DEFAULT_SYNTAX_THEME.to_string(),
@@ -900,6 +914,7 @@ mod tests {
 			scroll_thumb_fg,
 			panel_bg,
 			attention_fg,
+			canvas_bg,
 			syntax,
 		} = actual;
 
@@ -934,6 +949,7 @@ mod tests {
 		assert_eq!(scroll_thumb_fg, &expected.scroll_thumb_fg);
 		assert_eq!(panel_bg, &expected.panel_bg);
 		assert_eq!(attention_fg, &expected.attention_fg);
+		assert_eq!(canvas_bg, &expected.canvas_bg);
 		assert_eq!(syntax, &expected.syntax);
 	}
 
@@ -1544,5 +1560,55 @@ mod tests {
 				);
 			}
 		}
+	}
+
+	#[test]
+	fn t15d_canvas_bg_from_theme() {
+		assert_eq!(Theme::default().canvas_bg, Color::Rgb(0, 0, 0));
+		assert_eq!(
+			Theme::default().canvas(),
+			Style::default().bg(Color::Rgb(0, 0, 0))
+		);
+		assert_eq!(Theme::classic().canvas_bg, Color::Reset);
+		assert_eq!(
+			Theme::classic().canvas(),
+			Style::default().bg(Color::Reset)
+		);
+
+		let mut patch_classic = NamedTempFile::new().unwrap();
+		writeln!(patch_classic, r#"(canvas_bg: Some("Black"))"#)
+			.unwrap();
+		assert_theme_eq(
+			&Theme::init_for(patch_classic.path(), None),
+			&Theme {
+				canvas_bg: Color::Black,
+				..Theme::classic()
+			},
+		);
+
+		let mut patch_amber = NamedTempFile::new().unwrap();
+		writeln!(
+			patch_amber,
+			r#"(base: "amber", canvas_bg: Some("Red"))"#
+		)
+		.unwrap();
+		assert_theme_eq(
+			&Theme::init_for(patch_amber.path(), None),
+			&Theme {
+				canvas_bg: Color::Red,
+				..Theme::default()
+			},
+		);
+
+		let mut old_format = NamedTempFile::new().unwrap();
+		writeln!(old_format, r#"(canvas_bg: "Black")"#).unwrap();
+		let expected_old = Theme {
+			canvas_bg: Color::Black,
+			..Theme::classic()
+		};
+		let first = Theme::init_for(old_format.path(), None);
+		assert_theme_eq(&first, &expected_old);
+		let second = Theme::init_for(old_format.path(), None);
+		assert_theme_eq(&second, &expected_old);
 	}
 }

@@ -258,6 +258,11 @@ impl App {
 	pub fn draw(&self, f: &mut Frame) -> Result<()> {
 		let fsize = f.area();
 
+		f.render_widget(
+			Block::default().style(self.theme.canvas()),
+			fsize,
+		);
+
 		self.cmdbar.borrow_mut().refresh_width(fsize.width);
 
 		let chunks_main = Layout::default()
@@ -1510,7 +1515,10 @@ mod tests {
 		);
 	}
 
-	fn make_test_app(repo_path: &Path) -> (App, KeyConfig) {
+	fn make_test_app_with_theme(
+		repo_path: &Path,
+		theme: Theme,
+	) -> (App, KeyConfig) {
 		let (tx_git, _rx_git) = crossbeam_channel::unbounded();
 		let (tx_app, _rx_app) = crossbeam_channel::unbounded();
 		let key_config = KeyConfig::default();
@@ -1526,11 +1534,15 @@ mod tests {
 			tx_git,
 			tx_app,
 			Input::new(),
-			Theme::default(),
+			theme,
 			key_config.clone(),
 		)
 		.unwrap();
 		(app, key_config)
+	}
+
+	fn make_test_app(repo_path: &Path) -> (App, KeyConfig) {
+		make_test_app_with_theme(repo_path, Theme::default())
 	}
 
 	macro_rules! send_key {
@@ -4179,5 +4191,39 @@ mod tests {
 			app.msg_popup.message(),
 			"checkout warning:\nswitched to 'target', but could not clear the merge state: `simulated cleanup_state failure`"
 		);
+	}
+
+	#[test]
+	fn t15d_frame_painted_with_canvas() {
+		use ratatui::{backend::TestBackend, style::Color, Terminal};
+
+		let (td, _repo) = git2_testing::repo_init();
+
+		for (theme, expected_bg) in [
+			(Theme::default(), Color::Rgb(0, 0, 0)),
+			(Theme::classic(), Color::Reset),
+		] {
+			let (app, _kc) =
+				make_test_app_with_theme(td.path(), theme);
+
+			let mut term =
+				Terminal::new(TestBackend::new(80, 24)).unwrap();
+			term.draw(|f| app.draw(f).unwrap()).unwrap();
+			let buf = term.backend().buffer();
+			assert_eq!(buf[(0, 0)].bg, expected_bg);
+			assert_eq!(buf[(79, 1)].bg, expected_bg);
+
+			term.backend_mut().resize(18, 12);
+			term.draw(|f| app.draw(f).unwrap()).unwrap();
+			let buf = term.backend().buffer();
+			assert_eq!(buf[(0, 0)].bg, expected_bg);
+			assert_eq!(buf[(17, 1)].bg, expected_bg);
+
+			term.backend_mut().resize(80, 24);
+			term.draw(|f| app.draw(f).unwrap()).unwrap();
+			let buf = term.backend().buffer();
+			assert_eq!(buf[(0, 0)].bg, expected_bg);
+			assert_eq!(buf[(79, 1)].bg, expected_bg);
+		}
 	}
 }

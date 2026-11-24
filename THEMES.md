@@ -43,6 +43,7 @@ The default theme uses an amber-on-black RGB palette:
 | `scroll_thumb_fg` | `#FFD866` |
 | `panel_bg` | `#0C0800` |
 | `attention_fg` | `#FF5500` |
+| `canvas_bg` | `#000000` |
 | `syntax` | `"base16-eighties.dark"` |
 
 The file uses the [Ron format](https://github.com/ron-rs/ron) and is located at one of the following paths, depending on your operating system:
