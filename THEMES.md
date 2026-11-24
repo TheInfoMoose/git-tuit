@@ -7,7 +7,7 @@ With no `theme.ron`, gitui uses the amber theme on terminals that set `COLORTERM
 
 ## Configuration
 
-To change the colors of the default theme you need to add a `theme.ron` file that contains the colors you want to override. Your `theme.ron` only needs the fields it changes (as of 0.23). When a `theme.ron` file exists, any fields it leaves unset are filled from the classic gitui colors (`base: Some("classic")`, the default when `base` is omitted). To fill unset fields from the amber default theme instead, set `base: Some("amber")`. Old full-format theme files are automatically converted to the patch format on first load, with omitted fields taking their classic values. If `theme.ron` exists but cannot be read or parsed, gitui falls back to the classic theme.
+To change colors, add a `theme.ron` file with the fields you want to override. Unset fields are filled from the classic gitui colors unless the file sets `base: Some("amber")`. Base names ignore case, and `base: "amber"` also works without `Some`. Old full-format theme files are automatically converted to the patch format on first load, with omitted fields taking their classic values. If `theme.ron` exists but cannot be read or parsed—including a file that has a `base` key but fails to parse—gitui falls back to the classic theme and leaves the file unchanged.
 
 ## Default Theme
 
@@ -74,7 +74,7 @@ To override only a few colors on top of the amber default theme, set `base: Some
 )
 ```
 
-Note that you need to wrap values in `Some` due to the way the overrides work (as of 0.23).
+Note that you need to wrap values in `Some` due to the way the overrides work (as of 0.23); `base` is the one field that also takes a bare string.
 
 Notes:
 

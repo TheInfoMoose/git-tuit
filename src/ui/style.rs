@@ -681,7 +681,12 @@ impl Theme {
 			Ok(patch_file) => {
 				let (base, patch) = patch_file.into_parts();
 				match base.as_deref() {
-					None => Self::apply_classic_patch(patch),
+					None => {
+						log::info!(
+							"theme {theme_path:?} has no base; unset fields use the classic colors. Add base: Some(\"amber\") to use the amber theme."
+						);
+						Self::apply_classic_patch(patch)
+					}
 					Some(name) => {
 						let trimmed = name.trim();
 						if trimmed.eq_ignore_ascii_case("amber") {
@@ -1328,5 +1333,32 @@ mod tests {
 
 		let second = Theme::init_for(&path, None);
 		assert_theme_eq(&second, &expected);
+	}
+
+	#[test]
+	fn t14b_baseless_file_untouched() {
+		let cases = [
+			(
+				"(tag_fg: Some(\"Red\"))\n",
+				Theme {
+					tag_fg: Color::Red,
+					..Theme::classic()
+				},
+			),
+			("()\n", Theme::classic()),
+			("(base: None)\n", Theme::classic()),
+		];
+
+		for (text, expected) in cases {
+			let mut file = NamedTempFile::new().unwrap();
+			file.write_all(text.as_bytes()).unwrap();
+			let theme =
+				Theme::init_for(file.path(), Some("truecolor"));
+			assert_theme_eq(&theme, &expected);
+			assert_eq!(
+				fs::read_to_string(file.path()).unwrap(),
+				text
+			);
+		}
 	}
 }

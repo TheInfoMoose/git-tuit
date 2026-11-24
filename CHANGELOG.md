@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * open the external editor from the status diff view [[@WaterWhisperer](https://github.com/WaterWhisperer)] ([#2805](https://github.com/gitui-org/gitui/issues/2805))
 * automatically convert spaces to dashes when creating or renaming a branch [[@pbouillon]](https//pbouillon.github.io)] ([#2916](https://github.com/gitui-org/gitui/pull/2916))
 * support rewording non-HEAD commits when `commit.gpgsign` is enabled (gpg format only) [[@guerinoni](https://github.com/guerinoni)] ([#2959](https://github.com/gitui-org/gitui/pull/2959))
+* a `theme.ron` without `base` now fills unset fields from the classic colors instead of amber; add `base: Some("amber")` to keep the amber theme
 
 ### Fixes
 * crash when opening submodule ([#2895](https://github.com/gitui-org/gitui/issues/2895))
